@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      # Note: the following folder layout matters:
+      # parent_dir:
+      #   - spilo-build
+      #   - Hydras
+      #   - citus
+      #   - spilo
+      - name: Checkout spilo-build
+        uses: actions/checkout@v2
+        with:
+          path: spilo-build
+      - name: Checkout Hydras
+        uses: actions/checkout@v2
+        with:
+          repository: HydrasCo/Hydras
+          token: ${{ secrets.GH_TOKEN }}
+          path: Hydras
+      - name: Checkout citus
+        uses: actions/checkout@v2
+        with:
+          repository: HydrasCo/citus
+          token: ${{ secrets.GH_TOKEN }}
+          path: citus
+      - name: Checkout spilo
+        uses: actions/checkout@v2
+        with:
+          repository: HydrasCo/spilo
+          token: ${{ secrets.GH_TOKEN }}
+          path: spilo
+      - name: Run build
+        run: |
+          cd ./Hydras && HYDRAS_SHA=$(git rev-parse --short HEAD) && cd ../
+          cd ./citus && COLUMNAR_SHA=$(git rev-parse --short HEAD) && cd ../
+          cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && cd ../
+
+          TAG=${SPILO_SHA}_${COLUMNAR_SHA}_${HYDRAS_SHA} 
+          echo "Building Hydras Spilo: TAG=${TAG} HYDRAS_SHA=${HYDRAS_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} SPILO_SHA=${SPILO_SHA}"
+          cd ./spilo-build
+          TAG=${TAG} SPILO_REPO=011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo make
