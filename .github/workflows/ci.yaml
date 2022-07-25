@@ -72,4 +72,5 @@ jobs:
           echo "Pushing Hydras Spilo: TAG=${TAG} SPILO_SHA=${SPILO_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} HYDRAS_SHA=${HYDRAS_SHA}"
           cd ./spilo-build
           TAG=${TAG} SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_push
+          # Push to latest
           TAG=latest SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_push
