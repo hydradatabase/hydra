@@ -5,8 +5,8 @@ on:
       - '*'
 
 jobs:
-  build:
-    name: Docker Build
+  docker_build_and_push:
+    name: Docker Build & Push
     runs-on: ubuntu-latest
     steps:
       # Note: the following folder layout matters:
@@ -37,13 +37,39 @@ jobs:
           repository: HydrasCo/spilo
           token: ${{ secrets.GH_TOKEN }}
           path: spilo
-      - name: Run build
+      - name: Set versions
         run: |
-          cd ./Hydras && HYDRAS_SHA=$(git rev-parse --short HEAD) && cd ../
-          cd ./citus && COLUMNAR_SHA=$(git rev-parse --short HEAD) && cd ../
-          cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && cd ../
-
-          TAG=${SPILO_SHA}_${COLUMNAR_SHA}_${HYDRAS_SHA} 
-          echo "Building Hydras Spilo: TAG=${TAG} HYDRAS_SHA=${HYDRAS_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} SPILO_SHA=${SPILO_SHA}"
+          cd ./Hydras && HYDRAS_SHA=$(git rev-parse --short HEAD) && echo "HYDRAS_SHA=${HYDRAS_SHA}" >> $GITHUB_ENV && cd ../
+          cd ./citus && COLUMNAR_SHA=$(git rev-parse --short HEAD) && echo "COLUMNAR_SHA=${COLUMNAR_SHA}" >> $GITHUB_ENV && cd ../
+          cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && echo "SPILO_SHA=${SPILO_SHA}" >> $GITHUB_ENV && cd ../
+          echo "TAG=${SPILO_SHA}_${COLUMNAR_SHA}_${HYDRAS_SHA}" >> $GITHUB_ENV
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+          mask-aws-account-id: no
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: "011789831835"
+      - name: Run docker_build
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPO: spilo
+        run: |
+          echo "Building Hydras Spilo: TAG=${TAG} SPILO_SHA=${SPILO_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} HYDRAS_SHA=${HYDRAS_SHA}"
           cd ./spilo-build
-          TAG=${TAG} SPILO_REPO=011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo make
+          TAG=${TAG} SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_build
+      - name: Run docker_push
+        if: github.ref == 'refs/heads/master'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPO: spilo
+        run: |
+          echo "Pushing Hydras Spilo: TAG=${TAG} SPILO_SHA=${SPILO_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} HYDRAS_SHA=${HYDRAS_SHA}"
+          cd ./spilo-build
+          TAG=${TAG} SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_push
+          TAG=latest SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_push
