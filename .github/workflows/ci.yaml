@@ -92,6 +92,13 @@ jobs:
             COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ^1.18
+      - name: Run acceptance tests
+        run: |
+          cd ./spilo-build
+          SPILO_IMAGE=${{ steps.login-ecr.outputs.registry }}/spilo:${TAG} make acceptance_test
       - name: Docker Push Spilo
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v3
