@@ -30,3 +30,7 @@ docker_build_hydra_ext:
 .PHONY: docker_build_columnar_ext
 docker_build_columnar_ext:
 	cd $(CURDIR)/../citus && docker build -t $(COLUMNAR_REPO):$(TAG) .
+
+.PHONY: acceptance_test
+acceptance_test:
+	go test ./... -count=1 -race -v
