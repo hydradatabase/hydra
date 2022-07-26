@@ -22,6 +22,8 @@ func Test_Columnar(t *testing.T) {
 			containerName,
 			"-e",
 			"PGVERSION=13",
+			"-e",
+			"SPILO_PROVIDER=local",
 			"-p",
 			"127.0.0.1:5432:5432",
 			flagSpiloImage,
