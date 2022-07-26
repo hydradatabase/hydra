@@ -39,7 +39,7 @@ func Test_Columnar(t *testing.T) {
 	)
 	defer cancel()
 
-	waitUntil(t, 5, func() error {
+	waitUntil(t, 8, func() error {
 		var err error
 		conn, err = pgx.Connect(ctx, "postgres://postgres:zalando@127.0.0.1:5432")
 		if err != nil {
