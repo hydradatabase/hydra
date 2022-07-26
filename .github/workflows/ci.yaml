@@ -9,6 +9,11 @@ jobs:
   docker_build_and_push:
     name: Docker Build & Push
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
       # Note: the following folder layout matters:
       # parent_dir:
@@ -56,22 +61,48 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
         with:
           registries: "011789831835"
-      - name: Run docker_build
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPO: spilo
-        run: |
-          echo "Building Hydras Spilo: TAG=${TAG} SPILO_SHA=${SPILO_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} HYDRAS_SHA=${HYDRAS_SHA}"
-          cd ./spilo-build
-          TAG=${TAG} SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_build
-      - name: Run docker_push
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver-opts: network=host
+      - name: Docker Build Hydra
+        uses: docker/build-push-action@v3
+        with:
+          context: ./Hydras
+          push: true
+          tags: localhost:5000/hydra/hydra:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Docker Build Columnar
+        uses: docker/build-push-action@v3
+        with:
+          context: ./citus
+          push: true
+          tags: localhost:5000/hydra/columnar:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Docker Build Spilo
+        uses: docker/build-push-action@v3
+        with:
+          context: ./spilo/postgres-appliance
+          push: false
+          tags: ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
+          build-args: |
+            HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
+            COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Docker Push Spilo
         if: github.ref == 'refs/heads/master'
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPO: spilo
-        run: |
-          echo "Pushing Hydras Spilo: TAG=${TAG} SPILO_SHA=${SPILO_SHA} COLUMNAR_SHA=${COLUMNAR_SHA} HYDRAS_SHA=${HYDRAS_SHA}"
-          cd ./spilo-build
-          TAG=${TAG} SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_push
-          # Push to latest
-          TAG=latest SPILO_REPO=${ECR_REGISTRY}/${ECR_REPO} make docker_push
+        uses: docker/build-push-action@v3
+        with:
+          context: ./spilo/postgres-appliance
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/spilo:master
+          build-args: |
+            HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
+            COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
