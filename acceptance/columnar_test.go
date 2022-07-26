@@ -13,23 +13,24 @@ import (
 func Test_Columnar(t *testing.T) {
 	containerName := fmt.Sprintf("spilo-%s", xid.New())
 
-	cmd := newCmd(
-		"docker",
-		"run",
-		"-d",
-		"--rm",
-		"--name",
-		containerName,
-		"-e",
-		"PGVERSION=13",
-		"-p",
-		"127.0.0.1:5432:5432",
-		flagSpiloImage,
-	)
-	log.Println(cmd.String())
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	go func() {
+		cmd := newCmd(
+			"docker",
+			"run",
+			"--rm",
+			"--name",
+			containerName,
+			"-e",
+			"PGVERSION=13",
+			"-p",
+			"127.0.0.1:5432:5432",
+			flagSpiloImage,
+		)
+		log.Println(cmd.String())
+		if err := cmd.Run(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	defer terminateContainer(containerName)
 
 	var (
