@@ -5,7 +5,7 @@ define clone_if_not_exist
 endef
 
 TAG ?= latest
-HYDR_REPO ?= hydra/hydra
+HYDRA_REPO ?= hydra/hydra
 COLUMNAR_REPO ?= hydra/columnar
 SPILO_REPO ?= hydra/spilo
 
@@ -15,7 +15,7 @@ docker_push: docker_build
 
 .PHONY: docker_build
 docker_build: clone_projects docker_build_hydra_ext docker_build_columnar_ext
-	cd $(CURDIR)/../spilo/postgres-appliance && docker build --build-arg HYDRA_EXT_REPO=$(HYDR_REPO):$(TAG) --build-arg COLUMNAR_EXT_REPO=$(COLUMNAR_REPO):$(TAG) -t $(SPILO_REPO):$(TAG) .
+	cd $(CURDIR)/../spilo/postgres-appliance && docker build --build-arg HYDRA_EXT_REPO=$(HYDRA_REPO):$(TAG) --build-arg COLUMNAR_EXT_REPO=$(COLUMNAR_REPO):$(TAG) -t $(SPILO_REPO):$(TAG) .
 
 .PHONY: clone_projects
 clone_projects:
@@ -25,8 +25,12 @@ clone_projects:
 
 .PHONY: docker_build_hydra_ext
 docker_build_hydra_ext:
-	cd $(CURDIR)/../Hydras && docker build -t $(HYDR_REPO):$(TAG) .
+	cd $(CURDIR)/../Hydras && docker build -t $(HYDRA_REPO):$(TAG) .
 
 .PHONY: docker_build_columnar_ext
 docker_build_columnar_ext:
 	cd $(CURDIR)/../citus && docker build -t $(COLUMNAR_REPO):$(TAG) .
+
+.PHONY: acceptance_test
+acceptance_test:
+	go test ./... -count=1 -race -v
