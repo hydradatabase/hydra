@@ -43,7 +43,7 @@ func terminateContainer(name string) error {
 	}
 
 	if containerID := string(b); containerID != "" {
-		stopCmd := newCmd("docker", "stop", strings.TrimSpace(containerID))
+		stopCmd := newCmd("docker", "stop", "-t", "1", strings.TrimSpace(containerID))
 		log.Println(stopCmd.String())
 		if err := stopCmd.Run(); err != nil {
 			return err
