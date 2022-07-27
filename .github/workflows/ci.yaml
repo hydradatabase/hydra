@@ -85,8 +85,9 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: ./spilo/postgres-appliance
-          push: false
-          tags: ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
+          push: true
+          tags: |
+            localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
           build-args: |
             HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
             COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
@@ -98,7 +99,7 @@ jobs:
       - name: Run acceptance tests
         run: |
           cd ./spilo-build
-          SPILO_IMAGE=${{ steps.login-ecr.outputs.registry }}/spilo:${TAG} make acceptance_test
+          SPILO_IMAGE=localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${TAG} make acceptance_test
       - name: Docker Push Spilo
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v3
@@ -107,7 +108,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
-            ${{ steps.login-ecr.outputs.registry }}/spilo:master
+            ${{ steps.login-ecr.outputs.registry }}/spilo:latest
           build-args: |
             HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
             COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
