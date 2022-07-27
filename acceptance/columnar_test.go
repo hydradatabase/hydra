@@ -30,16 +30,19 @@ func Test_Columnar(t *testing.T) {
 		)
 		log.Println(cmd.String())
 		if err := cmd.Run(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}()
-	defer terminateContainer(containerName)
+	defer func() {
+		if err := terminateContainer(containerName); err != nil {
+			log.Println(err)
+		}
+	}()
 
 	var (
-		ctx, cancel = context.WithCancel(context.Background())
-		conn        *pgx.Conn
+		ctx  = context.Background()
+		conn *pgx.Conn
 	)
-	defer cancel()
 
 	waitUntil(t, 8, func() error {
 		var err error
