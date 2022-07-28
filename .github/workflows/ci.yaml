@@ -91,6 +91,7 @@ jobs:
           build-args: |
             HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
             COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
+            TIMESCALEDB=
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: actions/setup-go@v2
