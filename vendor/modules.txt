@@ -25,6 +25,10 @@ github.com/jackc/pgtype
 ## explicit; go 1.13
 github.com/jackc/pgx/v4
 github.com/jackc/pgx/v4/internal/sanitize
+github.com/jackc/pgx/v4/pgxpool
+# github.com/jackc/puddle v1.2.1
+## explicit; go 1.12
+github.com/jackc/puddle
 # github.com/rs/xid v1.2.1
 ## explicit
 github.com/rs/xid
