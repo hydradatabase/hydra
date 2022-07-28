@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/rs/xid"
 )
 
@@ -41,27 +42,28 @@ func Test_Columnar(t *testing.T) {
 
 	var (
 		ctx  = context.Background()
-		conn *pgx.Conn
+		pool *pgxpool.Pool
 	)
 
 	waitUntil(t, 8, func() error {
 		var err error
-		conn, err = pgx.Connect(ctx, "postgres://postgres:zalando@127.0.0.1:5432")
+		pool, err = pgxpool.Connect(ctx, "postgres://postgres:zalando@127.0.0.1:5432")
 		if err != nil {
 			return err
 		}
 
 		return nil
 	})
-	defer conn.Close(ctx)
+	defer pool.Close()
 
-	if err := conn.Ping(ctx); err != nil {
+	if err := pool.Ping(ctx); err != nil {
 		t.Fatal(err)
 	}
 
 	cases := []struct {
-		Name string
-		SQL  string
+		Name     string
+		SQL      string
+		Validate func(t *testing.T, row pgx.Row)
 	}{
 		{
 			Name: "using a columnar table",
@@ -132,13 +134,35 @@ SELECT alter_columnar_table_set(
     stripe_row_limit => 10000);
 			`,
 		},
+		{
+			Name: "no timescaledb ext",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 0, count; want != got {
+					t.Fatalf("timescaledb ext should not exist")
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
-			if _, err := conn.Exec(ctx, c.SQL); err != nil {
-				t.Fatal(err)
+			v := c.Validate
+			if v == nil {
+				if _, err := pool.Exec(ctx, c.SQL); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				rows := pool.QueryRow(ctx, c.SQL)
+				v(t, rows)
 			}
 		})
 	}

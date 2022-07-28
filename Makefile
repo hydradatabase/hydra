@@ -15,7 +15,13 @@ docker_push: docker_build
 
 .PHONY: docker_build
 docker_build: clone_projects docker_build_hydra_ext docker_build_columnar_ext
-	cd $(CURDIR)/../spilo/postgres-appliance && docker build --build-arg HYDRA_EXT_REPO=$(HYDRA_REPO):$(TAG) --build-arg COLUMNAR_EXT_REPO=$(COLUMNAR_REPO):$(TAG) -t $(SPILO_REPO):$(TAG) .
+	cd $(CURDIR)/../spilo/postgres-appliance && \
+		docker build \
+		--build-arg HYDRA_EXT_REPO=$(HYDRA_REPO):$(TAG) \
+		--build-arg COLUMNAR_EXT_REPO=$(COLUMNAR_REPO):$(TAG) \
+		--build-arg TIMESCALEDB= \
+		-t $(SPILO_REPO):$(TAG) \
+		.
 
 .PHONY: clone_projects
 clone_projects:
