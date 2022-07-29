@@ -85,7 +85,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: ./spilo-build
-          file: Dockerfile.cloud
+          file: ./spilo-build/Dockerfile.cloud
           push: true
           tags: |
             localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
