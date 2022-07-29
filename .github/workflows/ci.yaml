@@ -17,14 +17,14 @@ jobs:
     steps:
       # Note: the following folder layout matters:
       # parent_dir:
-      #   - spilo-build
+      #   - hydra
       #   - Hydras
       #   - citus
-      #   - spilo
-      - name: Checkout spilo-build
+      #   - spilo-build
+      - name: Checkout hydra
         uses: actions/checkout@v2
         with:
-          path: spilo-build
+          path: hydra
       - name: Checkout Hydras
         uses: actions/checkout@v2
         with:
@@ -37,17 +37,17 @@ jobs:
           repository: HydrasCo/citus
           token: ${{ secrets.GH_TOKEN }}
           path: citus
-      - name: Checkout spilo
+      - name: Checkout spilo-build
         uses: actions/checkout@v2
         with:
-          repository: HydrasCo/spilo
+          repository: HydrasCo/spilo-build
           token: ${{ secrets.GH_TOKEN }}
-          path: spilo
+          path: spilo-build
       - name: Set versions
         run: |
           cd ./Hydras && HYDRAS_SHA=$(git rev-parse --short HEAD) && echo "HYDRAS_SHA=${HYDRAS_SHA}" >> $GITHUB_ENV && cd ../
           cd ./citus && COLUMNAR_SHA=$(git rev-parse --short HEAD) && echo "COLUMNAR_SHA=${COLUMNAR_SHA}" >> $GITHUB_ENV && cd ../
-          cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && echo "SPILO_SHA=${SPILO_SHA}" >> $GITHUB_ENV && cd ../
+          cd ./spilo-build && SPILO_SHA=$(git rev-parse --short HEAD) && echo "SPILO_SHA=${SPILO_SHA}" >> $GITHUB_ENV && cd ../
           echo "TAG=${SPILO_SHA}_${COLUMNAR_SHA}_${HYDRAS_SHA}" >> $GITHUB_ENV
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -84,7 +84,8 @@ jobs:
       - name: Docker Build Spilo
         uses: docker/build-push-action@v3
         with:
-          context: ./spilo/postgres-appliance
+          context: ./spilo-build
+          file: Dockerfile.cloud
           push: true
           tags: |
             localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
@@ -99,13 +100,13 @@ jobs:
           go-version: ^1.18
       - name: Run acceptance tests
         run: |
-          cd ./spilo-build
+          cd ./hydra
           SPILO_IMAGE=localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${TAG} make acceptance_test
-      - name: Docker Push Spilo
+      - name: Docker Push Hydra
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v3
         with:
-          context: ./spilo/postgres-appliance
+          context: ./hydra
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
