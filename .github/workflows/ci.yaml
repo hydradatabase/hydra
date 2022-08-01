@@ -103,7 +103,7 @@ jobs:
           tags: |
             localhost:5000/hydra/hydra-all:${{ env.TAG }}
           build-args: |
-            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra:${{ env.TAG }}
+            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra-extension:${{ env.TAG }}
             COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
             SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
           cache-from: type=gha
@@ -127,7 +127,7 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
             ${{ steps.login-ecr.outputs.registry }}/spilo:latest
           build-args: |
-            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra:${{ env.TAG }}
+            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra-extension:${{ env.TAG }}
             COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
             SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
           cache-from: type=gha
