@@ -11,12 +11,12 @@ COLUMNAR_EXT_REPO ?= ghcr.io/hydrasco/columnar_ext
 SPILO_REPO ?= ghcr.io/hydrasco/spilo
 HYDRA_REPO ?= ghcr.io/hydrasco/hydra
 
-.PHONY: docker_push
-docker_push: docker_build
+.PHONY: docker_push_all
+docker_push: docker_build_all
 	docker push $(HYDRA_REPO):$(TAG)
 
-.PHONY: docker_build
-docker_build: clone_projects docker_build_hydra_ext docker_build_columnar_ext docker_build_spilo
+.PHONY: docker_build_all
+docker_build_all: clone_projects docker_build_hydra_ext docker_build_columnar_ext docker_build_spilo
 	docker build \
 		$(DOCKER_OPTS) \
 		--build-arg HYDRA_EXT_IAMGE=$(HYDRA_EXT_REPO):$(TAG) \
