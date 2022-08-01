@@ -10,10 +10,24 @@ HYDRA_EXT_REPO ?= ghcr.io/hydrasco/hydra_ext
 COLUMNAR_EXT_REPO ?= ghcr.io/hydrasco/columnar_ext
 SPILO_REPO ?= ghcr.io/hydrasco/spilo
 HYDRA_REPO ?= ghcr.io/hydrasco/hydra
+HYDRA_ALL_REPO ?= ghcr.io/hydrasco/hydra-all
+
+.PHONY: docker_push
+docker_push: docker_build
+	docker push $(HYDRA_REPO):$(TAG)
+
+.PHONY: docker_build
+docker_build: clone_projects docker_build_columnar_ext docker_build_spilo
+	docker build \
+		$(DOCKER_OPTS) \
+		--build-arg COLUMNAR_EXT_IMAGE=$(COLUMNAR_EXT_REPO):$(TAG) \
+		--build-arg SPILO_IMAGE=$(SPILO_REPO):$(TAG) \
+		-t $(HYDRA_REPO):$(TAG) \
+		.
 
 .PHONY: docker_push_all
-docker_push: docker_build_all
-	docker push $(HYDRA_REPO):$(TAG)
+docker_push_all: docker_build_all
+	docker push $(HYDRA_ALL_REPO):$(TAG)
 
 .PHONY: docker_build_all
 docker_build_all: clone_projects docker_build_hydra_ext docker_build_columnar_ext docker_build_spilo
@@ -23,7 +37,7 @@ docker_build_all: clone_projects docker_build_hydra_ext docker_build_columnar_ex
 		--build-arg COLUMNAR_EXT_IMAGE=$(COLUMNAR_EXT_REPO):$(TAG) \
 		--build-arg SPILO_IMAGE=$(SPILO_REPO):$(TAG) \
 		-f Dockerfile.all \
-		-t $(HYDRA_REPO):$(TAG) \
+		-t $(HYDRA_ALL_REPO):$(TAG) \
 		.
 
 .PHONY: clone_projects

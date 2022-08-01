@@ -74,7 +74,7 @@ jobs:
           tags: localhost:5000/hydra/hydra-extension:${{ env.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Docker Build Columnar
+      - name: Docker Build Columnar Extension
         uses: docker/build-push-action@v3
         with:
           context: ./citus
@@ -94,6 +94,19 @@ jobs:
             TIMESCALEDB=
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Docker Build Hydra
+        uses: docker/build-push-action@v3
+        with:
+          context: ./hydra
+          file: ./hydra/Dockerfile
+          push: true
+          tags: |
+            localhost:5000/hydra/hydra:${{ env.TAG }}
+          build-args: |
+            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
+            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Docker Build Hydra All
         uses: docker/build-push-action@v3
         with:
@@ -111,11 +124,11 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: ^1.18
-      - name: Run acceptance tests
+      - name: Run Acceptance Tests
         run: |
           cd ./hydra
-          HYDRA_IMAGE=localhost:5000/hydra/hydra-all:${TAG} make acceptance_test
-      - name: Docker Push Hydra
+          HYDRA_IMAGE=localhost:5000/hydra/hydra-all:${TAG} HYDRA_ALL_IMAGE=localhost:5000/hydra/hydra-all:${TAG} make acceptance_test
+      - name: Docker Push Hydra All
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v3
         with:

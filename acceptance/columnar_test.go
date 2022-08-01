@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v4"
@@ -11,8 +13,17 @@ import (
 	"github.com/rs/xid"
 )
 
-func Test_Columnar(t *testing.T) {
-	containerName := fmt.Sprintf("spilo-%s", xid.New())
+func Test_Hydra(t *testing.T) {
+	for _, image := range []string{flagHydraImage, flagHydraAllImage} {
+		image := image
+		t.Run(filepath.Base(image), func(t *testing.T) {
+			testHydra(t, image)
+		})
+	}
+}
+
+func testHydra(t *testing.T, image string) {
+	containerName := fmt.Sprintf("hydra-%s", xid.New())
 
 	go func() {
 		cmd := newCmd(
@@ -22,12 +33,10 @@ func Test_Columnar(t *testing.T) {
 			"--name",
 			containerName,
 			"-e",
-			"PGVERSION=13",
-			"-e",
 			"SPILO_PROVIDER=local",
 			"-p",
 			"127.0.0.1:5432:5432",
-			flagHydraImage,
+			image,
 		)
 		log.Println(cmd.String())
 		if err := cmd.Run(); err != nil {
@@ -60,11 +69,45 @@ func Test_Columnar(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cases := []struct {
+	type Case struct {
 		Name     string
 		SQL      string
 		Validate func(t *testing.T, row pgx.Row)
-	}{
+	}
+
+	cases := []Case{
+		{
+			Name: "columnar ext",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'citus_columnar';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, count; want != got {
+					t.Fatalf("columnar ext should exist")
+				}
+			},
+		},
+		{
+			Name: "no timescaledb ext",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 0, count; want != got {
+					t.Fatalf("timescaledb ext should not exist")
+				}
+			},
+		},
 		{
 			Name: "using a columnar table",
 			SQL: `
@@ -134,10 +177,30 @@ SELECT alter_columnar_table_set(
     stripe_row_limit => 10000);
 			`,
 		},
-		{
-			Name: "no timescaledb ext",
+	}
+
+	if strings.Contains(image, "hydra-all") {
+		cases = append(cases, Case{
+			Name: "hydra ext",
 			SQL: `
-SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
+SELECT count(1) FROM pg_available_extensions WHERE name = 'hydra';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, count; want != got {
+					t.Fatalf("hydra ext should exist")
+				}
+			},
+		})
+	} else {
+		cases = append(cases, Case{
+			Name: "no hydra ext",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'hydra';
 			`,
 			Validate: func(t *testing.T, row pgx.Row) {
 				var count int
@@ -146,10 +209,11 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 				}
 
 				if want, got := 0, count; want != got {
-					t.Fatalf("timescaledb ext should not exist")
+					t.Fatalf("hydra ext should not exist")
 				}
 			},
-		},
+		})
+
 	}
 
 	for _, c := range cases {
