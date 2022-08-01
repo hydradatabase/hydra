@@ -27,7 +27,7 @@ func Test_Columnar(t *testing.T) {
 			"SPILO_PROVIDER=local",
 			"-p",
 			"127.0.0.1:5432:5432",
-			flagSpiloImage,
+			flagHydraImage,
 		)
 		log.Println(cmd.String())
 		if err := cmd.Run(); err != nil {
