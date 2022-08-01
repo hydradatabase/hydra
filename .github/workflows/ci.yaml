@@ -50,18 +50,8 @@ jobs:
           cd ./citus && COLUMNAR_EXT_SHA=$(git rev-parse --short HEAD) && echo "COLUMNAR_EXT_SHA=${COLUMNAR_EXT_SHA}" >> $GITHUB_ENV && cd ../
           cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && echo "SPILO_SHA=${SPILO_SHA}" >> $GITHUB_ENV && cd ../
           echo "TAG=${SPILO_SHA}_${COLUMNAR_EXT_SHA}_${HYDRA_EXT_SHA}" >> $GITHUB_ENV
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: us-east-1
-          mask-aws-account-id: no
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          registries: "011789831835"
+
+      # Docker build
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
@@ -121,13 +111,60 @@ jobs:
             SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Acceptance tests
       - uses: actions/setup-go@v2
         with:
           go-version: ^1.18
       - name: Run Acceptance Tests
         run: |
           cd ./hydra
-          HYDRA_IMAGE=localhost:5000/hydra/hydra-all:${TAG} HYDRA_ALL_IMAGE=localhost:5000/hydra/hydra-all:${TAG} make acceptance_test
+          HYDRA_IMAGE=localhost:5000/hydra/hydra:${TAG} HYDRA_ALL_IMAGE=localhost:5000/hydra/hydra-all:${TAG} make acceptance_test
+
+      # Docker push hydra
+      - name: Login to ghcr.io
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v2.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker Push Hydra
+        if: github.ref == 'refs/heads/master'
+        uses: docker/build-push-action@v3
+        with:
+          context: ./hydra
+          file: ./hydra/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/hydrasco/hydra:${{ env.TAG }}
+            ghcr.io/hydrasco/hydra:latest
+          build-args: |
+            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
+            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
+          labels:
+            maintainer=HydrasCo
+            org.opencontainers.image.title=hydra
+            org.opencontainers.image.source=https://github.com/HydrasCo/hydra
+            org.opencontainers.image.vendor=HydrasCo
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Docker push hydra-all
+      - name: Configure AWS credentials
+        if: github.ref == 'refs/heads/master'
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+          mask-aws-account-id: no
+      - name: Login to Amazon ECR
+        if: github.ref == 'refs/heads/master'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: "011789831835"
       - name: Docker Push Hydra All
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v3
