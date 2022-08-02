@@ -1,0 +1,14 @@
+ARG HYDRA_EXT_IMAGE
+ARG COLUMNAR_EXT_IMAGE
+ARG SPILO_IMAGE
+
+FROM $HYDRA_EXT_IMAGE as hydra-ext
+FROM $COLUMNAR_EXT_IMAGE as columnar-ext
+
+FROM $SPILO_IMAGE
+
+COPY --from=hydra-ext /pg_ext /
+COPY --from=columnar-ext /pg_ext /
+COPY files/all/postgres-appliance/scripts /scripts/
+
+ENV PGVERSION=13

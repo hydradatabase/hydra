@@ -17,20 +17,20 @@ jobs:
     steps:
       # Note: the following folder layout matters:
       # parent_dir:
-      #   - spilo-build
+      #   - hydra
       #   - Hydras
       #   - citus
       #   - spilo
-      - name: Checkout spilo-build
+      - name: Checkout hydra
         uses: actions/checkout@v2
         with:
-          path: spilo-build
-      - name: Checkout Hydras
+          path: hydra
+      - name: Checkout hydra-extension
         uses: actions/checkout@v2
         with:
-          repository: HydrasCo/Hydras
+          repository: HydrasCo/hydra-extension
           token: ${{ secrets.GH_TOKEN }}
-          path: Hydras
+          path: hydra-extension
       - name: Checkout citus
         uses: actions/checkout@v2
         with:
@@ -40,40 +40,31 @@ jobs:
       - name: Checkout spilo
         uses: actions/checkout@v2
         with:
-          repository: HydrasCo/spilo
+          repository: zalando/spilo
           token: ${{ secrets.GH_TOKEN }}
+          ref: 2.1-p6
           path: spilo
       - name: Set versions
         run: |
-          cd ./Hydras && HYDRAS_SHA=$(git rev-parse --short HEAD) && echo "HYDRAS_SHA=${HYDRAS_SHA}" >> $GITHUB_ENV && cd ../
-          cd ./citus && COLUMNAR_SHA=$(git rev-parse --short HEAD) && echo "COLUMNAR_SHA=${COLUMNAR_SHA}" >> $GITHUB_ENV && cd ../
+          cd ./hydra-extension && HYDRA_EXT_SHA=$(git rev-parse --short HEAD) && echo "HYDRA_EXT_SHA=${HYDRA_EXT_SHA}" >> $GITHUB_ENV && cd ../
+          cd ./citus && COLUMNAR_EXT_SHA=$(git rev-parse --short HEAD) && echo "COLUMNAR_EXT_SHA=${COLUMNAR_EXT_SHA}" >> $GITHUB_ENV && cd ../
           cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && echo "SPILO_SHA=${SPILO_SHA}" >> $GITHUB_ENV && cd ../
-          echo "TAG=${SPILO_SHA}_${COLUMNAR_SHA}_${HYDRAS_SHA}" >> $GITHUB_ENV
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: us-east-1
-          mask-aws-account-id: no
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          registries: "011789831835"
+          echo "TAG=${SPILO_SHA}_${COLUMNAR_EXT_SHA}_${HYDRA_EXT_SHA}" >> $GITHUB_ENV
+
+      # Docker build
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
           driver-opts: network=host
-      - name: Docker Build Hydra
+      - name: Docker Build Hydra Extension
         uses: docker/build-push-action@v3
         with:
-          context: ./Hydras
+          context: ./hydra-extension
           push: true
-          tags: localhost:5000/hydra/hydra:${{ env.TAG }}
+          tags: localhost:5000/hydra/hydra-extension:${{ env.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Docker Build Columnar
+      - name: Docker Build Columnar Extension
         uses: docker/build-push-action@v3
         with:
           context: ./citus
@@ -85,33 +76,109 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: ./spilo/postgres-appliance
+          file: ./spilo/postgres-appliance/Dockerfile
           push: true
           tags: |
-            localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
+            localhost:5000/hydra/spilo:${{ env.TAG }}
           build-args: |
-            HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
-            COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
             TIMESCALEDB=
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Docker Build Hydra
+        uses: docker/build-push-action@v3
+        with:
+          context: ./hydra
+          file: ./hydra/Dockerfile
+          push: true
+          tags: |
+            localhost:5000/hydra/hydra:${{ env.TAG }}
+          build-args: |
+            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
+            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Docker Build Hydra All
+        uses: docker/build-push-action@v3
+        with:
+          context: ./hydra
+          file: ./hydra/Dockerfile.all
+          push: true
+          tags: |
+            localhost:5000/hydra/hydra-all:${{ env.TAG }}
+          build-args: |
+            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra-extension:${{ env.TAG }}
+            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
+            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Acceptance tests
       - uses: actions/setup-go@v2
         with:
           go-version: ^1.18
-      - name: Run acceptance tests
+      - name: Run Acceptance Tests
         run: |
-          cd ./spilo-build
-          SPILO_IMAGE=localhost:5000/${{ steps.login-ecr.outputs.registry }}/spilo:${TAG} make acceptance_test
-      - name: Docker Push Spilo
+          cd ./hydra
+          HYDRA_IMAGE=localhost:5000/hydra/hydra:${TAG} HYDRA_ALL_IMAGE=localhost:5000/hydra/hydra-all:${TAG} make acceptance_test
+
+      # Docker push hydra
+      - name: Login to ghcr.io
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v2.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker Push Hydra
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v3
         with:
-          context: ./spilo/postgres-appliance
+          context: ./hydra
+          file: ./hydra/Dockerfile
           push: true
           tags: |
+            ghcr.io/hydrasco/hydra:${{ env.TAG }}
+            ghcr.io/hydrasco/hydra:latest
+          build-args: |
+            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
+            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
+          labels:
+            maintainer=HydrasCo
+            org.opencontainers.image.title=hydra
+            org.opencontainers.image.source=https://github.com/HydrasCo/hydra
+            org.opencontainers.image.vendor=HydrasCo
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Docker push hydra-all
+      - name: Configure AWS credentials
+        if: github.ref == 'refs/heads/master'
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+          mask-aws-account-id: no
+      - name: Login to Amazon ECR
+        if: github.ref == 'refs/heads/master'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: "011789831835"
+      - name: Docker Push Hydra All
+        if: github.ref == 'refs/heads/master'
+        uses: docker/build-push-action@v3
+        with:
+          context: ./hydra
+          file: ./hydra/Dockerfile.all
+          push: true
+          tags: |
+            # TODO: create ECR repo to HOST/hydra and change the refs here
             ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
             ${{ steps.login-ecr.outputs.registry }}/spilo:latest
           build-args: |
-            HYDRA_EXT_REPO=localhost:5000/hydra/hydra:${{ env.TAG }}
-            COLUMNAR_EXT_REPO=localhost:5000/hydra/columnar:${{ env.TAG }}
+            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra-extension:${{ env.TAG }}
+            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
+            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
