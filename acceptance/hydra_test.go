@@ -53,8 +53,6 @@ func testHydra(t *testing.T, c Container) {
 			"--rm",
 			"--name",
 			containerName,
-			"-e",
-			"SPILO_PROVIDER=local",
 			"-p",
 			fmt.Sprintf("127.0.0.1:%d:5432", c.Port),
 			c.Image,
@@ -80,7 +78,7 @@ func testHydra(t *testing.T, c Container) {
 
 	waitUntil(t, 8, func() error {
 		var err error
-		pool, err = pgxpool.Connect(ctx, fmt.Sprintf("postgres://postgres:zalando@127.0.0.1:%d", c.Port))
+		pool, err = pgxpool.Connect(ctx, fmt.Sprintf("postgres://postgres:hydra@127.0.0.1:%d", c.Port))
 		if err != nil {
 			return err
 		}
