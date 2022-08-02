@@ -9,6 +9,9 @@ jobs:
   docker_build_and_push:
     name: Docker Build & Push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     services:
       registry:
         image: registry:2
