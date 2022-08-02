@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -35,6 +36,8 @@ func Test_Hydra(t *testing.T) {
 		c := c
 
 		t.Run(c.Name, func(t *testing.T) {
+			t.Parallel()
+
 			testHydra(t, c)
 		})
 	}
@@ -67,6 +70,9 @@ func testHydra(t *testing.T, c Container) {
 		}
 	}()
 
+	t.Log("Waiting for containers to fully spawn")
+	time.Sleep(10 * time.Second)
+
 	var (
 		ctx  = context.Background()
 		pool *pgxpool.Pool
@@ -79,13 +85,14 @@ func testHydra(t *testing.T, c Container) {
 			return err
 		}
 
+		if err := pool.Ping(ctx); err != nil {
+			pool.Close()
+			return err
+		}
+
 		return nil
 	})
 	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		t.Fatal(err)
-	}
 
 	type Case struct {
 		Name     string
