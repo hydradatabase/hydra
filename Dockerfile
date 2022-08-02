@@ -1,5 +1,5 @@
-ARG COLUMNAR_EXT_IMAGE=ghcr.io/hydrasco/columnar_ext:latest
-ARG SPILO_IMAGE=ghcr.io/hydrasco/spilo:latest
+ARG COLUMNAR_EXT_IMAGE
+ARG SPILO_IMAGE
 
 FROM $COLUMNAR_EXT_IMAGE as columnar-ext
 
