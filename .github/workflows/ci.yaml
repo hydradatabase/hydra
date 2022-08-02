@@ -175,8 +175,8 @@ jobs:
           context: ./hydra
           file: ./hydra/Dockerfile.all
           push: true
+          # TODO: create ECR repo to HOST/hydra and change the refs here
           tags: |
-            # TODO: create ECR repo to HOST/hydra and change the refs here
             ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
             ${{ steps.login-ecr.outputs.registry }}/spilo:latest
           build-args: |
