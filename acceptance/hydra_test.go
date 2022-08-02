@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v4"
@@ -13,17 +11,37 @@ import (
 	"github.com/rs/xid"
 )
 
+type Container struct {
+	Name  string
+	Image string
+	Port  int
+}
+
 func Test_Hydra(t *testing.T) {
-	for _, image := range []string{flagHydraImage, flagHydraAllImage} {
-		image := image
-		t.Run(filepath.Base(image), func(t *testing.T) {
-			testHydra(t, image)
+	containers := []Container{
+		{
+			Name:  "hydra",
+			Image: flagHydraImage,
+			Port:  35432,
+		},
+		{
+			Name:  "hydra-all",
+			Image: flagHydraAllImage,
+			Port:  45432,
+		},
+	}
+
+	for _, c := range containers {
+		c := c
+
+		t.Run(c.Name, func(t *testing.T) {
+			testHydra(t, c)
 		})
 	}
 }
 
-func testHydra(t *testing.T, image string) {
-	containerName := fmt.Sprintf("hydra-%s", xid.New())
+func testHydra(t *testing.T, c Container) {
+	containerName := fmt.Sprintf("%s-%s", c.Name, xid.New())
 
 	go func() {
 		cmd := newCmd(
@@ -35,8 +53,8 @@ func testHydra(t *testing.T, image string) {
 			"-e",
 			"SPILO_PROVIDER=local",
 			"-p",
-			"127.0.0.1:5432:5432",
-			image,
+			fmt.Sprintf("127.0.0.1:%d:5432", c.Port),
+			c.Image,
 		)
 		log.Println(cmd.String())
 		if err := cmd.Run(); err != nil {
@@ -56,7 +74,7 @@ func testHydra(t *testing.T, image string) {
 
 	waitUntil(t, 8, func() error {
 		var err error
-		pool, err = pgxpool.Connect(ctx, "postgres://postgres:zalando@127.0.0.1:5432")
+		pool, err = pgxpool.Connect(ctx, fmt.Sprintf("postgres://postgres:zalando@127.0.0.1:%d", c.Port))
 		if err != nil {
 			return err
 		}
@@ -179,7 +197,7 @@ SELECT alter_columnar_table_set(
 		},
 	}
 
-	if strings.Contains(image, "hydra-all") {
+	if c.Name == "hydra-all" {
 		cases = append(cases, Case{
 			Name: "hydra ext",
 			SQL: `
