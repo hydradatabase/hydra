@@ -1,9 +1,8 @@
-ARG COLUMNAR_EXT_IMAGE
-ARG SPILO_IMAGE
+#syntax=docker/dockerfile-upstream:latest
 
-FROM $COLUMNAR_EXT_IMAGE as columnar-ext
+FROM columnar_ext as columnar-ext
 
-FROM $SPILO_IMAGE
+FROM spilobase
 
 COPY --from=columnar-ext /pg_ext /
 COPY files/default/postgres-appliance/scripts /scripts/

@@ -1,11 +1,9 @@
-ARG HYDRA_EXT_IMAGE
-ARG COLUMNAR_EXT_IMAGE
-ARG SPILO_IMAGE
+#syntax=docker/dockerfile-upstream:latest
 
-FROM $HYDRA_EXT_IMAGE as hydra-ext
-FROM $COLUMNAR_EXT_IMAGE as columnar-ext
+FROM hydra_ext as hydra-ext
+FROM columnar_ext as columnar-ext
 
-FROM $SPILO_IMAGE
+FROM spilobase
 
 COPY --from=hydra-ext /pg_ext /
 COPY --from=columnar-ext /pg_ext /

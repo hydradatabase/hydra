@@ -28,13 +28,13 @@ There are two image distributions:
 To build the first distribution, run:
 
 ```
-TAG=1234 make docker_build
+TAG=1234 TARGET=hydra make docker_build
 ```
 
 To build the second distribution, run:
 
 ```
-TAG=1234 make docker_build_all
+TAG=1234 TARGET=hydra-all make docker_build
 ```
 
 ## Image Build Tags
