@@ -18,10 +18,11 @@ jobs:
         ports:
           - 5000:5000
     steps:
+      # Checkout
       # Note: the following folder layout matters:
       # parent_dir:
       #   - hydra
-      #   - Hydras
+      #   - hydra-extension
       #   - citus
       #   - spilo
       - name: Checkout hydra
@@ -47,6 +48,8 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
           ref: 2.1-p6
           path: spilo
+
+      # Set versions
       - name: Set versions
         run: |
           cd ./hydra-extension && HYDRA_EXT_SHA=$(git rev-parse --short HEAD) && echo "HYDRA_EXT_SHA=${HYDRA_EXT_SHA}" >> $GITHUB_ENV && cd ../
@@ -59,61 +62,17 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           driver-opts: network=host
-      - name: Docker Build Hydra Extension
-        uses: docker/build-push-action@v3
+
+      - name: Docker build
+        uses: docker/bake-action@master
         with:
-          context: ./hydra-extension
+          workdir: ./hydra
           push: true
-          tags: localhost:5000/hydra/hydra-extension:${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Docker Build Columnar Extension
-        uses: docker/build-push-action@v3
-        with:
-          context: ./citus
-          push: true
-          tags: localhost:5000/hydra/columnar:${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Docker Build Spilo
-        uses: docker/build-push-action@v3
-        with:
-          context: ./spilo/postgres-appliance
-          file: ./spilo/postgres-appliance/Dockerfile
-          push: true
-          tags: |
-            localhost:5000/hydra/spilo:${{ env.TAG }}
-          build-args: |
-            TIMESCALEDB=
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Docker Build Hydra
-        uses: docker/build-push-action@v3
-        with:
-          context: ./hydra
-          file: ./hydra/Dockerfile
-          push: true
-          tags: |
-            localhost:5000/hydra/hydra:${{ env.TAG }}
-          build-args: |
-            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
-            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Docker Build Hydra All
-        uses: docker/build-push-action@v3
-        with:
-          context: ./hydra
-          file: ./hydra/Dockerfile.all
-          push: true
-          tags: |
-            localhost:5000/hydra/hydra-all:${{ env.TAG }}
-          build-args: |
-            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra-extension:${{ env.TAG }}
-            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
-            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          set: |
+            hydra.tags=localhost:5000/hydra/hydra:${{ env.TAG }}
+            hydra-all.tags=localhost:5000/hydra/hydra-all:${{ env.TAG }}
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
 
       # Acceptance tests
       - uses: actions/setup-go@v2
@@ -132,26 +91,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Docker Push Hydra
+
+      - name: Docker push hydra to ghcr.io
         if: github.ref == 'refs/heads/master'
-        uses: docker/build-push-action@v3
+        uses: docker/bake-action@master
         with:
-          context: ./hydra
-          file: ./hydra/Dockerfile
+          workdir: ./hydra
+          targets: hydra
           push: true
-          tags: |
-            ghcr.io/hydrasco/hydra:${{ env.TAG }}
-            ghcr.io/hydrasco/hydra:latest
-          build-args: |
-            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
-            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
-          labels:
-            maintainer=HydrasCo
-            org.opencontainers.image.title=hydra
-            org.opencontainers.image.source=https://github.com/HydrasCo/hydra
-            org.opencontainers.image.vendor=HydrasCo
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          set: |
+            hydra.tags=ghcr.io/hydrasco/hydra:latest
+            hydra.tags=ghcr.io/hydrasco/hydra:${{ env.TAG }}
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
 
       # Docker push hydra-all
       - name: Configure AWS credentials
@@ -162,26 +114,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: us-east-1
           mask-aws-account-id: no
+
       - name: Login to Amazon ECR
         if: github.ref == 'refs/heads/master'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
           registries: "011789831835"
-      - name: Docker Push Hydra All
+
+      - name: Docker push hydra-all to ECR
         if: github.ref == 'refs/heads/master'
-        uses: docker/build-push-action@v3
+        uses: docker/bake-action@master
         with:
-          context: ./hydra
-          file: ./hydra/Dockerfile.all
+          workdir: ./hydra
+          targets: hydra-all
           push: true
           # TODO: create ECR repo to HOST/hydra and change the refs here
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
-            ${{ steps.login-ecr.outputs.registry }}/spilo:latest
-          build-args: |
-            HYDRA_EXT_IMAGE=localhost:5000/hydra/hydra-extension:${{ env.TAG }}
-            COLUMNAR_EXT_IMAGE=localhost:5000/hydra/columnar:${{ env.TAG }}
-            SPILO_IMAGE=localhost:5000/hydra/spilo:${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          set: |
+            hydra-all.tags=${{ steps.login-ecr.outputs.registry }}/spilo:latest
+            hydra-all.tags=${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
