@@ -1,6 +1,8 @@
 # Hydra
 
-[Hydra](https://hydras.io/) is an open-source PostgreSQL data warehouse alternative to Snowflake.
+[Hydra](https://hydras.io/) is the open-source Snowflake alternative for scaling startups.
+Hydra is 100% Postgres - use the full Postgres ecosystem to set up your "source of truth" reporting.
+
 Here is a list of high-leveled features:
 
 * [x] columnar store
