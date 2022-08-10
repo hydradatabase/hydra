@@ -13,7 +13,7 @@ Here is a list of high-leveled features:
 The following is a quick local setup. For production use, sign up for [our cloud offering](https://hydras.io/#early-access).
 
 ```console
-docker run --rm -d -p 127.0.0.1:5432:5432 ghcr.io/HydrasCo/hydra
+docker run --rm -d -p 127.0.0.1:5432:5432 ghcr.io/hydrasco/hydra
 psql postgres://postgres:hydra@127.0.0.1:5432
 ```
 
