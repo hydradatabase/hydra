@@ -6,7 +6,7 @@ these extensions.
 
 Currently active projects are:
 
-* [the Hydra columnar engine](/HydrasCo/citus)
+* [the Hydra columnar engine](https://github.com/HydrasCo/citus)
 
 ## Build
 
