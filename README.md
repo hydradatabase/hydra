@@ -22,6 +22,7 @@ You can find detailed usage [here](https://docs.hydras.io/features/columnar).
 ## Community
 
 * Website: [hydras.io](https://hydras.io)
+* [Documentation](https://docs.hydras.io/)
 * Twitter: [@HydrasCo](https://twitter.com/HydrasCo)
 * [Discord chat](https://discord.com/invite/zKpVxbXnNY) for quick questions.
 * [GitHub Discussions](https://github.com/HydrasCo/hydra/discussions) for longer topics.
