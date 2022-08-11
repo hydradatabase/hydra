@@ -3,10 +3,14 @@
 [Hydra](https://hydras.io/) is the open-source Snowflake alternative for scaling startups.
 Hydra is 100% Postgres - use the full Postgres ecosystem to set up your "source of truth" reporting.
 
-Here is a list of high-leveled features:
+Here is a list of high-leveled features Hydra offers:
 
-* [x] columnar store
+* [x] append-only columnar store - [docs](https://docs.hydras.io/features/columnar)
+* [x] managed service - [sign up for early access](https://hydras.io/#early-access)
+* [x] TLS publicly-signed certificates - [docs](https://docs.hydras.io/features/tls)
+* [ ] updates and deletes for columnar store
 * [ ] vectorized execution
+* [ ] separation of compute and storage
 
 ## Quickstart
 
