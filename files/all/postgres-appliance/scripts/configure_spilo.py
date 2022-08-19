@@ -309,8 +309,6 @@ postgresql:
     extwlist.extensions: 'btree_gin,btree_gist,citext,extra_window_functions,first_last_agg,hll,\
 hstore,hypopg,intarray,ltree,pgcrypto,pgq,pgq_node,pg_trgm,postgres_fdw,tablefunc,uuid-ossp'
     extwlist.custom_path: /scripts
-    cron.use_background_workers: 'on'
-    max_background_workers: 20
   pg_hba:
     - local   all             all                                   trust
     {{#PAM_OAUTH2}}
