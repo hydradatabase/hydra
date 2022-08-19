@@ -69,7 +69,7 @@ func testHydra(t *testing.T, c Container) {
 	}()
 
 	t.Log("Waiting for containers to fully spawn")
-	time.Sleep(10 * time.Second)
+	time.Sleep(20 * time.Second)
 
 	var (
 		ctx  = context.Background()
