@@ -1,0 +1,11 @@
+services:
+  hydra:
+    container_name: hydra
+    image: ghcr.io/hydrasco/hydra:latest
+    ports:
+      - ${POSTGRES_PORT}:5432
+    environment:
+      PGUSER_SUPERUSER: ${POSTGRES_USER}
+      PGPASSWORD_SUPERUSER: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./volumes/db:/home/postgres/pgdata
