@@ -132,6 +132,34 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 			},
 		},
 		{
+			Name: "ensure 20 worker processes",
+			SQL: `SHOW max_worker_processes;`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var workerProcesses string
+				if err := row.Scan(&workerProcesses); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := "20", workerProcesses; want != got {
+					t.Fatalf("max_worker_processes not set to 20, set to %s", got)
+				}
+			},
+		},
+		{
+			Name: "cron should use worker processes",
+			SQL: `SHOW cron.use_background_workers;`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var settingValue string
+				if err := row.Scan(&settingValue); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := "on", settingValue; want != got {
+					t.Fatalf("cron.use_background_workers not set to 'on'")
+				}
+			},
+		},
+		{
 			Name: "using a columnar table",
 			SQL: `
 CREATE TABLE my_columnar_table

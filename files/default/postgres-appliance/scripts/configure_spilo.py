@@ -222,6 +222,7 @@ bootstrap:
         autovacuum_max_workers: 5
         autovacuum_vacuum_scale_factor: 0.05
         autovacuum_analyze_scale_factor: 0.02
+        max_worker_processes: 20
   {{#CLONE_WITH_WALE}}
   method: clone_with_wale
   clone_with_wale:
@@ -310,7 +311,6 @@ postgresql:
 hstore,hypopg,intarray,ltree,pgcrypto,pgq,pgq_node,pg_trgm,postgres_fdw,tablefunc,uuid-ossp'
     extwlist.custom_path: /scripts
     cron.use_background_workers: 'on'
-    max_background_workers: 20
   pg_hba:
     - local   all             all                                   trust
     {{#PAM_OAUTH2}}
