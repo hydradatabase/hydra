@@ -1,7 +1,9 @@
 services:
   hydra:
     container_name: hydra
-    image: ghcr.io/hydrasco/hydra:latest
+    build:
+      dockerfile: ./Dockerfile.latest
+      context: .
     ports:
       - ${POSTGRES_PORT}:5432
     environment:

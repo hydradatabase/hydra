@@ -18,6 +18,7 @@ The following is a quick local setup. For production use, sign up for [our cloud
 
 ```console
 cp .env.example .env
+docker compose build --pull
 docker compose up
 psql postgres://postgres:hydra@127.0.0.1:5432
 ```
