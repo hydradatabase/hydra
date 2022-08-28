@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hydra
+  namespace: default
+  labels:
+    app: hydra
+spec:
+  selector:
+    matchLabels:
+      app: hydra
+  template:
+    metadata:
+      labels:
+        app: hydra
+    spec:
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+      containers:
+        - image: ghcr.io/hydrasco/hydra:cdae614_8eee2a8_243ba49
+          name: container
+          # command: ["/bin/sh"]
+          # args: ["-c","postgres", "-c", "max_connections=200"]
+          env:
+            # Use secret in real usage
+            - name: POSTGRES_USER
+              value: postgres
+            - name: SPILO_PROVIDER
+              value: local
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hydra-secret
+                  key: hydra_pwd
+            - name: POSTGRES_DB
+              value: hydra
+            - name: PGDATA
+              value: /var/lib/postgresql/data/hydradata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: hydra-persistent-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: data
+      volumes:
+        - name: hydra-persistent-storage
+          persistentVolumeClaim:
+            claimName: hydra
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: hydra-service
+  namespace: default
+  labels:
+    app: hydra
+spec:
+  ports:
+    - name: tcp
+      protocol: TCP
+      #      port = port connected to ingress
+      port: 5432
+      # targetPort = port on container
+      targetPort: 5432
+  selector:
+    app: hydra
