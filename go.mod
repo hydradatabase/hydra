@@ -1,4 +1,4 @@
-module github.com/HydrasCo/spilo-build
+module github.com/HydrasDB/spilo-build
 
 go 1.18
 

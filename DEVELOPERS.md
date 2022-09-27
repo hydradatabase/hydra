@@ -6,7 +6,7 @@ these extensions.
 
 Currently active projects are:
 
-* [the Hydra columnar engine](https://github.com/HydrasCo/citus)
+* [the Hydra columnar engine](https://github.com/HydrasDB/citus)
 
 ## Build
 
@@ -14,8 +14,8 @@ The Hydra Docker image is based on [zalando/spilo](https://github.com/zalando/sp
 
 There are two image distributions:
 
-1. Spilo + [Columnar PostgreSQL extension](https://github.com/HydrasCo/citus)
-2. Spilo + [Columnar PostgreSQL extension](https://github.com/HydrasCo/citus) + [Hydra's proprietary PostgreSQL extension](https://github.com/HydrasCo/Hydras)
+1. Spilo + [Columnar PostgreSQL extension](https://github.com/HydrasDB/citus)
+2. Spilo + [Columnar PostgreSQL extension](https://github.com/HydrasDB/citus) + [Hydra's proprietary PostgreSQL extension](https://github.com/HydrasDB/Hydras)
 
 To build the first distribution, run:
 
