@@ -7,8 +7,8 @@ endef
 DOCKER_OPTS ?=
 TARGET ?= default
 TAG ?= latest
-HYDRA_REPO ?= ghcr.io/hydrasco/hydra
-HYDRA_ALL_REPO ?= ghcr.io/hydrasco/hydra-all
+HYDRA_REPO ?= ghcr.io/hydrasdb/hydra
+HYDRA_ALL_REPO ?= ghcr.io/hydrasdb/hydra-all
 
 .PHONY: docker_push
 docker_push: docker_build
@@ -20,8 +20,8 @@ docker_build: clone_projects
 
 .PHONY: clone_projects
 clone_projects:
-	@$(call clone_if_not_exist,git@github.com:HydrasCo/hydra-extension.git,$(CURDIR)/../hydra-extension,main)
-	@$(call clone_if_not_exist,git@github.com:HydrasCo/citus.git,$(CURDIR)/../citus,master)
+	@$(call clone_if_not_exist,git@github.com:HydrasDB/hydra-extension.git,$(CURDIR)/../hydra-extension,main)
+	@$(call clone_if_not_exist,git@github.com:HydrasDB/citus.git,$(CURDIR)/../citus,master)
 	@$(call clone_if_not_exist,git@github.com:zalando/spilo.git,$(CURDIR)/../spilo,2.1-p6)
 
 .PHONY: acceptance_test

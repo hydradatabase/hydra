@@ -2,8 +2,6 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches:
-      - '*'
 
 jobs:
   docker_build_and_push:
@@ -32,13 +30,13 @@ jobs:
       - name: Checkout hydra-extension
         uses: actions/checkout@v2
         with:
-          repository: HydrasCo/hydra-extension
+          repository: HydrasDB/hydra-extension
           token: ${{ secrets.GH_TOKEN }}
           path: hydra-extension
       - name: Checkout citus
         uses: actions/checkout@v2
         with:
-          repository: HydrasCo/citus
+          repository: HydrasDB/citus
           token: ${{ secrets.GH_TOKEN }}
           path: citus
       - name: Checkout spilo
@@ -100,8 +98,8 @@ jobs:
           targets: hydra
           push: true
           set: |
-            hydra.tags=ghcr.io/hydrasco/hydra:latest
-            hydra.tags=ghcr.io/hydrasco/hydra:${{ env.TAG }}
+            hydra.tags=ghcr.io/hydrasdb/hydra:latest
+            hydra.tags=ghcr.io/hydrasdb/hydra:${{ env.TAG }}
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
 

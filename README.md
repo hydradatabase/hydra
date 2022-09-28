@@ -1,47 +1,51 @@
-# Hydra
+![Hydra - the open source data warehouse](.images/header.png)
 
-[Hydra](https://hydras.io/) is the open-source Snowflake alternative for scaling startups.
-Hydra is 100% Postgres - use the full Postgres ecosystem to set up your "source of truth" reporting.
+Data driven decisions at every stage - [Hydra](https://hydras.io/) is your open source data warehouse built on Postgres.
 
-Here is a list of high-leveled features Hydra offers:
+Postgres is the foundation of the Modern Data Stack. Hydra's mission is to make data-driven decisions accessible at every stage. We built Hydra on an open Postgres foundation that's easy to use. Everything that works with Postgres works with Hydra.
 
+* [x] hosted postgres database - [docs](https://docs.hydras.io/getting-started/hydra-with-postgres)
 * [x] append-only columnar store - [docs](https://docs.hydras.io/features/columnar)
-* [x] managed service - [sign up for early access](https://hydras.io/#early-access)
-* [x] TLS publicly-signed certificates - [docs](https://docs.hydras.io/features/tls)
-* [ ] updates and deletes for columnar store
+* [x] external tables - [docs](https://docs.hydras.io/features/external_tables)
+* [x] postgres scheduler - [docs](https://docs.hydras.io/features/scheduler)
 * [ ] vectorized execution
+* [ ] updates and deletes for columnar store
 * [ ] separation of compute and storage
 
-## Quickstart
+![Where does Hydra fit](.images/hydra-db.png)
 
-The following is a quick local setup. For production use, sign up for [our cloud offering](https://hydras.io/#early-access).
+## Quick Start
 
-```console
+Try out Hydra locally using [docker-compose](https://docs.docker.com/compose/).
+
+```
 cp .env.example .env
 docker compose up
 psql postgres://postgres:hydra@127.0.0.1:5432
 ```
 
-You can find detailed usage [here](https://docs.hydras.io/features/columnar).
+For production use sign up for our [cloud offering](https://hydras.io).
+
+## Documentation
+
+You can find our documentation [here](https://docs.hydras.io/getting-started/readme).
 
 ## Community
 
-* Website: [hydras.io](https://hydras.io)
-* [Documentation](https://docs.hydras.io/)
-* Twitter: [@HydrasCo](https://twitter.com/HydrasCo)
-* [Discord chat](https://discord.com/invite/zKpVxbXnNY) for quick questions.
-* [GitHub Discussions](https://github.com/HydrasCo/hydra/discussions) for longer topics.
-* [GitHub Issues](https://github.com/HydrasCo/hydra/issues) for bugs and missing features.
+- [Discord chat](https://discord.com/invite/zKpVxbXnNY) for quick questions
+- [GitHub Discussions](https://github.com/HydrasDB/hydra/discussions) for longer topics
+- [GitHub Issues](https://github.com/HydrasDB/hydra/issues) for bugs and missing features
+- [@HydrasDB](https://twitter.com/hydrasdb) on Twitter
 
-## Overview
+## Status
 
-The Hydra image is built on top of [Spilo](https://github.com/zalando/spilo). Spilo is a containerization of
-Postgres designed to be run in a production environment. The Hydra build adds extensions and modifies certain
-configuration files to enable those extensions. 
+- [x] Early Access: Closed, private testing
+- [ ] Open Alpha: Open for everyone
+- [ ] Open Beta: Hydra can handle most non-enterprise use
+- [ ] Production: Enterprise ready
 
-## Building the image
-
-Please see [DEVELOPERS.md](DEVELOPERS.md) for information on building the image.
+## Developing Hydra
+Please see [DEVELOPERS.md](DEVELOPERS.md) for information on contributing to Hydra and building the image.
 
 ## License and Acknowledgments
 
@@ -50,7 +54,7 @@ Hydra is only possible by building on the shoulders of giants.
 The code in this repo is licensed under the [Apache 2.0 license](LICENSE). Pre-built images are
 subject to additional licenses as follows:
 
-* [Hydra columnar engine](https://github.com/HydrasCo/citus) - AGPL 3.0
+* [Hydra columnar engine](https://github.com/HydrasDB/citus) - AGPL 3.0
 * [Spilo](https://github.com/zalando/spilo) - Apache 2.0
 * The underlying Spilo image contains a large number of open source projects, including:
   * Postgres - [the Postgres license](https://www.postgresql.org/about/licence/)

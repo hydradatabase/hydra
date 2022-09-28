@@ -3,11 +3,11 @@ variable "TAG" {
 }
 
 variable "HYDRA_REPO" {
-  default = "ghcr.io/hydrasco/hydra"
+  default = "ghcr.io/hydrasdb/hydra"
 }
 
 variable "HYDRA_ALL_REPO" {
-  default = "ghcr.io/hydrasco/hydra-all"
+  default = "ghcr.io/hydrasdb/hydra-all"
 }
 
 group "default" {
