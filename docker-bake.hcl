@@ -36,6 +36,7 @@ target "spilo" {
   context = "../spilo/postgres-appliance"
   args = {
     TIMESCALEDB = ""
+    PGOLDVERSIONS = 13
   }
 }
 
