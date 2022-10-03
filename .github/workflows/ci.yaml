@@ -44,7 +44,7 @@ jobs:
         with:
           repository: zalando/spilo
           token: ${{ secrets.GH_TOKEN }}
-          ref: 2.1-p6
+          ref: 2.1-p7
           path: spilo
 
       # Set versions

@@ -176,14 +176,14 @@ while IFS= read -r db_name; do
     # In case if timescaledb binary is missing the first query fails with the error
     # ERROR:  could not access file "$libdir/timescaledb-$OLD_VERSION": No such file or directory
     UPGRADE_TIMESCALEDB=$(echo -e "SELECT NULL;\nSELECT default_version != installed_version FROM pg_catalog.pg_available_extensions WHERE name = 'timescaledb'" | psql -tAX -d "${db_name}" 2> /dev/null | tail -n 1)
-    if [ "x$UPGRADE_TIMESCALEDB" = "xt" ]; then
+    if [ "$UPGRADE_TIMESCALEDB" = "t" ]; then
         echo "ALTER EXTENSION timescaledb UPDATE;"
     fi
     UPGRADE_POSTGIS=$(echo -e "SELECT COUNT(*) FROM pg_catalog.pg_extension WHERE extname = 'postgis'" | psql -tAX -d "${db_name}" 2> /dev/null | tail -n 1)
-    if [ "x$UPGRADE_POSTGIS" = "x1" ]; then
+    if [ "$UPGRADE_POSTGIS" = "1" ]; then
         # public.postgis_lib_version() is available only if postgis extension is created
         UPGRADE_POSTGIS=$(echo -e "SELECT extversion != public.postgis_lib_version() FROM pg_catalog.pg_extension WHERE extname = 'postgis'" | psql -tAX -d "${db_name}" 2> /dev/null | tail -n 1)
-        if [ "x$UPGRADE_POSTGIS" = "xt" ]; then
+        if [ "$UPGRADE_POSTGIS" = "t" ]; then
             echo "ALTER EXTENSION postgis UPDATE;"
             echo "SELECT public.postgis_extensions_upgrade();"
         fi
@@ -202,7 +202,7 @@ GRANT EXECUTE ON FUNCTION public.pg_stat_statements_reset($RESET_ARGS) TO admin;
     else
         echo "GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO admin;"
     fi
-    if [ "x$ENABLE_PG_MON" = "xtrue" ] && [ "$PGVER" -ge 11 ]; then echo "CREATE EXTENSION IF NOT EXISTS pg_mon SCHEMA public;"; fi
+    if [ "$ENABLE_PG_MON" = "true" ] && [ "$PGVER" -ge 11 ]; then echo "CREATE EXTENSION IF NOT EXISTS pg_mon SCHEMA public;"; fi
     cat metric_helpers.sql
 done < <(psql -d "$2" -tAc 'select pg_catalog.quote_ident(datname) from pg_catalog.pg_database where datallowconn')
 ) | PGOPTIONS="-c synchronous_commit=local" psql -Xd "$2"
