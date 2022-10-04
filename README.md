@@ -10,7 +10,7 @@ Postgres is the foundation of the Modern Data Stack. Hydra's mission is to make 
 * [x] 📎 append-only columnar store - [docs](https://docs.hydras.io/features/columnar)
 * [x] 📊 external tables - [docs](https://docs.hydras.io/features/external_tables)
 * [x] 📅 postgres scheduler - [docs](https://docs.hydras.io/features/scheduler)
-* [ ] ☠️ vectorized execution
+* [ ] 🐎 vectorized execution
 * [ ] ⚙️ updates and deletes for columnar store
 * [ ] ↔️ separation of compute and storage
 
