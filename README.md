@@ -50,6 +50,8 @@ You can find our documentation [here](https://docs.hydras.io/getting-started/rea
 
 We are currently in Early Access. Watch [releases](https://github.com/HydrasDB/hydra/releases) of this repo to get notified of updates.
 
+![follow the repo](.images/follow.gif)
+
 ## 🛠 Developing Hydra
 Please see [DEVELOPERS.md](DEVELOPERS.md) for information on contributing to Hydra and building the image.
 
