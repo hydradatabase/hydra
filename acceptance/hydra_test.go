@@ -3,7 +3,9 @@ package acceptance
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"testing"
 	"time"
 
@@ -13,22 +15,25 @@ import (
 )
 
 type Container struct {
-	Name  string
-	Image string
-	Port  int
+	Name          string
+	Image         string
+	Port          int
+	ReadinessPort int
 }
 
 func Test_Hydra(t *testing.T) {
 	containers := []Container{
 		{
-			Name:  "hydra",
-			Image: flagHydraImage,
-			Port:  35432,
+			Name:          "hydra",
+			Image:         flagHydraImage,
+			Port:          35432,
+			ReadinessPort: 38008,
 		},
 		{
-			Name:  "hydra-all",
-			Image: flagHydraAllImage,
-			Port:  45432,
+			Name:          "hydra-all",
+			Image:         flagHydraAllImage,
+			Port:          45432,
+			ReadinessPort: 48008,
 		},
 	}
 
@@ -55,6 +60,8 @@ func testHydra(t *testing.T, c Container) {
 			containerName,
 			"-p",
 			fmt.Sprintf("127.0.0.1:%d:5432", c.Port),
+			"-p",
+			fmt.Sprintf("127.0.0.1:%d:8008", c.ReadinessPort),
 			c.Image,
 		)
 		log.Println(cmd.String())
@@ -68,29 +75,37 @@ func testHydra(t *testing.T, c Container) {
 		}
 	}()
 
-	t.Log("Waiting for containers to fully spawn")
-	time.Sleep(20 * time.Second)
-
-	var (
-		ctx  = context.Background()
-		pool *pgxpool.Pool
-	)
-
 	waitUntil(t, 8, func() error {
-		var err error
-		pool, err = pgxpool.Connect(ctx, fmt.Sprintf("postgres://postgres:hydra@127.0.0.1:%d", c.Port))
+		t.Log("Waiting for containers to fully spawn")
+		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", c.ReadinessPort))
 		if err != nil {
 			return err
 		}
 
-		if err := pool.Ping(ctx); err != nil {
-			pool.Close()
-			return err
+		if resp.StatusCode != 200 {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+
+			return fmt.Errorf("db is not ready: code=%d, body=%s", resp.StatusCode, body)
 		}
 
 		return nil
 	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.Connect(ctx, fmt.Sprintf("postgres://postgres:hydra@127.0.0.1:%d", c.Port))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	type Case struct {
 		Name     string
@@ -133,7 +148,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 		},
 		{
 			Name: "ensure 20 worker processes",
-			SQL: `SHOW max_worker_processes;`,
+			SQL:  `SHOW max_worker_processes;`,
 			Validate: func(t *testing.T, row pgx.Row) {
 				var workerProcesses string
 				if err := row.Scan(&workerProcesses); err != nil {
@@ -147,7 +162,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 		},
 		{
 			Name: "cron should use worker processes",
-			SQL: `SHOW cron.use_background_workers;`,
+			SQL:  `SHOW cron.use_background_workers;`,
 			Validate: func(t *testing.T, row pgx.Row) {
 				var settingValue string
 				if err := row.Scan(&settingValue); err != nil {
@@ -270,6 +285,9 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'hydra';
 	for _, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
 			v := c.Validate
 			if v == nil {
 				if _, err := pool.Exec(ctx, c.SQL); err != nil {
