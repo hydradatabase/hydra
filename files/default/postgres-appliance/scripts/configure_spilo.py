@@ -188,6 +188,9 @@ bootstrap:
       {{#STANDBY_PORT}}
       port: {{STANDBY_PORT}}
       {{/STANDBY_PORT}}
+      {{#STANDBY_PRIMARY_SLOT_NAME}}
+      primary_slot_name: {{STANDBY_PRIMARY_SLOT_NAME}}
+      {{/STANDBY_PRIMARY_SLOT_NAME}}
     {{/STANDBY_CLUSTER}}
     ttl: 30
     loop_wait: &loop_wait 10
@@ -613,6 +616,7 @@ def get_placeholders(provider):
     placeholders.setdefault('STANDBY_WITH_WALE', '')
     placeholders.setdefault('STANDBY_HOST', '')
     placeholders.setdefault('STANDBY_PORT', '')
+    placeholders.setdefault('STANDBY_PRIMARY_SLOT_NAME', '')
     placeholders.setdefault('STANDBY_CLUSTER', placeholders['STANDBY_WITH_WALE'] or placeholders['STANDBY_HOST'])
 
     if provider == PROVIDER_AWS and not USE_KUBERNETES:
@@ -769,7 +773,8 @@ def write_log_environment(placeholders):
 def write_wale_environment(placeholders, prefix, overwrite):
     s3_names = ['WALE_S3_PREFIX', 'WALG_S3_PREFIX', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY',
                 'WALE_S3_ENDPOINT', 'AWS_ENDPOINT', 'AWS_REGION', 'AWS_INSTANCE_PROFILE', 'WALE_DISABLE_S3_SSE',
-                'WALG_S3_SSE_KMS_ID', 'WALG_S3_SSE', 'WALG_DISABLE_S3_SSE', 'AWS_S3_FORCE_PATH_STYLE']
+                'WALG_S3_SSE_KMS_ID', 'WALG_S3_SSE', 'WALG_DISABLE_S3_SSE', 'AWS_S3_FORCE_PATH_STYLE', 'AWS_ROLE_ARN',
+                'AWS_WEB_IDENTITY_TOKEN_FILE']
     azure_names = ['WALG_AZ_PREFIX', 'AZURE_STORAGE_ACCOUNT', 'AZURE_STORAGE_ACCESS_KEY',
                    'AZURE_STORAGE_SAS_TOKEN', 'WALG_AZURE_BUFFER_SIZE', 'WALG_AZURE_MAX_BUFFERS',
                    'AZURE_ENVIRONMENT_NAME']
