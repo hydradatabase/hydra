@@ -38,6 +38,8 @@ jobs:
         with:
           repository: HydrasDB/citus
           token: ${{ secrets.GH_TOKEN }}
+          # Remove this after devel is merged
+          ref: devel
           path: citus
       - name: Checkout spilo
         uses: actions/checkout@v2

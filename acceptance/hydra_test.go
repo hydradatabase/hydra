@@ -117,7 +117,7 @@ func testHydra(t *testing.T, c Container) {
 		{
 			Name: "columnar ext",
 			SQL: `
-SELECT count(1) FROM pg_available_extensions WHERE name = 'citus_columnar';
+SELECT count(1) FROM pg_available_extensions WHERE name = 'columnar';
 			`,
 			Validate: func(t *testing.T, row pgx.Row) {
 				var count int
@@ -187,18 +187,17 @@ CREATE TABLE my_columnar_table
 ) USING columnar;
 			`,
 		},
-		// TODO: this example does not work due to https://linear.app/hydra/issue/HYD-30/cant-change-existing-table-to-columnar
-		// {
-		// Name: "convert between row and columnar",
-		// SQL: `
-		// CREATE TABLE my_table(i INT8 DEFAULT '7');
-		// INSERT INTO my_table VALUES(1);
-		// -- convert to columnar
-		// SELECT alter_table_set_access_method('my_table', 'columnar');
-		// -- back to row
-		// SELECT alter_table_set_access_method('my_table', 'heap');
-		// `,
-		// },
+		{
+			Name: "convert between row and columnar",
+			SQL: `
+		CREATE TABLE my_table(i INT8 DEFAULT '7');
+		INSERT INTO my_table VALUES(1);
+		-- convert to columnar
+		SELECT alter_table_set_access_method('my_table', 'columnar');
+		-- back to row
+		SELECT alter_table_set_access_method('my_table', 'heap');
+		`,
+		},
 		{
 			Name: "convert by copying",
 			SQL: `
