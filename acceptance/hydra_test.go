@@ -193,7 +193,7 @@ CREATE TABLE my_columnar_table
 		CREATE TABLE my_table(i INT8 DEFAULT '7');
 		INSERT INTO my_table VALUES(1);
 		-- convert to columnar
-		SELECT alter_table_set_access_method('my_table', 'columnar');
+		SELECT columnar.alter_table_set_access_method('my_table', 'columnar');
 		-- back to row
 		-- TODO: reenable this after it's supported
 		-- SELECT alter_table_set_access_method('my_table', 'heap');
