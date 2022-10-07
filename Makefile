@@ -22,7 +22,7 @@ docker_build: clone_projects
 clone_projects:
 	@$(call clone_if_not_exist,git@github.com:HydrasDB/hydra-extension.git,$(CURDIR)/../hydra-extension,main)
 	@$(call clone_if_not_exist,git@github.com:HydrasDB/citus.git,$(CURDIR)/../citus,master)
-	@$(call clone_if_not_exist,git@github.com:zalando/spilo.git,$(CURDIR)/../spilo,2.1-p6)
+	@$(call clone_if_not_exist,git@github.com:zalando/spilo.git,$(CURDIR)/../spilo,2.1-p7)
 
 .PHONY: acceptance_test
 acceptance_test:
