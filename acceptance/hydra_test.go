@@ -29,12 +29,6 @@ func Test_Hydra(t *testing.T) {
 			Port:          35432,
 			ReadinessPort: 38008,
 		},
-		{
-			Name:          "hydra-all",
-			Image:         flagHydraAllImage,
-			Port:          45432,
-			ReadinessPort: 48008,
-		},
 	}
 
 	for _, c := range containers {
