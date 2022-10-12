@@ -6,22 +6,8 @@ variable "HYDRA_REPO" {
   default = "ghcr.io/hydrasdb/hydra"
 }
 
-variable "HYDRA_ALL_REPO" {
-  default = "ghcr.io/hydrasdb/hydra-all"
-}
-
 group "default" {
-  targets = ["hydra", "hydra-all"]
-}
-
-target "hydra-all" {
-  dockerfile = "Dockerfile.all"
-  contexts = {
-    spilobase = "target:spilo"
-    columnar_ext = "target:columnar_ext"
-    hydra_ext = "target:hydra_ext"
-  }
-  tags = ["${HYDRA_ALL_REPO}:${TAG}"]
+  targets = ["hydra"]
 }
 
 target "hydra" {
@@ -42,8 +28,4 @@ target "spilo" {
 
 target "columnar_ext" {
   context = "../citus"
-}
-
-target "hydra_ext" {
-  context = "../hydra-extension"
 }
