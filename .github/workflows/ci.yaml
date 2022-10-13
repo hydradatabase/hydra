@@ -70,7 +70,9 @@ jobs:
       - name: Run Acceptance Tests
         run: |
           cd ./hydra
-          HYDRA_IMAGE=localhost:5000/hydra/hydra:${TAG} make acceptance_test
+          HYDRA_IMAGE=localhost:5000/hydra/hydra:${TAG} \
+            HYDRA_PROD_IMAGE=ghcr.io/hydrasdb/hydra:$(cat HYDRA_PROD_VER) \
+            make acceptance_test
 
       # Docker push to ghcr.io
       - name: Login to ghcr.io

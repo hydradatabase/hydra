@@ -24,6 +24,11 @@ TAG=1234 TARGET=hydra make docker_build
 Image build tag is in the format of `${SPILO_SHA}_${COLUMNAR_EXT_SHA}`, e.g. `72fb97e_ff32dd9`.
 The `latest` tag is always tagged to the latest main branch.
 
+## Hydra Production Version
+
+The `HYDRA_PROD_VER` file stores the version that Hydra runs in production.
+Please bump it when a new production version is released.
+
 ## Spilo Version Update
 
 Hydra Docker build overrides the following Spilo scripts to enable extra PostgreSQL extensions:
