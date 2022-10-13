@@ -16,8 +16,8 @@ func Test_HydraUpgrade(t *testing.T) {
 
 	cases := []Case{
 		{
-			Name:        "upgrade from columnar ext rename",
-			BeforeImage: "ghcr.io/hydrasdb/hydra:7149160_8eee2a8_dacf51c",
+			Name:        "upgrade from the prod image",
+			BeforeImage: flagHydraProdImage,
 			AfterImage:  flagHydraImage,
 		},
 		{
