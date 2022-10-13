@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -29,7 +30,11 @@ func Test_HydraUpgrade(t *testing.T) {
 	for i, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
-			pgdata := filepath.Join(t.TempDir(), "data")
+			tmpdir, err := os.MkdirTemp("", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			pgdata := filepath.Join(tmpdir, "data")
 
 			container := Container{
 				Name:            "hydra",
