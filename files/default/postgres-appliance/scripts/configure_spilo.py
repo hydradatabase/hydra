@@ -290,6 +290,7 @@ postgresql:
   parameters:
     archive_command: {{{postgresql.parameters.archive_command}}}
     shared_buffers: {{postgresql.parameters.shared_buffers}}
+    work_mem: {{postgresql.parameters.work_mem}}
     logging_collector: 'on'
     log_destination: csvlog
     log_directory: ../pg_log
@@ -673,6 +674,9 @@ def get_placeholders(provider):
     placeholders['postgresql']['parameters']['shared_buffers'] = '{}MB'.format(int(os_memory_mb/sb_ratio))
     # # 1 connection per 30 MB, at least 100, at most 1000
     placeholders['postgresql']['parameters']['max_connections'] = min(max(100, int(os_memory_mb/30)), 1000)
+
+    # work_mem: 1 MB per GB of RAM, up to 64MB, min 16MB
+    placeholders['postgresql']['parameters']['work_mem'] = '{}MB'.format(min(64, max(16, os_memory_mb/1000)))
 
     placeholders['instance_data'] = get_instance_metadata(provider)
     placeholders.setdefault('RESTAPI_CONNECT_ADDRESS', placeholders['instance_data']['ip'])
