@@ -193,6 +193,8 @@ while IFS= read -r db_name; do
 CREATE EXTENSION IF NOT EXISTS pg_stat_kcache SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS set_user SCHEMA public;
 ALTER EXTENSION set_user UPDATE;
+UPDATE pg_catalog.pg_extension SET extname = 'columnar' WHERE extname = 'citus_columnar';
+UPDATE pg_catalog.pg_proc SET probin = '$libdir/columnar' WHERE probin = '$libdir/citus_columnar';
 CREATE EXTENSION IF NOT EXISTS columnar;
 ALTER EXTENSION columnar UPDATE;
 GRANT EXECUTE ON FUNCTION public.set_user(text) TO admin;
