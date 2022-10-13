@@ -22,6 +22,7 @@ clone_projects:
 	@$(call clone_if_not_exist,git@github.com:HydrasDB/citus.git,$(CURDIR)/../citus,master)
 	@$(call clone_if_not_exist,git@github.com:zalando/spilo.git,$(CURDIR)/../spilo,2.1-p7)
 
+GO_TEST_FLAGS ?=
 .PHONY: acceptance_test
 acceptance_test:
-	go test ./... -count=1 -race -v
+	go test ./... $(GO_TEST_FLAGS) -count=1 -race -v

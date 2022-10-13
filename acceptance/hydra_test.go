@@ -2,104 +2,32 @@ package acceptance
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/rs/xid"
 )
 
 type Container struct {
-	Name          string
-	Image         string
-	Port          int
-	ReadinessPort int
+	Name            string
+	Image           string
+	Port            int
+	ReadinessPort   int
+	MountDataVolume string
 }
 
 func Test_Hydra(t *testing.T) {
-	containers := []Container{
-		{
-			Name:          "hydra",
-			Image:         flagHydraImage,
-			Port:          35432,
-			ReadinessPort: 38008,
-		},
+	c := Container{
+		Name:          "hydra",
+		Image:         flagHydraImage,
+		Port:          35432,
+		ReadinessPort: 38008,
 	}
 
-	for _, c := range containers {
-		c := c
-
-		t.Run(c.Name, func(t *testing.T) {
-			t.Parallel()
-
-			testHydra(t, c)
-		})
-	}
-}
-
-func testHydra(t *testing.T, c Container) {
-	containerName := fmt.Sprintf("%s-%s", c.Name, xid.New())
-
-	go func() {
-		cmd := newCmd(
-			"docker",
-			"run",
-			"--rm",
-			"--name",
-			containerName,
-			"-p",
-			fmt.Sprintf("127.0.0.1:%d:5432", c.Port),
-			"-p",
-			fmt.Sprintf("127.0.0.1:%d:8008", c.ReadinessPort),
-			c.Image,
-		)
-		log.Println(cmd.String())
-		if err := cmd.Run(); err != nil {
-			log.Println(err)
-		}
-	}()
-	defer func() {
-		if err := terminateContainer(containerName); err != nil {
-			log.Println(err)
-		}
-	}()
-
-	waitUntil(t, 8, func() error {
-		t.Log("Waiting for containers to fully spawn")
-		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", c.ReadinessPort))
-		if err != nil {
-			return err
-		}
-
-		if resp.StatusCode != 200 {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-
-			return fmt.Errorf("db is not ready: code=%d, body=%s", resp.StatusCode, body)
-		}
-
-		return nil
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	cancel := runHydraContainer(t, c)
 	defer cancel()
 
-	pool, err := pgxpool.Connect(ctx, fmt.Sprintf("postgres://postgres:hydra@127.0.0.1:%d", c.Port))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		t.Fatal(err)
-	}
+	pool := newPGPool(t, c)
 
 	type Case struct {
 		Name     string
