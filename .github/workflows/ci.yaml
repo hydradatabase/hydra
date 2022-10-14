@@ -60,6 +60,8 @@ jobs:
         with:
           workdir: ./hydra
           push: true
+          pull: true
+          no-cache: true
           set: |
             hydra.tags=localhost:5000/hydra/hydra:${{ env.TAG }}
             *.cache-from=type=gha
