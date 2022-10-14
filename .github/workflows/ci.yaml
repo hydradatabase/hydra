@@ -32,6 +32,8 @@ jobs:
           repository: HydrasDB/citus
           token: ${{ secrets.GH_TOKEN }}
           path: citus
+          # TODO: change back to master after merged
+          ref: owenthereal/columnar_prefix_functions
       - name: Checkout spilo
         uses: actions/checkout@v2
         with:

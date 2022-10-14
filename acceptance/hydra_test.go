@@ -159,7 +159,7 @@ ALTER TABLE p2 ADD UNIQUE (n);
 		{
 			Name: "options",
 			SQL: `
-SELECT alter_columnar_table_set(
+SELECT columnar.alter_columnar_table_set(
     'my_columnar_table',
     compression => 'none',
     stripe_row_limit => 10000);
