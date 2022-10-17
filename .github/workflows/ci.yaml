@@ -33,7 +33,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
           path: citus
           # TODO: change back to master after merged
-          ref: owenthereal/columnar_prefix_functions
+          ref: devel
       - name: Checkout spilo
         uses: actions/checkout@v2
         with:
@@ -61,7 +61,6 @@ jobs:
           workdir: ./hydra
           push: true
           pull: true
-          no-cache: true
           set: |
             hydra.tags=localhost:5000/hydra/hydra:${{ env.TAG }}
             *.cache-from=type=gha
