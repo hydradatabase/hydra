@@ -77,8 +77,6 @@ target "columnar" {
     POSTGRES_BASE_VERSION = "${POSTGRES_BASE_VERSION}"
   }
 
-  tags = ["${COLUMNAR_REPO}:${TAG}"]
-
   cache-to = ["type=local,dest=tmp/bake_cache/columnar"]
   cache-from = ["type=local,src=tmp/bake_cache/columnar"]
 }
