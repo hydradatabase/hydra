@@ -23,7 +23,7 @@ variable "POSTGRES_BASE_VERSION" {
 }
 
 group "default" {
-  targets = ["postgres"]
+  targets = ["postgres", "spilo"]
 }
 
 target "shared" {
@@ -71,7 +71,7 @@ target "spilo" {
 target "columnar" {
   inherits = ["shared"]
 
-  context = "../citus"
+  context = "columnar"
 
   args = {
     POSTGRES_BASE_VERSION = "${POSTGRES_BASE_VERSION}"
