@@ -1,0 +1,10 @@
+#syntax=docker/dockerfile:1
+
+FROM spilo_base
+
+COPY --from=columnar /pg_ext /
+COPY files/default/postgres-appliance/scripts /scripts/
+
+ARG POSTGRES_BASE_VERSION=13
+# Default envs
+ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=postgres PGPASSWORD_SUPERUSER=hydra
