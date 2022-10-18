@@ -1,0 +1,34 @@
+/* This file is created manually */
+
+/* Citus full name as a string */
+#undef CITUS_NAME
+
+/* Citus edition as a string */
+#undef CITUS_EDITION
+
+/* Extension version expected by this Citus build */
+#undef CITUS_EXTENSIONVERSION
+
+/* Citus major version as a string */
+#undef CITUS_MAJORVERSION
+
+/* Citus version as a string */
+#undef CITUS_VERSION
+
+/* Citus version as a number */
+#undef CITUS_VERSION_NUM
+
+/* A string containing the version number, platform, and C compiler */
+#undef CITUS_VERSION_STR
+
+/* Define to 1 if you have the `curl' library (-lcurl). */
+#undef HAVE_LIBCURL
+
+/* Define to 1 if you have the `liblz4' library (-llz4). */
+#undef HAVE_CITUS_LIBLZ4
+
+/* Define to 1 if you have the `libzstd' library (-lzstd). */
+#undef HAVE_LIBZSTD
+
+/* Base URL for statistics collection and update checks */
+#undef REPORTS_BASE_URL

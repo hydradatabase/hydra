@@ -1,0 +1,257 @@
+--
+-- Testing alter_table_set_access_method
+--
+-- 1. check conversion of 'normal' tables
+CREATE TABLE t (a INT) USING heap;
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+INSERT INTO t VALUES (1),(2),(3);
+SELECT COUNT(*) = 3 FROM t;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT columnar.alter_table_set_access_method('t', 'columnar');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*)  = 3 FROM t;
+ ?column? 
+----------
+ t
+(1 row)
+
+DROP TABLE t;
+-- 2. check conversion of tables with trigger
+CREATE TABLE t (a INT) USING heap;
+CREATE or REPLACE FUNCTION trs_before() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE NOTICE 'BEFORE STATEMENT %', TG_OP;
+  RETURN NULL;
+END;
+$$;
+CREATE TRIGGER tr_before_stmt BEFORE INSERT ON t
+  FOR EACH STATEMENT EXECUTE PROCEDURE trs_before();
+CREATE or REPLACE FUNCTION trs_after() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE NOTICE 'AFTER STATEMENT %', TG_OP;
+  RETURN NULL;
+END;
+$$;
+CREATE TRIGGER tr_after_stmt AFTER INSERT ON t
+  FOR EACH STATEMENT EXECUTE PROCEDURE trs_after();
+CREATE or REPLACE FUNCTION trr_before() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+   RAISE NOTICE 'BEFORE ROW %: (%)', TG_OP, NEW.a;
+   RETURN NEW;
+END;
+$$;
+CREATE TRIGGER tr_before_row BEFORE INSERT ON t
+  FOR EACH ROW EXECUTE PROCEDURE trr_before();
+create or replace function trr_after() returns trigger language plpgsql as $$
+BEGIN
+   RAISE NOTICE 'AFTER ROW %: (%)', TG_OP, NEW.a;
+   RETURN NEW;
+END;
+$$;
+-- This trigger should not be applied to columnar table
+CREATE TRIGGER tr_after_row AFTER INSERT ON t
+  FOR EACH ROW EXECUTE PROCEDURE trr_after();
+INSERT INTO t VALUES (1);
+NOTICE:  BEFORE STATEMENT INSERT
+NOTICE:  BEFORE ROW INSERT: (1)
+NOTICE:  AFTER ROW INSERT: (1)
+NOTICE:  AFTER STATEMENT INSERT
+SELECT COUNT(*) = 4 FROM pg_trigger WHERE tgrelid = 't'::regclass::oid;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT columnar.alter_table_set_access_method('t', 'columnar');
+WARNING:  Trigger `CREATE TRIGGER tr_after_row AFTER INSERT ON public.t FOR EACH ROW EXECUTE FUNCTION trr_after()` cannot be applied.
+WARNING:  Foreign keys and AFTER ROW triggers are not supported for columnar tables. Consider an AFTER STATEMENT trigger instead.
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) = 3 FROM pg_trigger WHERE tgrelid = 't'::regclass::oid;
+ ?column? 
+----------
+ t
+(1 row)
+
+INSERT INTO t VALUES (1);
+NOTICE:  BEFORE STATEMENT INSERT
+NOTICE:  BEFORE ROW INSERT: (1)
+NOTICE:  AFTER STATEMENT INSERT
+-- 3. check conversion of tables with indexes which can be created with columnar
+CREATE TABLE index_table (a INT) USING heap;
+CREATE INDEX idx1 ON index_table (a);
+-- also create an index with statistics
+CREATE INDEX idx2 ON index_table ((a+1));
+ALTER INDEX idx2 ALTER COLUMN 1 SET STATISTICS 300;
+SELECT COUNT(1) FROM pg_class WHERE relname = 'index_table' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'index_table';
+ indexname 
+-----------
+ idx1
+ idx2
+(2 rows)
+
+SELECT columnar.alter_table_set_access_method('index_table', 'columnar');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'index_table' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'index_table';
+ indexname 
+-----------
+ idx1
+ idx2
+(2 rows)
+
+DROP TABLE index_table;
+-- 4. Convert table with indexes and constraints
+CREATE TABLE tbl (
+  c1 CIRCLE,
+  c2 TEXT,
+  i int4[],
+  p point,
+  a int,
+  EXCLUDE USING gist
+    (c1 WITH &&, (c2::circle) WITH &&)
+    WHERE (circle_center(c1) <> '(0,0)'),
+  EXCLUDE USING btree
+    (a WITH =)
+	INCLUDE(p)
+	WHERE (c2 < 'astring')
+);
+CREATE INDEX tbl_gin ON tbl USING gin (i);
+CREATE INDEX tbl_gist ON tbl USING gist(p);
+CREATE INDEX tbl_brin ON tbl USING brin (a) WITH (pages_per_range = 1);
+CREATE INDEX tbl_hash ON tbl USING hash (c2);
+ALTER TABLE tbl ADD CONSTRAINT tbl_unique UNIQUE (c2);
+CREATE UNIQUE INDEX tbl_btree ON tbl USING btree (a);
+ALTER TABLE tbl ADD CONSTRAINT tbl_pkey PRIMARY KEY USING INDEX tbl_btree;
+NOTICE:  ALTER TABLE / ADD CONSTRAINT USING INDEX will rename index "tbl_btree" to "tbl_pkey"
+SELECT indexname, indexdef FROM pg_indexes
+WHERE tablename = 'tbl'
+ORDER BY indexname;
+   indexname    |                                                       indexdef                                                        
+----------------+-----------------------------------------------------------------------------------------------------------------------
+ tbl_a_p_excl   | CREATE INDEX tbl_a_p_excl ON public.tbl USING btree (a) INCLUDE (p) WHERE (c2 < 'astring'::text)
+ tbl_brin       | CREATE INDEX tbl_brin ON public.tbl USING brin (a) WITH (pages_per_range='1')
+ tbl_c1_c2_excl | CREATE INDEX tbl_c1_c2_excl ON public.tbl USING gist (c1, ((c2)::circle)) WHERE (circle_center(c1) <> '(0,0)'::point)
+ tbl_gin        | CREATE INDEX tbl_gin ON public.tbl USING gin (i)
+ tbl_gist       | CREATE INDEX tbl_gist ON public.tbl USING gist (p)
+ tbl_hash       | CREATE INDEX tbl_hash ON public.tbl USING hash (c2)
+ tbl_pkey       | CREATE UNIQUE INDEX tbl_pkey ON public.tbl USING btree (a)
+ tbl_unique     | CREATE UNIQUE INDEX tbl_unique ON public.tbl USING btree (c2)
+(8 rows)
+
+SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'tbl'::regclass;
+                                         pg_get_constraintdef                                          
+-------------------------------------------------------------------------------------------------------
+ EXCLUDE USING gist (c1 WITH &&, ((c2)::circle) WITH &&) WHERE ((circle_center(c1) <> '(0,0)'::point))
+ EXCLUDE USING btree (a WITH =) INCLUDE (p) WHERE ((c2 < 'astring'::text))
+ UNIQUE (c2)
+ PRIMARY KEY (a)
+(4 rows)
+
+SELECT columnar.alter_table_set_access_method('tbl', 'columnar');
+WARNING:  Index `CREATE INDEX tbl_gin ON public.tbl USING gin (i)` cannot be created.
+WARNING:  Index `CREATE INDEX tbl_gist ON public.tbl USING gist (p)` cannot be created.
+WARNING:  Index `CREATE INDEX tbl_brin ON public.tbl USING brin (a) WITH (pages_per_range='1')` cannot be created.
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'tbl' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'tbl';
+  indexname   
+--------------
+ tbl_hash
+ tbl_a_p_excl
+ tbl_unique
+ tbl_pkey
+(4 rows)
+
+SELECT conname FROM pg_constraint
+WHERE conrelid = 'tbl'::regclass
+ORDER BY conname;
+   conname    
+--------------
+ tbl_a_p_excl
+ tbl_pkey
+ tbl_unique
+(3 rows)
+
+DROP TABLE tbl;
+-- 5. check non existing table
+SELECT columnar.alter_table_set_access_method('some_test', 'columnar');
+WARNING:  Table public.some_test does not exist.
+ alter_table_set_access_method 
+-------------------------------
+ f
+(1 row)
+
+-- 6. check if method is different than columnar
+CREATE TABLE t(a INT);
+ERROR:  relation "t" already exists
+SELECT columnar.alter_table_set_access_method('t', 'other');
+WARNING:  Cannot convert table: Allowed access methods are heap and columnar.
+ alter_table_set_access_method 
+-------------------------------
+ f
+(1 row)
+
+DROP TABLE t;
+-- 7. check if table have identity columns
+CREATE TABLE identity_cols_test (a INT, b INT GENERATED BY DEFAULT AS IDENTITY (INCREMENT BY 42));
+SELECT columnar.alter_table_set_access_method('identity_cols_test', 'columnar');
+WARNING:  Cannot convert table: table public.identity_cols_test must not use GENERATED ... AS IDENTITY.
+ alter_table_set_access_method 
+-------------------------------
+ f
+(1 row)
+
+DROP TABLE identity_cols_test;

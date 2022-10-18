@@ -1,0 +1,240 @@
+--
+-- Test querying columnar tables.
+--
+CREATE SCHEMA columnar_join;
+SET search_path to columnar_join, public;
+-- Settings to make the result deterministic
+SET datestyle = "ISO, YMD";
+-- Query uncompressed data
+SELECT count(*) FROM contestant;
+ count 
+-------
+     8
+(1 row)
+
+SELECT avg(rating), stddev_samp(rating) FROM contestant;
+          avg          |   stddev_samp    
+-----------------------+------------------
+ 2344.3750000000000000 | 433.746119785032
+(1 row)
+
+SELECT country, avg(rating) FROM contestant WHERE rating > 2200
+	GROUP BY country ORDER BY country;
+ country |          avg          
+---------+-----------------------
+ XA      | 2203.0000000000000000
+ XB      | 2610.5000000000000000
+ XC      | 2236.0000000000000000
+ XD      | 3090.0000000000000000
+(4 rows)
+
+SELECT * FROM contestant ORDER BY handle;
+ handle | birthdate  | rating | percentile | country | achievements 
+--------+------------+--------+------------+---------+--------------
+ a      | 1990-01-10 |   2090 |       97.1 | XA      | {a}
+ b      | 1990-11-01 |   2203 |       98.1 | XA      | {a,b}
+ c      | 1988-11-01 |   2907 |       99.4 | XB      | {w,y}
+ d      | 1985-05-05 |   2314 |       98.3 | XB      | {}
+ e      | 1995-05-05 |   2236 |       98.2 | XC      | {a}
+ f      | 1983-04-02 |   3090 |       99.6 | XD      | {a,b,c,y}
+ g      | 1991-12-13 |   1803 |       85.1 | XD      | {a,c}
+ h      | 1987-10-26 |   2112 |       95.4 | XD      | {w,a}
+(8 rows)
+
+-- all special column accesses should fail
+SELECT ctid FROM contestant;
+ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+SELECT cmin FROM contestant;
+ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+SELECT cmax FROM contestant;
+ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+SELECT xmin FROM contestant;
+ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+SELECT xmax FROM contestant;
+ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+SELECT tableid FROM contestant;
+ERROR:  column "tableid" does not exist
+LINE 1: SELECT tableid FROM contestant;
+               ^
+-- sample scans should fail
+SELECT * FROM contestant TABLESAMPLE SYSTEM(0.1);
+ERROR:  sample scans not supported on columnar tables
+-- Query compressed data
+SELECT count(*) FROM contestant_compressed;
+ count 
+-------
+     8
+(1 row)
+
+SELECT avg(rating), stddev_samp(rating) FROM contestant_compressed;
+          avg          |   stddev_samp    
+-----------------------+------------------
+ 2344.3750000000000000 | 433.746119785032
+(1 row)
+
+SELECT country, avg(rating) FROM contestant_compressed WHERE rating > 2200
+	GROUP BY country ORDER BY country;
+ country |          avg          
+---------+-----------------------
+ XA      | 2203.0000000000000000
+ XB      | 2610.5000000000000000
+ XC      | 2236.0000000000000000
+ XD      | 3090.0000000000000000
+(4 rows)
+
+SELECT * FROM contestant_compressed ORDER BY handle;
+ handle | birthdate  | rating | percentile | country | achievements 
+--------+------------+--------+------------+---------+--------------
+ a      | 1990-01-10 |   2090 |       97.1 | XA      | {a}
+ b      | 1990-11-01 |   2203 |       98.1 | XA      | {a,b}
+ c      | 1988-11-01 |   2907 |       99.4 | XB      | {w,y}
+ d      | 1985-05-05 |   2314 |       98.3 | XB      | {}
+ e      | 1995-05-05 |   2236 |       98.2 | XC      | {a}
+ f      | 1983-04-02 |   3090 |       99.6 | XD      | {a,b,c,y}
+ g      | 1991-12-13 |   1803 |       85.1 | XD      | {a,c}
+ h      | 1987-10-26 |   2112 |       95.4 | XD      | {w,a}
+(8 rows)
+
+-- Verify that we handle whole-row references correctly
+SELECT to_json(v) FROM contestant v ORDER BY rating LIMIT 1;
+                                                     to_json                                                      
+------------------------------------------------------------------------------------------------------------------
+ {"handle":"g","birthdate":"1991-12-13","rating":1803,"percentile":85.1,"country":"XD ","achievements":["a","c"]}
+(1 row)
+
+-- Test variables used in expressions
+CREATE TABLE union_first (a int, b int) USING columnar;
+CREATE TABLE union_second (a int, b int) USING columnar;
+INSERT INTO union_first SELECT a, a FROM generate_series(1, 5) a;
+INSERT INTO union_second SELECT a, a FROM generate_series(11, 15) a;
+(SELECT a*1, b FROM union_first) union all (SELECT a*1, b FROM union_second);
+ ?column? | b  
+----------+----
+        1 |  1
+        2 |  2
+        3 |  3
+        4 |  4
+        5 |  5
+       11 | 11
+       12 | 12
+       13 | 13
+       14 | 14
+       15 | 15
+(10 rows)
+
+DROP TABLE union_first, union_second;
+-- https://github.com/citusdata/citus/issues/4600
+CREATE TABLE INT8_TBL_columnar(q1 int8, q2 int8) using columnar;
+INSERT INTO INT8_TBL_columnar VALUES('  123   ','  456');
+INSERT INTO INT8_TBL_columnar VALUES('123   ','4567890123456789');
+INSERT INTO INT8_TBL_columnar VALUES('4567890123456789','123');
+INSERT INTO INT8_TBL_columnar VALUES(+4567890123456789,'4567890123456789');
+INSERT INTO INT8_TBL_columnar VALUES('+4567890123456789','-4567890123456789');
+explain (costs off, summary off) select * from
+  INT8_TBL_columnar a left join lateral
+  (select b.q1 as bq1, c.q1 as cq1, least(a.q1,b.q1,c.q1) from
+   INT8_TBL_columnar b cross join INT8_TBL_columnar c) ss
+  on a.q2 = ss.bq1;
+                          QUERY PLAN                           
+---------------------------------------------------------------
+ Nested Loop Left Join
+   ->  Custom Scan (ColumnarScan) on int8_tbl_columnar a
+         Columnar Projected Columns: q1, q2
+   ->  Nested Loop
+         ->  Custom Scan (ColumnarScan) on int8_tbl_columnar c
+               Columnar Projected Columns: q1
+         ->  Custom Scan (ColumnarScan) on int8_tbl_columnar b
+               Filter: (a.q2 = q1)
+               Columnar Projected Columns: q1
+               Columnar Chunk Group Filters: (a.q2 = q1)
+(10 rows)
+
+explain (costs off, summary off)
+  SELECT COUNT(*) FROM INT8_TBL_columnar t1 JOIN
+  LATERAL (SELECT * FROM INT8_TBL_columnar t2 WHERE t1.q1 = t2.q1)
+  as foo ON (true);
+                              QUERY PLAN                              
+----------------------------------------------------------------------
+ Aggregate
+   ->  Hash Join
+         Hash Cond: (t2.q1 = t1.q1)
+         ->  Custom Scan (ColumnarScan) on int8_tbl_columnar t2
+               Columnar Projected Columns: q1
+         ->  Hash
+               ->  Custom Scan (ColumnarScan) on int8_tbl_columnar t1
+                     Columnar Projected Columns: q1
+(8 rows)
+
+CREATE TABLE INT8_TBL_heap (LIKE INT8_TBL_columnar) USING heap;
+INSERT INTO INT8_TBL_heap SELECT * FROM INT8_TBL_columnar;
+CREATE TABLE result_columnar AS
+select * from
+  INT8_TBL_columnar a left join lateral
+  (select b.q1 as bq1, c.q1 as cq1, least(a.q1,b.q1,c.q1) from
+   INT8_TBL_columnar b cross join INT8_TBL_columnar c) ss
+  on a.q2 = ss.bq1;
+CREATE TABLE result_regular AS
+select * from
+  INT8_TBL_heap a left join lateral
+  (select b.q1 as bq1, c.q1 as cq1, least(a.q1,b.q1,c.q1) from
+   INT8_TBL_heap b cross join INT8_TBL_heap c) ss
+  on a.q2 = ss.bq1;
+-- 2 results should be identical, so the following should be empty
+(table result_columnar EXCEPT table result_regular)
+UNION
+(table result_regular EXCEPT table result_columnar);
+ q1 | q2 | bq1 | cq1 | least 
+----+----+-----+-----+-------
+(0 rows)
+
+SET client_min_messages TO WARNING;
+DROP SCHEMA columnar_join CASCADE;
+--
+-- https://github.com/citusdata/citus/issues/5258
+--
+set default_table_access_method to columnar;
+CREATE TABLE atest1 ( a int, b text );
+CREATE TABLE atest2 (col1 varchar(10), col2 boolean);
+INSERT INTO atest1 VALUES (1, 'one');
+SELECT * FROM atest1; -- ok
+ a |  b  
+---+-----
+ 1 | one
+(1 row)
+
+SELECT * FROM atest2; -- ok
+ col1 | col2 
+------+------
+(0 rows)
+
+INSERT INTO atest1 VALUES (2, 'two'); -- ok
+INSERT INTO atest1 SELECT 1, b FROM atest1; -- ok
+SELECT * FROM atest2 WHERE ( col1 IN ( SELECT b FROM atest1 ) );
+ col1 | col2 
+------+------
+(0 rows)
+
+DROP TABLE atest1;
+DROP TABLE atest2;
+set default_table_access_method to default;
+create temp table t1 (f1 numeric(14,0), f2 varchar(30)) USING columnar;
+select * from
+  (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
+   from t1 up) ss
+group by f1,f2,fs;
+ f1 | f2 | fs 
+----+----+----
+(0 rows)
+
+drop table t1;
+CREATE TABLE tbl1(c0 int4range) USING COLUMNAR;
+CREATE TABLE tbl2(c0 int4range);
+INSERT INTO tbl1(c0) VALUES('[0,1]'::int4range);
+INSERT INTO tbl1(c0) VALUES('[0,1]'::int4range);
+SELECT tbl1.c0 FROM tbl1 JOIN tbl2 ON tbl1.c0=tbl2.c0 WHERE tbl2.c0<=tbl2.c0 ISNULL;
+ c0 
+----
+(0 rows)
+
+DROP TABLE tbl1;
+DROP TABLE tbl2;

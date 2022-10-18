@@ -1,0 +1,153 @@
+--
+-- Test different operations on empty columnar tables.
+--
+SET columnar.compression to 'none';
+create table t_uncompressed(a int) using columnar;
+create table t_compressed(a int) using columnar;
+-- set options
+SELECT alter_columnar_table_set('t_compressed', compression => 'pglz');
+ alter_columnar_table_set 
+--------------------------
+ 
+(1 row)
+
+SELECT alter_columnar_table_set('t_compressed', stripe_row_limit => 2000);
+ alter_columnar_table_set 
+--------------------------
+ 
+(1 row)
+
+SELECT alter_columnar_table_set('t_compressed', chunk_group_row_limit => 1000);
+ alter_columnar_table_set 
+--------------------------
+ 
+(1 row)
+
+SELECT * FROM columnar.options WHERE regclass = 't_compressed'::regclass;
+   regclass   | chunk_group_row_limit | stripe_row_limit | compression_level | compression 
+--------------+-----------------------+------------------+-------------------+-------------
+ t_compressed |                  1000 |             2000 |                 3 | pglz
+(1 row)
+
+-- select
+select * from t_uncompressed;
+ a 
+---
+(0 rows)
+
+select count(*) from t_uncompressed;
+ count 
+-------
+     0
+(1 row)
+
+select * from t_compressed;
+ a 
+---
+(0 rows)
+
+select count(*) from t_compressed;
+ count 
+-------
+     0
+(1 row)
+
+-- check storage
+select
+  version_major, version_minor, reserved_stripe_id, reserved_row_number
+  from columnar_test_helpers.columnar_storage_info('t_compressed');
+ version_major | version_minor | reserved_stripe_id | reserved_row_number 
+---------------+---------------+--------------------+---------------------
+             2 |             0 |                  1 |                   1
+(1 row)
+
+select
+  version_major, version_minor, reserved_stripe_id, reserved_row_number
+  from columnar_test_helpers.columnar_storage_info('t_uncompressed');
+ version_major | version_minor | reserved_stripe_id | reserved_row_number 
+---------------+---------------+--------------------+---------------------
+             2 |             0 |                  1 |                   1
+(1 row)
+
+-- explain
+explain (costs off, summary off, timing off) select * from t_uncompressed;
+                  QUERY PLAN                  
+----------------------------------------------
+ Custom Scan (ColumnarScan) on t_uncompressed
+   Columnar Projected Columns: a
+(2 rows)
+
+explain (costs off, summary off, timing off) select * from t_compressed;
+                 QUERY PLAN                 
+--------------------------------------------
+ Custom Scan (ColumnarScan) on t_compressed
+   Columnar Projected Columns: a
+(2 rows)
+
+-- vacuum
+vacuum t_compressed;
+vacuum t_uncompressed;
+-- vacuum full
+vacuum full t_compressed;
+vacuum full t_uncompressed;
+-- check storage
+select
+  version_major, version_minor, reserved_stripe_id, reserved_row_number
+  from columnar_test_helpers.columnar_storage_info('t_compressed');
+ version_major | version_minor | reserved_stripe_id | reserved_row_number 
+---------------+---------------+--------------------+---------------------
+             2 |             0 |                  1 |                   1
+(1 row)
+
+select
+  version_major, version_minor, reserved_stripe_id, reserved_row_number
+  from columnar_test_helpers.columnar_storage_info('t_uncompressed');
+ version_major | version_minor | reserved_stripe_id | reserved_row_number 
+---------------+---------------+--------------------+---------------------
+             2 |             0 |                  1 |                   1
+(1 row)
+
+-- analyze
+analyze t_uncompressed;
+analyze t_compressed;
+-- truncate
+truncate t_uncompressed;
+truncate t_compressed;
+-- alter type
+alter table t_uncompressed alter column a type text;
+alter table t_compressed alter column a type text;
+-- check storage
+select
+  version_major, version_minor, reserved_stripe_id, reserved_row_number
+  from columnar_test_helpers.columnar_storage_info('t_compressed');
+ version_major | version_minor | reserved_stripe_id | reserved_row_number 
+---------------+---------------+--------------------+---------------------
+             2 |             0 |                  1 |                   1
+(1 row)
+
+select
+  version_major, version_minor, reserved_stripe_id, reserved_row_number
+  from columnar_test_helpers.columnar_storage_info('t_uncompressed');
+ version_major | version_minor | reserved_stripe_id | reserved_row_number 
+---------------+---------------+--------------------+---------------------
+             2 |             0 |                  1 |                   1
+(1 row)
+
+-- verify cost of scanning an empty table is zero, not NaN
+explain table t_uncompressed;
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Custom Scan (ColumnarScan) on t_uncompressed  (cost=0.00..0.00 rows=1 width=32)
+   Columnar Projected Columns: a
+(2 rows)
+
+explain table t_compressed;
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Custom Scan (ColumnarScan) on t_compressed  (cost=0.00..0.00 rows=1 width=32)
+   Columnar Projected Columns: a
+(2 rows)
+
+-- drop
+drop table t_compressed;
+drop table t_uncompressed;

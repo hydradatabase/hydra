@@ -1,0 +1,5 @@
+# Citus extension
+comment = 'Citus Columnar extension'
+default_version = '11.1-2'
+module_pathname = '$libdir/columnar'
+relocatable = false

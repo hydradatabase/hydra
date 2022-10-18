@@ -1,0 +1,54 @@
+# Global excludes across all subdirectories
+*.o
+*.so
+*.so.[0-9]
+*.so.[0-9].[0-9]
+*.sl
+*.sl.[0-9]
+*.sl.[0-9].[0-9]
+*.dylib
+*.dll
+*.a
+*.mo
+*.pot
+objfiles.txt
+.deps/
+*.gcno
+*.gcda
+*.gcov
+*.gcov.out
+lcov.info
+coverage/
+*.vcproj
+*.vcxproj
+win32ver.rc
+*.exe
+lib*dll.def
+lib*.pc
+*.bc
+
+# Local excludes in root directory
+/config.log
+/config.status
+/pgsql.sln
+/pgsql.sln.cache
+/Debug/
+/Release/
+/autom4te.cache
+/Makefile.global
+/src/Makefile.custom
+/compile_commands.json
+
+# temporary files vim creates
+*.swp
+
+# vscode
+.vscode/*
+.ccls
+
+# output from diff normalization that shouldn't be commited
+*.unmodified
+*.modified
+
+# style related temporary outputs
+*.uncrustify

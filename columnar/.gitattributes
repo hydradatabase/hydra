@@ -1,0 +1,40 @@
+*		whitespace=space-before-tab,trailing-space
+*.[chly]	whitespace=space-before-tab,trailing-space,indent-with-non-tab,tabwidth=4
+*.dsl		whitespace=space-before-tab,trailing-space,tab-in-indent
+*.patch		-whitespace
+*.pl		whitespace=space-before-tab,trailing-space,tabwidth=4
+*.po		whitespace=space-before-tab,trailing-space,tab-in-indent,-blank-at-eof
+*.sgml		whitespace=space-before-tab,trailing-space,tab-in-indent,-blank-at-eol
+*.x[ms]l	whitespace=space-before-tab,trailing-space,tab-in-indent
+
+# Avoid confusing ASCII underlines with leftover merge conflict markers
+README		conflict-marker-size=32
+README.*	conflict-marker-size=32
+
+# Certain data files that contain special whitespace, and other special cases
+*.data						-whitespace
+
+# Test output files that contain extra whitespace
+*.out					-whitespace
+src/test/regress/output/*.source	-whitespace
+
+# These files are maintained or generated elsewhere.  We take them as is.
+configure				-whitespace
+
+# all C files (implementation and header) use our style...
+*.[ch] citus-style
+
+# except these exceptions...
+src/backend/distributed/utils/citus_outfuncs.c -citus-style
+src/backend/distributed/utils/pg11_snprintf.c -citus-style
+src/backend/distributed/deparser/ruleutils_11.c -citus-style
+src/backend/distributed/deparser/ruleutils_12.c -citus-style
+src/backend/distributed/deparser/ruleutils_13.c -citus-style
+src/backend/distributed/deparser/ruleutils_14.c -citus-style
+src/backend/distributed/commands/index_pg_source.c -citus-style
+
+src/include/distributed/citus_nodes.h -citus-style
+/vendor/** -citus-style
+
+# Hide diff on github by default for copied udfs
+src/backend/distributed/sql/udfs/*/[123456789]*.sql linguist-generated=true

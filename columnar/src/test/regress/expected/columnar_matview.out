@@ -1,0 +1,97 @@
+--
+-- Testing we materialized views properly
+--
+SET columnar.compression TO 'none';
+CREATE TABLE t(a int, b int) USING columnar;
+INSERT INTO t SELECT floor(i / 4), 2 * i FROM generate_series(1, 10) i;
+CREATE MATERIALIZED VIEW t_view(a, bsum, cnt) USING columnar AS
+   SELECT a, sum(b), count(*) FROM t GROUP BY a;
+SELECT * FROM t_view a ORDER BY a;
+ a | bsum | cnt 
+---+------+-----
+ 0 |   12 |   3
+ 1 |   44 |   4
+ 2 |   54 |   3
+(3 rows)
+
+INSERT INTO t SELECT floor(i / 4), 2 * i FROM generate_series(11, 20) i;
+SELECT * FROM t_view a ORDER BY a;
+ a | bsum | cnt 
+---+------+-----
+ 0 |   12 |   3
+ 1 |   44 |   4
+ 2 |   54 |   3
+(3 rows)
+
+-- show columnar options for materialized view
+SELECT * FROM columnar.options
+WHERE regclass = 't_view'::regclass;
+ regclass | chunk_group_row_limit | stripe_row_limit | compression_level | compression 
+----------+-----------------------+------------------+-------------------+-------------
+ t_view   |                 10000 |           150000 |                 3 | none
+(1 row)
+
+-- show we can set options on a materialized view
+SELECT alter_columnar_table_set('t_view', compression => 'pglz');
+ alter_columnar_table_set 
+--------------------------
+ 
+(1 row)
+
+SELECT * FROM columnar.options
+WHERE regclass = 't_view'::regclass;
+ regclass | chunk_group_row_limit | stripe_row_limit | compression_level | compression 
+----------+-----------------------+------------------+-------------------+-------------
+ t_view   |                 10000 |           150000 |                 3 | pglz
+(1 row)
+
+REFRESH MATERIALIZED VIEW t_view;
+-- verify options have not been changed
+SELECT * FROM columnar.options
+WHERE regclass = 't_view'::regclass;
+ regclass | chunk_group_row_limit | stripe_row_limit | compression_level | compression 
+----------+-----------------------+------------------+-------------------+-------------
+ t_view   |                 10000 |           150000 |                 3 | pglz
+(1 row)
+
+SELECT * FROM t_view a ORDER BY a;
+ a | bsum | cnt 
+---+------+-----
+ 0 |   12 |   3
+ 1 |   44 |   4
+ 2 |   76 |   4
+ 3 |  108 |   4
+ 4 |  140 |   4
+ 5 |   40 |   1
+(6 rows)
+
+-- verify that we have created metadata entries for the materialized view
+SELECT columnar_test_helpers.columnar_relation_storageid(oid) AS storageid
+FROM pg_class WHERE relname='t_view' \gset
+SELECT count(*) FROM columnar.stripe WHERE storage_id=:storageid;
+ count 
+-------
+     1
+(1 row)
+
+SELECT count(*) FROM columnar.chunk WHERE storage_id=:storageid;
+ count 
+-------
+     3
+(1 row)
+
+DROP TABLE t CASCADE;
+NOTICE:  drop cascades to materialized view t_view
+-- dropping must remove metadata
+SELECT count(*) FROM columnar.stripe WHERE storage_id=:storageid;
+ count 
+-------
+     0
+(1 row)
+
+SELECT count(*) FROM columnar.chunk WHERE storage_id=:storageid;
+ count 
+-------
+     0
+(1 row)
+
