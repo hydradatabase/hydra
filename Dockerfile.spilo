@@ -5,6 +5,6 @@ FROM spilo_base
 COPY --from=columnar /pg_ext /
 COPY files/default/postgres-appliance/scripts /scripts/
 
-ARG POSTGRES_BASE_VERSION=13
+ARG POSTGRES_BASE_VERSION
 # Default envs
 ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=postgres PGPASSWORD_SUPERUSER=hydra

@@ -54,7 +54,7 @@ target "spilo" {
   dockerfile = "Dockerfile.spilo"
 
   contexts = {
-    spilo_base = "docker-image://registry.opensource.zalan.do/acid/spilo-14:${SPILO_VERSION}"
+    spilo_base = "target:spilo_base"
     columnar = "target:columnar"
   }
 
@@ -79,4 +79,18 @@ target "columnar" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/columnar"]
   cache-from = ["type=local,src=tmp/bake_cache/columnar"]
+}
+
+target "spilo_base" {
+  inherits = ["shared"]
+
+  context = "https://github.com/zalando/spilo.git#${SPILO_VERSION}:postgres-appliance"
+
+  args = {
+    TIMESCALEDB = ""
+    PGOLDVERSIONS = "${POSTGRES_BASE_VERSION}"
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/spilo_base"]
+  cache-from = ["type=local,src=tmp/bake_cache/spilo_base"]
 }
