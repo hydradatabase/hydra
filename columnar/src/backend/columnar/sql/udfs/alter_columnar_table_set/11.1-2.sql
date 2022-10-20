@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION columnar.alter_columnar_table_set(
+DROP FUNCTION IF EXISTS columnar.alter_columnar_table_set;
+
+CREATE OR REPLACE FUNCTION pg_catalog.alter_columnar_table_set(
     table_name regclass,
     chunk_group_row_limit int DEFAULT NULL,
     stripe_row_limit int DEFAULT NULL,
@@ -8,7 +10,7 @@ CREATE OR REPLACE FUNCTION columnar.alter_columnar_table_set(
     LANGUAGE C
 AS 'MODULE_PATHNAME', 'alter_columnar_table_set';
 
-COMMENT ON FUNCTION columnar.alter_columnar_table_set(
+COMMENT ON FUNCTION pg_catalog.alter_columnar_table_set(
     table_name regclass,
     chunk_group_row_limit int,
     stripe_row_limit int,

@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS pg_catalog.alter_columnar_table_reset;
+
 CREATE OR REPLACE FUNCTION columnar.alter_columnar_table_reset(
     table_name regclass,
     chunk_group_row_limit bool DEFAULT false,

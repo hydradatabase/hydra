@@ -30,7 +30,7 @@ SELECT data_length AS size_comp_level_default FROM columnar.stripe WHERE storage
     SELECT storage_id from columnar_test_helpers.columnar_storage_info('test_zstd')) \gset
 
 -- change compression level
-SELECT alter_columnar_table_set('test_zstd', compression_level => 19);
+SELECT columnar.alter_columnar_table_set('test_zstd', compression_level => 19);
 VACUUM FULL test_zstd;
 
 SELECT data_length AS size_comp_level_19 FROM columnar.stripe WHERE storage_id = (

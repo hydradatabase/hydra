@@ -203,7 +203,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 			},
 		},
 		shared.Case{
-			Name: "spilo started the expected postgres version",
+			Name: fmt.Sprintf("spilo started the expected postgres version %s", config.PostgresVersion),
 			SQL:  `SHOW server_version;`,
 			Validate: func(t *testing.T, row pgx.Row) {
 				var version string
