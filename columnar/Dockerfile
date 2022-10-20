@@ -6,12 +6,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install gnupg postg
 RUN sh /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install lsb-release gcc make libssl-dev autoconf pkg-config postgresql-${POSTGRES_BASE_VERSION} postgresql-server-dev-${POSTGRES_BASE_VERSION} libcurl4-gnutls-dev liblz4-dev libzstd-dev -y
 
-WORKDIR /citus
+WORKDIR /columnar
 COPY . .
 RUN chown -R postgres:postgres .
 
 USER postgres
-ENV PATH=/usr/lib/postgresql/13/bin:$PATH
+ENV PATH=/usr/lib/postgresql/${POSTGRES_BASE_VERSION}/bin:$PATH
 RUN ./configure && make clean extension
 
 USER root
@@ -21,7 +21,7 @@ USER postgres
 RUN make check-all
 
 USER root
-RUN DESTDIR=/pg_ext make -C /citus/src/backend/columnar install 
+RUN DESTDIR=/pg_ext make -C /columnar/src/backend/columnar install 
 
 FROM scratch
 
