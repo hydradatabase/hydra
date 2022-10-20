@@ -21,7 +21,7 @@ PLATFORM ?= linux/arm64
 # Runs a docker build for the target platform and loads it into the local docker
 # environment
 docker_build_local: $(DOCKER_CACHE_DIR)
-	POSTGRES_BASE_VERESION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --pull --load $(TARGET)
+	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --pull --load $(TARGET)
 
 .PHONY: docker_build_local_postgres
 docker_build_local_postgres: TARGET = postgres
