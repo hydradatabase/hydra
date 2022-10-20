@@ -6,7 +6,7 @@
 CREATE TABLE contestant (handle TEXT, birthdate DATE, rating INT,
 	percentile FLOAT, country CHAR(3), achievements TEXT[])
 	USING columnar;
-SELECT alter_columnar_table_set('contestant', compression => 'none');
+SELECT columnar.alter_columnar_table_set('contestant', compression => 'none');
 
 CREATE INDEX contestant_idx on contestant(handle);
 

@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION columnar.alter_columnar_table_reset(
+DROP FUNCTION IF EXISTS columnar.alter_columnar_table_reset;
+
+CREATE OR REPLACE FUNCTION pg_catalog.alter_columnar_table_reset(
     table_name regclass,
     chunk_group_row_limit bool DEFAULT false,
     stripe_row_limit bool DEFAULT false,
@@ -8,7 +10,7 @@ CREATE OR REPLACE FUNCTION columnar.alter_columnar_table_reset(
     LANGUAGE C
 AS 'MODULE_PATHNAME', 'alter_columnar_table_reset';
 
-COMMENT ON FUNCTION columnar.alter_columnar_table_reset(
+COMMENT ON FUNCTION pg_catalog.alter_columnar_table_reset(
     table_name regclass,
     chunk_group_row_limit bool,
     stripe_row_limit bool,

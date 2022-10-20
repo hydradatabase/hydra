@@ -5,19 +5,19 @@ SET columnar.compression to 'none';
 create table t_uncompressed(a int) using columnar;
 create table t_compressed(a int) using columnar;
 -- set options
-SELECT alter_columnar_table_set('t_compressed', compression => 'pglz');
+SELECT columnar.alter_columnar_table_set('t_compressed', compression => 'pglz');
  alter_columnar_table_set 
 --------------------------
  
 (1 row)
 
-SELECT alter_columnar_table_set('t_compressed', stripe_row_limit => 2000);
+SELECT columnar.alter_columnar_table_set('t_compressed', stripe_row_limit => 2000);
  alter_columnar_table_set 
 --------------------------
  
 (1 row)
 
-SELECT alter_columnar_table_set('t_compressed', chunk_group_row_limit => 1000);
+SELECT columnar.alter_columnar_table_set('t_compressed', chunk_group_row_limit => 1000);
  alter_columnar_table_set 
 --------------------------
  

@@ -34,7 +34,7 @@ select
   from columnar_test_helpers.columnar_storage_info('t');
 
 -- test the case when all data cannot fit into a single stripe
-SELECT alter_columnar_table_set('t', stripe_row_limit => 1000);
+SELECT columnar.alter_columnar_table_set('t', stripe_row_limit => 1000);
 INSERT INTO t SELECT i, 2 * i FROM generate_series(1,2500) i;
 
 SELECT sum(a), sum(b) FROM t;
@@ -91,7 +91,7 @@ SELECT count(*) FROM t;
 -- then vacuum to print stats
 
 BEGIN;
-SELECT alter_columnar_table_set('t',
+SELECT columnar.alter_columnar_table_set('t',
     chunk_group_row_limit => 1000,
     stripe_row_limit => 2000,
     compression => 'pglz');
@@ -99,7 +99,7 @@ SAVEPOINT s1;
 INSERT INTO t SELECT i FROM generate_series(1, 1500) i;
 ROLLBACK TO SAVEPOINT s1;
 INSERT INTO t SELECT i / 5 FROM generate_series(1, 1500) i;
-SELECT alter_columnar_table_set('t', compression => 'none');
+SELECT columnar.alter_columnar_table_set('t', compression => 'none');
 SAVEPOINT s2;
 INSERT INTO t SELECT i FROM generate_series(1, 1500) i;
 ROLLBACK TO SAVEPOINT s2;
@@ -125,7 +125,7 @@ VACUUM t;
 -- vacuum full should remove chunks for dropped columns
 -- note that, a chunk will be stored in non-compressed for if compression
 -- doesn't reduce its size.
-SELECT alter_columnar_table_set('t', compression => 'pglz');
+SELECT columnar.alter_columnar_table_set('t', compression => 'pglz');
 VACUUM FULL t;
 VACUUM t;
 

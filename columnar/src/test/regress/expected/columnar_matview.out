@@ -32,7 +32,7 @@ WHERE regclass = 't_view'::regclass;
 (1 row)
 
 -- show we can set options on a materialized view
-SELECT alter_columnar_table_set('t_view', compression => 'pglz');
+SELECT columnar.alter_columnar_table_set('t_view', compression => 'pglz');
  alter_columnar_table_set 
 --------------------------
  

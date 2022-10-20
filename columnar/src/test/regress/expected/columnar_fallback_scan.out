@@ -8,7 +8,7 @@
 set columnar.enable_custom_scan = false;
 create table fallback_scan(i int) using columnar;
 -- large enough to test parallel_workers > 1
-select alter_columnar_table_set('fallback_scan', compression => 'none');
+select columnar.alter_columnar_table_set('fallback_scan', compression => 'none');
  alter_columnar_table_set 
 --------------------------
  
