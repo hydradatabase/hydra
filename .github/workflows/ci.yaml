@@ -1,128 +1,209 @@
 name: CI
+
 on:
   workflow_dispatch:
   push:
 
+env:
+  POSTGRES_REPO: ghcr.io/hydrasdb/hydra
+  SPILO_REPO: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
+  TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
+
 jobs:
-  docker_build_and_push:
-    name: Docker Build & Push
+  lint_go:
+    name: Run Go linters
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     steps:
-      # Checkout
-      # Note: the following folder layout matters:
-      # parent_dir:
-      #   - hydra
-      #   - citus
-      #   - spilo
-      - name: Checkout hydra
-        uses: actions/checkout@v2
-        with:
-          path: hydra
-      - name: Checkout columnar
-        uses: actions/checkout@v2
-        with:
-          repository: HydrasDB/citus
-          token: ${{ secrets.GH_TOKEN }}
-          path: citus
-      - name: Checkout spilo
-        uses: actions/checkout@v2
-        with:
-          repository: zalando/spilo
-          token: ${{ secrets.GH_TOKEN }}
-          ref: 2.1-p7
-          path: spilo
+    - name: Checkout
+      uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v3
 
-      # Set versions
-      - name: Set versions
-        run: |
-          cd ./citus && COLUMNAR_EXT_SHA=$(git rev-parse --short HEAD) && echo "COLUMNAR_EXT_SHA=${COLUMNAR_EXT_SHA}" >> $GITHUB_ENV && cd ../
-          cd ./spilo && SPILO_SHA=$(git rev-parse --short HEAD) && echo "SPILO_SHA=${SPILO_SHA}" >> $GITHUB_ENV && cd ../
-          echo "TAG=${SPILO_SHA}_${COLUMNAR_EXT_SHA}" >> $GITHUB_ENV
 
-      # Docker build
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          driver-opts: network=host
+  build_validate_postgres:
+    strategy:
+      matrix:
+        postgres: ['13', '14']
+    name: Build and Validate Postgres ${{ matrix.postgres }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: setup POSTGRES_IMAGE env
+      run: echo "POSTGRES_IMAGE=${{ format('{0}:{1}-{2}', env.POSTGRES_REPO, matrix.postgres, github.sha) }}" >> $GITHUB_ENV
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+        platforms: linux/amd64,linux/arm64/v8
+        driver-opts: network=host
+    - name: Bake and load amd64 Postgres image
+      uses: docker/bake-action@v2.3.0
+      env:
+        POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
+      with:
+        load: true
+        pull: true
+        targets: postgres
+        set: |
+          *.platform=linux/amd64
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
+          postgres.tags=${{ env.POSTGRES_IMAGE }}
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: Run Acceptance Tests
+      env:
+        POSTGRES_UPGRADE_FROM_IMAGE: ${{ env.POSTGRES_IMAGE }}
+        POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
+      run: make postgres_acceptance_test
+    - name: Upload test container logs
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: postgres_${{ matrix.postgres }}_container_logs
+        path: ${{ env.TEST_CONTAINER_LOG_DIR }}
+        retention-days: 7
+    - name: Bake multi-platform Postgres
+      if: github.ref == 'refs/heads/main'
+      uses: docker/bake-action@v2.3.0
+      with:
+        pull: true
+        targets: postgres
+        set: |
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
 
-      - name: Docker build
-        uses: docker/bake-action@master
-        with:
-          workdir: ./hydra
-          push: true
-          set: |
-            hydra.tags=localhost:5000/hydra/hydra:${{ env.TAG }}
-            *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
+  build_validate_spilo:
+    name: Build and Validate Spilo
+    runs-on: ubuntu-latest
+    steps:
+    - name: setup SPILO_IMAGE
+      run: echo "SPILO_IMAGE=${{ format('{0}:{1}', env.SPILO_REPO, github.sha) }}" >> $GITHUB_ENV
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+        platforms: linux/amd64,linux/arm64/v8
+        driver-opts: network=host
+    - name: Bake and load amd64 spilo image
+      uses: docker/bake-action@v2.3.0
+      with:
+        load: true
+        pull: true
+        targets: spilo
+        set: |
+          *.platform=linux/amd64
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
+          spilo.tags=${{ env.SPILO_IMAGE }}
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: Run Acceptance Tests for Postgres 13
+      env:
+        SPILO_POSTGRES_VERSION: '13'
+      run: make spilo_acceptance_test
+    - name: Run Acceptance Tests for Postgres 14
+      env:
+        SPILO_UPGRADE_FROM_IMAGE: ${{ env.SPILO_IMAGE }}
+        SPILO_POSTGRES_VERSION: '14'
+      run: make spilo_acceptance_test
+    - name: Upload test container logs
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: spilo_container_logs
+        path: ${{ env.TEST_CONTAINER_LOG_DIR }}
+        retention-days: 7
+    - name: Bake multi-platform spilo
+      if: github.ref == 'refs/heads/main'
+      uses: docker/bake-action@v2.3.0
+      with:
+        pull: true
+        targets: spilo
+        set: |
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
 
-      # Acceptance tests
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ^1.18
-      - name: Run Acceptance Tests
-        run: |
-          cd ./hydra
-          HYDRA_IMAGE=localhost:5000/hydra/hydra:${TAG} \
-            HYDRA_PROD_IMAGE=ghcr.io/hydrasdb/hydra:$(cat HYDRA_PROD_VER) \
-            make acceptance_test
+  push_postgres:
+    needs: [build_validate_postgres, build_validate_spilo]
+    if: github.repository == 'hydrasdb/hydra' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        postgres: ['13', '14']
+    name: Push Postgres ${{ matrix.postgres }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+        platforms: linux/amd64,linux/arm64/v8
+        driver-opts: network=host
+    - name: Login to ghcr.io
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Bake and push Postgres
+      uses: docker/bake-action@v2.3.0
+      with:
+        push: true
+        targets: postgres
+        set: |
+          *.cache-from=type=gha
+          postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}
+          postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
+          ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
-      # Docker push to ghcr.io
-      - name: Login to ghcr.io
-        if: github.ref == 'refs/heads/main'
-        uses: docker/login-action@v2.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker push hydra to ghcr.io
-        if: github.ref == 'refs/heads/main'
-        uses: docker/bake-action@master
-        with:
-          workdir: ./hydra
-          targets: hydra
-          push: true
-          set: |
-            hydra.tags=ghcr.io/hydrasdb/hydra:latest
-            hydra.tags=ghcr.io/hydrasdb/hydra:${{ env.TAG }}
-            *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
-
-      # Docker push to ecr
-      - name: Configure AWS credentials
-        if: github.ref == 'refs/heads/main'
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: us-east-1
-          mask-aws-account-id: no
-
-      - name: Login to Amazon ECR
-        if: github.ref == 'refs/heads/main'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          registries: "011789831835"
-
-      - name: Docker push hydra to ECR
-        if: github.ref == 'refs/heads/main'
-        uses: docker/bake-action@master
-        with:
-          workdir: ./hydra
-          targets: hydra
-          push: true
-          # TODO: create ECR repo to HOST/hydra and change the refs here
-          set: |
-            hydra.tags=${{ steps.login-ecr.outputs.registry }}/spilo:latest
-            hydra.tags=${{ steps.login-ecr.outputs.registry }}/spilo:${{ env.TAG }}
-            *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
+  push_spilo:
+    needs: [build_validate_postgres, build_validate_spilo]
+    if: github.repository == 'hydrasdb/hydra' && github.ref == 'refs/heads/main'
+    name: Push Spilo
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+        platforms: linux/amd64,linux/arm64/v8
+        driver-opts: network=host
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+        aws-region: us-east-1
+        mask-aws-account-id: no
+    - name: Login to Amazon ECR
+      id: spilo-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+      with:
+        registries: "011789831835"
+    - name: Bake and push spilo
+      uses: docker/bake-action@v2.3.0
+      with:
+        push: true
+        targets: spilo
+        set: |
+          *.cache-from=type=gha
+          spilo.tags=${{ env.SPILO_REPO }}:${{ github.sha }}
