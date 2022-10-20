@@ -8,22 +8,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/HydrasDB/hydra/acceptance/shared"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joeshaw/envdecode"
 	"github.com/rs/xid"
 )
 
 type Config struct {
-	Image                string        `env:"POSTGRES_IMAGE,required"`
-	UpgradeFromImage     string        `env:"POSTGRES_UPGRADE_FROM_IMAGE,required"`
-	ContainerLogDir      string        `env:"CONTAINER_LOG_DIR,default="`
-	WaitForStartTimeout  time.Duration `env:"WAIT_FOR_START_TIMEOUT,default=15s"`
-	WaitForStartInterval time.Duration `env:"WAIT_FOR_START_INTERVAL,default=1s"`
-	PostgresPort         int           `env:"POSTGRES_PORT,default=5432"`
+	Image                   string        `env:"POSTGRES_IMAGE,required"`
+	UpgradeFromImage        string        `env:"POSTGRES_UPGRADE_FROM_IMAGE,required"`
+	ContainerLogDir         string        `env:"CONTAINER_LOG_DIR,default="`
+	WaitForStartTimeout     time.Duration `env:"WAIT_FOR_START_TIMEOUT,default=15s"`
+	WaitForStartInterval    time.Duration `env:"WAIT_FOR_START_INTERVAL,default=1s"`
+	PostgresPort            int           `env:"POSTGRES_PORT,default=5432"`
+	ExpectedPostgresVersion string        `env:"EXPECTED_POSTGRES_VERSION,required"`
 }
 
 var config Config
@@ -129,6 +132,20 @@ func (c postgresAcceptanceContainer) PGPool() *pgxpool.Pool {
 func Test_PostgresAcceptance(t *testing.T) {
 	shared.RunAcceptanceTests(
 		t, context.Background(), &postgresAcceptanceContainer{config: config},
+		shared.Case{
+			Name: "started with the expected postgres version",
+			SQL:  `SHOW server_version;`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var version string
+				if err := row.Scan(&version); err != nil {
+					t.Fatal(err)
+				}
+
+				if !strings.HasPrefix(version, config.ExpectedPostgresVersion) {
+					t.Errorf("incorrect postgres version, got %s, expected major version %s", version, config.ExpectedPostgresVersion)
+				}
+			},
+		},
 	)
 }
 

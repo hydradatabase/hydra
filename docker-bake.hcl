@@ -11,7 +11,7 @@ variable "SPILO_VERSION" {
 }
 
 variable "POSTGRES_BASE_VERSION" {
-  default = "13"
+  default = "14"
 }
 
 variable "SPILO_POSTGRES_VERSION" {
