@@ -14,35 +14,42 @@ $(TEST_CONTAINER_LOG_DIR):
 .PHONY: docker_build
 # Runs a full multi-platform docker build
 docker_build: $(DOCKER_CACHE_DIR)
-	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake $(TARGET)
+	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --pull $(TARGET)
 
 PLATFORM ?= linux/arm64
 .PHONY: docker_build_local
-# Runs a docker build of the target platform and loads it into the local docker
+# Runs a docker build for the target platform and loads it into the local docker
 # environment
 docker_build_local: $(DOCKER_CACHE_DIR)
-	POSTGRES_BASE_VERESION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --load $(TARGET)
+	POSTGRES_BASE_VERESION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --pull --load $(TARGET)
 
 .PHONY: docker_build_local_postgres
 docker_build_local_postgres: TARGET = postgres
+# Runs a local docker build for the target platform for postgres and loads it
+# into the local docker
 docker_build_local_postgres: docker_build_local
 
 .PHONY: docker_build_local_spilo
 docker_build_local_spilo: TARGET = spilo
+# Runs a local docker build for the target platform for spilo and loads it
+# into the local docker
 docker_build_local_spilo: docker_build_local
 
 GO_TEST_FLAGS ?=
 
 .PHONY: acceptance_test
+# Runs the acceptance tests
 acceptance_test: postgres_acceptance_test spilo_acceptance_test
 
 .PHONY: acceptance_build_test
+# Builds local images then runs the acceptance tests
 acceptance_build_test: postgres_acceptance_build_test spilo_acceptance_build_test
 
 POSTGRES_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
 POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
 
 .PHONY: postgres_acceptance_test
+# Runs the postgres acceptance tests
 postgres_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) \
 		POSTGRES_IMAGE=$(POSTGRES_IMAGE) \
@@ -51,12 +58,14 @@ postgres_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 		go test ./acceptance/postgres/... $(GO_TEST_FLAGS) -count=1 -v
 
 .PHONY: postgres_acceptance_build_test
+# Builds the postgres image then runs the acceptance tests
 postgres_acceptance_build_test: docker_build_local_postgres postgres_acceptance_test
 
 SPILO_IMAGE ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:latest
 SPILO_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$$(cat HYDRA_PROD_VER)
 
 .PHONY: spilo_acceptance_test
+# Runs the spilo acceptance tests
 spilo_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) \
 		SPILO_IMAGE=$(SPILO_IMAGE) \
@@ -64,12 +73,15 @@ spilo_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 		go test ./acceptance/spilo/... $(GO_TEST_FLAGS) -count=1 -v
 
 .PHONY: spilo_acceptance_build_test
+# Builds the spilo image then runs acceptance tests
 spilo_acceptance_build_test: docker_build_local_spilo spilo_acceptance_test
 
 .PHONY: lint_acceptance
+# Runs the go linter
 lint_acceptance:
 	golangci-lint run
 
 .PHONY: lint_fix_acceptance
+# Runs the go linter with the auto-fixer
 lint_fix_acceptance:
 	golangci-lint run --fix

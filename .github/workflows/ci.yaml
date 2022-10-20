@@ -100,21 +100,21 @@ jobs:
           *.platform=linux/amd64
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
-          spilo.tags=ghcr.io/hydrasdb/spilo:${{ github.sha }}
+          spilo.tags=011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
     - uses: actions/setup-go@v3
       with:
         go-version-file: go.mod
         cache: true
     - name: Run Acceptance Tests for Postgres 13
       env:
-        SPILO_IMAGE: ghcr.io/hydrasdb/spilo:${{ github.sha }}
+        SPILO_IMAGE: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
         SPILO_POSTGRES_VERSION: '13'
         TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
       run: make spilo_acceptance_test
     - name: Run Acceptance Tests for Postgres 14
       env:
-        SPILO_IMAGE: ghcr.io/hydrasdb/spilo:${{ github.sha }}
-        SPILO_UPGRADE_FROM_IMAGE: ghcr.io/hydrasdb/spilo:${{ github.sha }}
+        SPILO_IMAGE: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
+        SPILO_UPGRADE_FROM_IMAGE: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
         SPILO_POSTGRES_VERSION: '14'
         TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
       run: make spilo_acceptance_test
@@ -199,4 +199,4 @@ jobs:
         targets: spilo
         set: |
           *.cache-from=type=gha
-          spilo.tags=${{ steps.spilo-ecr.outputs.registry }}/spilo:${{ github.sha }}
+          spilo.tags=011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}

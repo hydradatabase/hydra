@@ -102,7 +102,7 @@ func (c *spiloAcceptanceContainer) WaitForContainerReady(t *testing.T, ctx conte
 		case <-done:
 			return
 		case <-ticker.C:
-			req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("http://127.0.0.1:%d", c.config.ReadinessPort), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d", c.config.ReadinessPort), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
