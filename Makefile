@@ -34,8 +34,10 @@ docker_build_local_spilo: docker_build_local
 GO_TEST_FLAGS ?=
 
 .PHONY: acceptance_test
-acceptance_test: $(TEST_CONTAINER_LOG_DIR)
-	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) go test ./acceptance/... $(GO_TEST_FLAGS) -count=1 -race -v
+acceptance_test: postgres_acceptance_test spilo_acceptance_test
+
+.PHONY: acceptance_build_test
+acceptance_build_test: postgres_acceptance_build_test spilo_acceptance_build_test
 
 POSTGRES_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
 POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
@@ -51,7 +53,7 @@ postgres_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 .PHONY: postgres_acceptance_build_test
 postgres_acceptance_build_test: docker_build_local_postgres postgres_acceptance_test
 
-SPILO_IMAGE ?= ghcr.io/hydrasdb/spilo:latest
+SPILO_IMAGE ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:latest
 SPILO_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$$(cat HYDRA_PROD_VER)
 
 .PHONY: spilo_acceptance_test

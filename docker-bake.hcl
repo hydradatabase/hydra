@@ -3,7 +3,7 @@ variable "POSTGRES_REPO" {
 }
 
 variable "SPILO_REPO" {
-  default = "ghcr.io/hydrasdb/spilo"
+  default = "011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo"
 }
 
 variable "SPILO_VERSION" {
