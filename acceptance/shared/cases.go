@@ -26,7 +26,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'columnar';
 			}
 
 			if want, got := 1, count; want != got {
-				t.Fatalf("columnar ext should exist")
+				t.Errorf("columnar ext should exist")
 			}
 		},
 	},

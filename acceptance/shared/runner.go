@@ -28,12 +28,12 @@ func RunAcceptanceTests(t *testing.T, ctx context.Context, cm ContainerManager, 
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, time.Second)
 			defer cancel()
 
 			if val := c.Validate; val == nil {
 				if _, err := pool.Exec(ctx, c.SQL); err != nil {
-					t.Fatal(err)
+					t.Errorf("unable to execute %s: %s", c.SQL, err)
 				}
 			} else {
 				val(t, pool.QueryRow(ctx, c.SQL))
@@ -59,7 +59,7 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm ContainerManager) {
 
 				if val := c.Validate; val == nil {
 					if _, err := pool.Exec(ctx, c.SQL); err != nil {
-						t.Fatal(err)
+						t.Errorf("unable to execute %s: %s", c.SQL, err)
 					}
 				} else {
 					val(t, pool.QueryRow(ctx, c.SQL))
@@ -82,7 +82,7 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm ContainerManager) {
 
 				if val := c.Validate; val == nil {
 					if _, err := pool.Exec(ctx, c.SQL); err != nil {
-						t.Fatal(err)
+						t.Errorf("unable to execute %s: %s", c.SQL, err)
 					}
 				} else {
 					val(t, pool.QueryRow(ctx, c.SQL))

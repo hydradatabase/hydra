@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ type Config struct {
 	ContainerLogDir      string        `env:"CONTAINER_LOG_DIR,default="`
 	WaitForStartTimeout  time.Duration `env:"WAIT_FOR_START_TIMEOUT,default=60s"`
 	WaitForStartInterval time.Duration `env:"WAIT_FOR_START_INTERVAL,default=5s"`
+	PostgresVersion      string        `env:"SPILO_POSTGRES_VERSION,default=13"`
 	PostgresPort         int           `env:"POSTGRES_PORT,default=5432"`
 	ReadinessPort        int           `env:"READINESS_PORT,default=8008"`
 }
@@ -65,6 +67,7 @@ func (c *spiloAcceptanceContainer) StartContainer(t *testing.T, ctx context.Cont
 		"--publish", fmt.Sprintf("%d:8008", c.config.ReadinessPort),
 		"--env", fmt.Sprintf("PGUSER_SUPERUSER=%s", pgusername),
 		"--env", fmt.Sprintf("PGPASSWORD_SUPERUSER=%s", pgpassword),
+		"--env", fmt.Sprintf("PGVERSION=%s", c.config.PostgresVersion),
 	}
 
 	if c.pgdataDir != "" {
@@ -163,7 +166,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 				}
 
 				if want, got := 0, count; want != got {
-					t.Fatalf("timescaledb ext should not exist")
+					t.Errorf("timescaledb ext should not exist")
 				}
 			},
 		},
@@ -177,7 +180,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 				}
 
 				if want, got := "20", workerProcesses; want != got {
-					t.Fatalf("max_worker_processes not set to 20, set to %s", got)
+					t.Errorf("max_worker_processes not set to 20, set to %s", got)
 				}
 			},
 		},
@@ -191,7 +194,21 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 				}
 
 				if want, got := "on", settingValue; want != got {
-					t.Fatalf("cron.use_background_workers not set to 'on'")
+					t.Errorf("cron.use_background_workers not set to 'on'")
+				}
+			},
+		},
+		shared.Case{
+			Name: "spilo started the expected postgres version",
+			SQL:  `SHOW server_version;`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var version string
+				if err := row.Scan(&version); err != nil {
+					t.Fatal(err)
+				}
+
+				if !strings.HasPrefix(version, config.PostgresVersion) {
+					t.Errorf("incorrect postgres version, got %s, expected major version %s", version, config.PostgresVersion)
 				}
 			},
 		},

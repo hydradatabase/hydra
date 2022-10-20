@@ -1,7 +1,3 @@
-variable "TAG" {
-  default = "latest"
-}
-
 variable "POSTGRES_REPO" {
   default = "ghcr.io/hydrasdb/hydra"
 }
@@ -10,15 +6,19 @@ variable "SPILO_REPO" {
   default = "ghcr.io/hydrasdb/spilo"
 }
 
-variable "COLUMNAR_REPO" {
-  default = "ghcr.io/hydrasdb/columnar"
-}
-
 variable "SPILO_VERSION" {
   default = "2.1-p7"
 }
 
 variable "POSTGRES_BASE_VERSION" {
+  default = "13"
+}
+
+variable "SPILO_POSTGRES_VERSION" {
+  default = "14"
+}
+
+variable "SPILO_POSTGRES_OLD_VERSIONS" {
   default = "13"
 }
 
@@ -39,10 +39,13 @@ target "postgres" {
   contexts = {
     postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}"
 
-    columnar = "target:columnar"
+    columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
   }
 
-  tags = ["${POSTGRES_REPO}:${TAG}"]
+  tags = [
+    "${POSTGRES_REPO}:latest",
+    "${POSTGRES_REPO}:${POSTGRES_BASE_VERSION}-latest"
+  ]
 
   cache-to = ["type=local,dest=tmp/bake_cache/postgres"]
   cache-from = ["type=local,src=tmp/bake_cache/postgres"]
@@ -55,30 +58,21 @@ target "spilo" {
 
   contexts = {
     spilo_base = "target:spilo_base"
-    columnar = "target:columnar"
+    columnar_13 = "target:columnar_13"
+    columnar_14 = "target:columnar_14"
   }
 
   args = {
-    POSTGRES_BASE_VERSION = "${POSTGRES_BASE_VERSION}"
+    POSTGRES_BASE_VERSION = "${SPILO_POSTGRES_VERSION}"
   }
 
-  tags = ["${SPILO_REPO}:${TAG}"]
+  tags = [
+    "${SPILO_REPO}:latest",
+    "${SPILO_REPO}:${SPILO_VERSION}-latest"
+  ]
 
   cache-to = ["type=local,dest=tmp/bake_cache/spilo"]
   cache-from = ["type=local,src=tmp/bake_cache/spilo"]
-}
-
-target "columnar" {
-  inherits = ["shared"]
-
-  context = "columnar"
-
-  args = {
-    POSTGRES_BASE_VERSION = "${POSTGRES_BASE_VERSION}"
-  }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/columnar"]
-  cache-from = ["type=local,src=tmp/bake_cache/columnar"]
 }
 
 target "spilo_base" {
@@ -88,9 +82,36 @@ target "spilo_base" {
 
   args = {
     TIMESCALEDB = ""
-    PGOLDVERSIONS = "${POSTGRES_BASE_VERSION}"
+    PGVERSION = "${SPILO_POSTGRES_VERSION}"
+    PGOLDVERSIONS = "${SPILO_POSTGRES_OLD_VERSIONS}"
   }
 
   cache-to = ["type=local,dest=tmp/bake_cache/spilo_base"]
   cache-from = ["type=local,src=tmp/bake_cache/spilo_base"]
+}
+
+target "columnar_13" {
+  inherits = ["shared"]
+
+  context = "columnar"
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/columnar_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/columnar_13"]
+}
+
+target "columnar_14" {
+  inherits = ["shared"]
+
+  context = "columnar"
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/columnar_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/columnar_14"]
 }

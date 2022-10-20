@@ -2,7 +2,8 @@
 
 FROM spilo_base
 
-COPY --from=columnar /pg_ext /
+COPY --from=columnar_13 /pg_ext /
+COPY --from=columnar_14 /pg_ext /
 COPY files/default/postgres-appliance/scripts /scripts/
 
 ARG POSTGRES_BASE_VERSION
