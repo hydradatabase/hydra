@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   push:
 
+env:
+  POSTGRES_REPO: ghcr.io/hydrasdb/hydra
+  SPILO_REPO: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
+  TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
+
 jobs:
   lint_go:
     name: Run Go linters
@@ -26,6 +31,8 @@ jobs:
     name: Build and Validate Postgres ${{ matrix.postgres }}
     runs-on: ubuntu-latest
     steps:
+    - name: setup POSTGRES_IMAGE env
+      run: echo "POSTGRES_IMAGE=${{ format('{0}:{1}-{2}', env.POSTGRES_REPO, matrix.postgres, github.sha) }}" >> $GITHUB_ENV
     - name: Checkout
       uses: actions/checkout@v3
     - name: Set up QEMU
@@ -48,26 +55,25 @@ jobs:
           *.platform=linux/amd64
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
-          postgres.tags=ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
+          postgres.tags=${{ env.POSTGRES_IMAGE }}
     - uses: actions/setup-go@v3
       with:
         go-version-file: go.mod
         cache: true
     - name: Run Acceptance Tests
       env:
-        POSTGRES_IMAGE: ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
-        POSTGRES_UPGRADE_FROM_IMAGE: ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
+        POSTGRES_UPGRADE_FROM_IMAGE: ${{ env.POSTGRES_IMAGE }}
         POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
-        TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
       run: make postgres_acceptance_test
     - name: Upload test container logs
       if: failure()
       uses: actions/upload-artifact@v3
       with:
         name: postgres_${{ matrix.postgres }}_container_logs
-        path: /tmp/containerlogs
+        path: ${{ env.TEST_CONTAINER_LOG_DIR }}
         retention-days: 7
     - name: Bake multi-platform Postgres
+      if: github.ref == 'refs/heads/main'
       uses: docker/bake-action@v2.3.0
       with:
         pull: true
@@ -80,6 +86,8 @@ jobs:
     name: Build and Validate Spilo
     runs-on: ubuntu-latest
     steps:
+    - name: setup SPILO_IMAGE
+      run: echo "SPILO_IMAGE=${{ format('{0}:{1}', env.SPILO_REPO, github.sha) }}" >> $GITHUB_ENV
     - name: Checkout
       uses: actions/checkout@v3
     - name: Set up QEMU
@@ -100,32 +108,29 @@ jobs:
           *.platform=linux/amd64
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
-          spilo.tags=011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
+          spilo.tags=${{ env.SPILO_IMAGE }}
     - uses: actions/setup-go@v3
       with:
         go-version-file: go.mod
         cache: true
     - name: Run Acceptance Tests for Postgres 13
       env:
-        SPILO_IMAGE: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
         SPILO_POSTGRES_VERSION: '13'
-        TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
       run: make spilo_acceptance_test
     - name: Run Acceptance Tests for Postgres 14
       env:
-        SPILO_IMAGE: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
-        SPILO_UPGRADE_FROM_IMAGE: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
+        SPILO_UPGRADE_FROM_IMAGE: ${{ env.SPILO_IMAGE }}
         SPILO_POSTGRES_VERSION: '14'
-        TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
       run: make spilo_acceptance_test
     - name: Upload test container logs
       if: failure()
       uses: actions/upload-artifact@v3
       with:
         name: spilo_container_logs
-        path: /tmp/containerlogs
+        path: ${{ env.TEST_CONTAINER_LOG_DIR }}
         retention-days: 7
     - name: Bake multi-platform spilo
+      if: github.ref == 'refs/heads/main'
       uses: docker/bake-action@v2.3.0
       with:
         pull: true
@@ -164,9 +169,9 @@ jobs:
         targets: postgres
         set: |
           *.cache-from=type=gha
-          postgres.tags=ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}
-          postgres.tags=ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
-          ${{ matrix.postgres == '14' && 'postgres.tags=ghcr.io/hydrasdb/hydra:latest' || '' }}
+          postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}
+          postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
+          ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
   push_spilo:
     needs: [build_validate_postgres, build_validate_spilo]
@@ -201,4 +206,4 @@ jobs:
         targets: spilo
         set: |
           *.cache-from=type=gha
-          spilo.tags=011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:${{ github.sha }}
+          spilo.tags=${{ env.SPILO_REPO }}:${{ github.sha }}
