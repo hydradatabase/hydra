@@ -39,6 +39,7 @@ acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 
 POSTGRES_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
 POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
+
 .PHONY: postgres_acceptance_test
 postgres_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) \
@@ -52,6 +53,7 @@ postgres_acceptance_build_test: docker_build_local_postgres postgres_acceptance_
 
 SPILO_IMAGE ?= ghcr.io/hydrasdb/spilo:latest
 SPILO_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$$(cat HYDRA_PROD_VER)
+
 .PHONY: spilo_acceptance_test
 spilo_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) \
