@@ -164,7 +164,9 @@ jobs:
         targets: postgres
         set: |
           *.cache-from=type=gha
+          postgres.tags=ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}
           postgres.tags=ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
+          ${{ matrix.postgres == '14' && 'postgres.tags=ghcr.io/hydrasdb/hydra:latest' || '' }}
 
   push_spilo:
     needs: [build_validate_postgres, build_validate_spilo]
