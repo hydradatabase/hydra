@@ -5,51 +5,108 @@ on:
   push:
 
 jobs:
-  docker_build_and_push:
-    name: Docker Build & Push
+  build_validate_postgres:
+    strategy:
+      matrix:
+        postgres: ['13', '14']
+    name: Build and Validate Postgres ${{ matrix.postgres }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     steps:
-      - name: Checkout hydra
-        uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+        platforms: linux/amd64,linux/arm64/v8
+        driver-opts: network=host
+    - name: Bake and load amd64 Postgres ${{ matrix.postgres }} image
+      uses: docker/bake-action@v2.3.0
+      env:
+        POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
+      with:
+        load: true
+        pull: true
+        targets: postgres
+        set: |
+          *.platform=linux/amd64
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
+          postgres.tags=ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: Run Acceptance Tests
+      env:
+        POSTGRES_IMAGE: ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
+        POSTGRES_UPGRADE_FROM_IMAGE: ghcr.io/hydrasdb/hydra:${{ matrix.postgres }}-${{ github.sha }}
+        POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
+        TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
+      run: make postgres_acceptance_test
+    - name: Upload test container logs
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: postgres_${{ matrix.postgres }}_container_logs
+        path: /tmp/containerlogs
+        retention-days: 7
+    - name: Bake multi-platform Postgres
+      uses: docker/bake-action@v2.3.0
+      with:
+        pull: true
+        targets: postgres
+        set: |
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
 
-      # Docker build
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          driver-opts: network=host
-
-      - name: Docker build
-        uses: docker/bake-action@v2.3.0
-        env:
-          POSTGRES_REPO: localhost:5000/hydra
-          SPILO_REPO: localhost:5000/spilo
-          TAG: ${{ github.sha }}
-        with:
-          pull: true
-          push: true
-          set: |
-            *.platform=linux/amd64
-            *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
-
-      # Acceptance tests
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ^1.19
-      - name: Run Acceptance Tests
-        env:
-          HYDRA_IMAGE: localhost:5000/spilo:${{ github.sha }}
-        run: |
-          HYDRA_PROD_IMAGE=ghcr.io/hydrasdb/hydra:$(cat HYDRA_PROD_VER) \
-            make acceptance_test
+  # docker_build_and_push:
+  #   name: Docker Build & Push
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   services:
+  #     registry:
+  #       image: registry:2
+  #       ports:
+  #         - 5000:5000
+  #   steps:
+  #     - name: Checkout hydra
+  #       uses: actions/checkout@v3
+  #
+  #     # Docker build
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v2
+  #       with:
+  #         driver-opts: network=host
+  #
+  #     - name: Docker build
+  #       uses: docker/bake-action@v2.3.0
+  #       env:
+  #         POSTGRES_REPO: localhost:5000/hydra
+  #         SPILO_REPO: localhost:5000/spilo
+  #         TAG: ${{ github.sha }}
+  #       with:
+  #         pull: true
+  #         push: true
+  #         set: |
+  #           *.platform=linux/amd64
+  #           *.cache-from=type=gha
+  #           *.cache-to=type=gha,mode=max
+  #
+  #     # Acceptance tests
+  #     - uses: actions/setup-go@v2
+  #       with:
+  #         go-version: ^1.19
+  #     - name: Run Acceptance Tests
+  #       env:
+  #         HYDRA_IMAGE: localhost:5000/spilo:${{ github.sha }}
+  #       run: |
+  #         HYDRA_PROD_IMAGE=ghcr.io/hydrasdb/hydra:$(cat HYDRA_PROD_VER) \
+  #           make acceptance_test
 
       # # Docker push to ghcr.io
       # - name: Login to ghcr.io
