@@ -5,6 +5,20 @@ on:
   push:
 
 jobs:
+  lint_go:
+    name: Run Go linters
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v3
+
+
   build_validate_postgres:
     strategy:
       matrix:

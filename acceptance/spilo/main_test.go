@@ -1,4 +1,4 @@
-package spilo
+package spilo_test
 
 import (
 	"context"
@@ -89,8 +89,6 @@ func (c *spiloAcceptanceContainer) StartContainer(t *testing.T, ctx context.Cont
 	}
 
 	c.WaitForContainerReady(t, ctx)
-
-	return
 }
 
 func (c *spiloAcceptanceContainer) WaitForContainerReady(t *testing.T, ctx context.Context) {
@@ -104,11 +102,17 @@ func (c *spiloAcceptanceContainer) WaitForContainerReady(t *testing.T, ctx conte
 		case <-done:
 			return
 		case <-ticker.C:
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", c.config.ReadinessPort))
+			req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("http://127.0.0.1:%d", c.config.ReadinessPort), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Logf("waiting for spilo to be ready: %s", err)
 				continue
 			}
+			defer resp.Body.Close()
 
 			if resp.StatusCode != 200 {
 				body, err := io.ReadAll(resp.Body)

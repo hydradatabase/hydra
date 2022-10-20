@@ -1,4 +1,4 @@
-package postgres
+package postgres_test
 
 import (
 	"context"
@@ -83,8 +83,6 @@ func (c *postgresAcceptanceContainer) StartContainer(t *testing.T, ctx context.C
 	}
 
 	c.WaitForContainerReady(t, ctx)
-
-	return
 }
 
 func (c *postgresAcceptanceContainer) WaitForContainerReady(t *testing.T, ctx context.Context) {

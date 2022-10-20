@@ -7,7 +7,7 @@ POSTGRES_BASE_VERSION ?= 14
 $(DOCKER_CACHE_DIR):
 	mkdir -p $(DOCKER_CACHE_DIR)
 
-TEST_CONTAINER_LOG_DIR ?= $$(pwd)/tmp/testlogs
+TEST_CONTAINER_LOG_DIR ?= $(CURDIR)/tmp/testlogs
 $(TEST_CONTAINER_LOG_DIR):
 	mkdir -p $(TEST_CONTAINER_LOG_DIR)
 
@@ -65,3 +65,11 @@ spilo_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 
 .PHONY: spilo_acceptance_build_test
 spilo_acceptance_build_test: docker_build_local_spilo spilo_acceptance_test
+
+.PHONY: lint_acceptance
+lint_acceptance:
+	golangci-lint run
+
+.PHONY: lint_fix_acceptance
+lint_fix_acceptance:
+	golangci-lint run --fix

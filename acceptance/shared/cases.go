@@ -7,12 +7,17 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// A Case describes an acceptance test case. If a Validate function is provided
+// then the test will call that function and expect it to handle test failues.
+// Otherwise the case will fail if pool.Exec fails on the SQL.
 type Case struct {
-	Name     string
-	SQL      string
-	Validate func(t *testing.T, row pgx.Row)
+	Name     string                          // name of the test
+	SQL      string                          // SQL to run during the test
+	Validate func(t *testing.T, row pgx.Row) // optional validation function
 }
 
+// AcceptanceCases describe the shared acceptance criteria for any Hydra-based
+// images.
 var AcceptanceCases = []Case{
 	{
 		Name: "columnar ext",
@@ -101,10 +106,13 @@ SELECT alter_columnar_table_set(
 	},
 }
 
-var BeforeUpgradeCases = []Case{
-	{
-		Name: "create columnar table",
-		SQL: `
+// These describe the shared setup and validation cases that occur to validate
+// the upgrade between two version of a Hydra-derived image.
+var (
+	BeforeUpgradeCases = []Case{
+		{
+			Name: "create columnar table",
+			SQL: `
 CREATE TABLE columnar_table
 (
     id UUID,
@@ -114,20 +122,19 @@ CREATE TABLE columnar_table
     t TEXT
 ) USING columnar;
 		`,
-	},
-	{
-		Name: "insert into columnar table",
-		SQL: `
+		},
+		{
+			Name: "insert into columnar table",
+			SQL: `
 INSERT INTO columnar_table (id, i1, i2, n, t)
 VALUES ('75372aac-d74a-4e5a-8bf3-43cdaf9011de', 2, 3, 100.1, 'hydra');
 		`,
-	},
-}
-
-var AfterUpgradeCases = []Case{
-	{
-		Name: "create another columnar table",
-		SQL: `
+		},
+	}
+	AfterUpgradeCases = []Case{
+		{
+			Name: "create another columnar table",
+			SQL: `
 CREATE TABLE columnar_table2
 (
     id UUID,
@@ -137,42 +144,43 @@ CREATE TABLE columnar_table2
     t TEXT
 ) USING columnar;
 		`,
-	},
-	{
-		Name: "validate columnar data",
-		SQL:  "SELECT id, i1, i2, n, t FROM columnar_table LIMIT 1;",
-		Validate: func(t *testing.T, row pgx.Row) {
-			var result struct {
-				ID uuid.UUID
-				I1 int
-				I2 int
-				N  float32
-				T  string
-			}
-
-			if err := row.Scan(&result.ID, &result.I1, &result.I2, &result.N, &result.T); err != nil {
-				t.Fatal(err)
-			}
-
-			if result.ID != uuid.MustParse("75372aac-d74a-4e5a-8bf3-43cdaf9011de") {
-				t.Errorf("id returned %s after upgrade, expected 75372aac-d74a-4e5a-8bf3-43cdaf9011de", result.ID)
-			}
-
-			if result.I1 != 2 {
-				t.Errorf("i1 returned %d after upgrade, expected 2", result.I1)
-			}
-
-			if result.I2 != 3 {
-				t.Errorf("i2 returned %d after upgrade, expected 3", result.I2)
-			}
-
-			if result.N != 100.1 {
-				t.Errorf("n returned %f after upgrade, expected 100.1", result.N)
-			}
-
-			if result.T != "hydra" {
-				t.Errorf("t returned %s after upgrade, expected hydra", result.T)
-			}
 		},
-	},
-}
+		{
+			Name: "validate columnar data",
+			SQL:  "SELECT id, i1, i2, n, t FROM columnar_table LIMIT 1;",
+			Validate: func(t *testing.T, row pgx.Row) {
+				var result struct {
+					ID uuid.UUID
+					I1 int
+					I2 int
+					N  float32
+					T  string
+				}
+
+				if err := row.Scan(&result.ID, &result.I1, &result.I2, &result.N, &result.T); err != nil {
+					t.Fatal(err)
+				}
+
+				if result.ID != uuid.MustParse("75372aac-d74a-4e5a-8bf3-43cdaf9011de") {
+					t.Errorf("id returned %s after upgrade, expected 75372aac-d74a-4e5a-8bf3-43cdaf9011de", result.ID)
+				}
+
+				if result.I1 != 2 {
+					t.Errorf("i1 returned %d after upgrade, expected 2", result.I1)
+				}
+
+				if result.I2 != 3 {
+					t.Errorf("i2 returned %d after upgrade, expected 3", result.I2)
+				}
+
+				if result.N != 100.1 {
+					t.Errorf("n returned %f after upgrade, expected 100.1", result.N)
+				}
+
+				if result.T != "hydra" {
+					t.Errorf("t returned %s after upgrade, expected hydra", result.T)
+				}
+			},
+		},
+	}
+)

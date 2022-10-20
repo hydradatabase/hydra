@@ -1,0 +1,23 @@
+linters:
+  presets:
+    - bugs
+    - comment
+    - error
+    - import
+    - sql
+    - test
+    - unused
+  disable:
+    # unwanted
+    - exhaustivestruct
+    - exhaustruct
+    - gosec
+    - paralleltest
+    # deprecated
+    - deadcode
+    - scopelint
+    - varcheck
+    # issues with generics
+    - rowserrcheck
+    - sqlclosecheck
+    - structcheck
