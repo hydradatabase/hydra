@@ -90,10 +90,14 @@ target "spilo_base" {
   cache-from = ["type=local,src=tmp/bake_cache/spilo_base"]
 }
 
-target "columnar_13" {
+target "columnar" {
   inherits = ["shared"]
-
   context = "columnar"
+  target = "output"
+}
+
+target "columnar_13" {
+  inherits = ["columnar"]
 
   args = {
     POSTGRES_BASE_VERSION = 13
@@ -104,9 +108,7 @@ target "columnar_13" {
 }
 
 target "columnar_14" {
-  inherits = ["shared"]
-
-  context = "columnar"
+  inherits = ["columnar"]
 
   args = {
     POSTGRES_BASE_VERSION = 14
