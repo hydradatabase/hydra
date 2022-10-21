@@ -4,7 +4,7 @@ ARG POSTGRES_BASE_VERSION=13
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install gnupg postgresql-common -y
 RUN sh /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install lsb-release gcc make libssl-dev autoconf pkg-config postgresql-${POSTGRES_BASE_VERSION} postgresql-server-dev-${POSTGRES_BASE_VERSION} libcurl4-gnutls-dev liblz4-dev libzstd-dev -y
+RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && apt-get install lsb-release gcc make libssl-dev autoconf pkg-config postgresql-${POSTGRES_BASE_VERSION} postgresql-server-dev-${POSTGRES_BASE_VERSION} libcurl4-gnutls-dev liblz4-dev libzstd-dev -y
 
 FROM setup as builder
 
