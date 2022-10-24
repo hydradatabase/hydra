@@ -35,6 +35,10 @@ docker_build_local_spilo: TARGET = spilo
 # into the local docker
 docker_build_local_spilo: docker_build_local
 
+.PHONY: docker_check_columnar
+docker_check_columnar:
+	docker buildx bake --set *.platform=$(PLATFORM) --set columnar.target=checker columnar_13 columnar_14
+
 GO_TEST_FLAGS ?=
 
 .PHONY: acceptance_test

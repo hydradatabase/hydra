@@ -23,8 +23,32 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3
 
+  validate_columnar:
+    strategy:
+      matrix:
+        postgres: ['13', '14']
+    name: Validate Columnar ${{ matrix.postgres }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+    - name: Bake Columnar validation
+      uses: docker/bake-action@v2.3.0
+      with:
+        pull: true
+        targets: ${{ format('columnar_{0}', matrix.postgres) }}
+        set: |
+          *.platform=linux/amd64
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
+          columnar.target=checker
 
   build_validate_postgres:
+    needs: [validate_columnar]
     strategy:
       matrix:
         postgres: ['13', '14']
@@ -83,6 +107,7 @@ jobs:
           *.cache-to=type=gha,mode=max
 
   build_validate_spilo:
+    needs: [validate_columnar]
     name: Build and Validate Spilo
     runs-on: ubuntu-latest
     steps:
