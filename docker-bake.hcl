@@ -40,6 +40,7 @@ target "postgres" {
     postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}"
 
     columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
+    http = "target:http_${POSTGRES_BASE_VERSION}"
   }
 
   tags = [
@@ -60,6 +61,8 @@ target "spilo" {
     spilo_base = "target:spilo_base"
     columnar_13 = "target:columnar_13"
     columnar_14 = "target:columnar_14"
+    http_13 = "target:http_13"
+    http_14 = "target:http_14"
   }
 
   args = {
@@ -88,6 +91,38 @@ target "spilo_base" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/spilo_base"]
   cache-from = ["type=local,src=tmp/bake_cache/spilo_base"]
+}
+
+target "http" {
+  inherits = ["shared"]
+  context = "http"
+  target = "output"
+
+  args = {
+    PGSQL_HTTP_TAG = "v1.5.0"
+  }
+}
+
+target "http_13" {
+  inherits = ["http"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/http_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/http_13"]
+}
+
+target "http_14" {
+  inherits = ["http"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/http_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/http_14"]
 }
 
 target "columnar" {

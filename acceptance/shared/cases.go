@@ -20,7 +20,7 @@ type Case struct {
 // images.
 var AcceptanceCases = []Case{
 	{
-		Name: "columnar ext",
+		Name: "columnar ext available",
 		SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'columnar';
 			`,
@@ -31,7 +31,23 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'columnar';
 			}
 
 			if want, got := 1, count; want != got {
-				t.Errorf("columnar ext should exist")
+				t.Error("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "columnar ext enabled",
+		SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'columnar';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Error("columnar ext should exist")
 			}
 		},
 	},
@@ -179,6 +195,66 @@ CREATE TABLE columnar_table2
 
 				if result.T != "hydra" {
 					t.Errorf("t returned %s after upgrade, expected hydra", result.T)
+				}
+			},
+		},
+		{
+			Name: "http ext available",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'http';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, count; want != got {
+					t.Errorf("columnar ext should exist")
+				}
+			},
+		},
+		{
+			Name: "http ext enabled",
+			SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'http';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, count; want != got {
+					t.Errorf("columnar ext should exist")
+				}
+			},
+		},
+		{
+			Name: "http put",
+			SQL: `
+SELECT status, content_type, content::json->>'data' AS data
+  FROM http_put('http://httpbin.org/put', 'some text', 'text/plain');
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var result struct {
+					Status      int
+					ContentType string
+					Data        string
+				}
+
+				if err := row.Scan(&result.Status, &result.ContentType, &result.Data); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 200, result.Status; want != got {
+					t.Errorf("http put response status should match: want=%d got=%d", want, got)
+				}
+				if want, got := "application/json", result.ContentType; want != got {
+					t.Errorf("http put response content type should match: want=%s got=%s", want, got)
+				}
+				if want, got := "some text", result.Data; want != got {
+					t.Errorf("http put response data should match: want=%s got=%s", want, got)
 				}
 			},
 		},

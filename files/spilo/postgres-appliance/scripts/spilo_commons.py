@@ -13,6 +13,7 @@ LIB_DIR = '/usr/lib/postgresql'
 # (min_version, max_version, shared_preload_libraries, extwlist.extensions)
 extensions = {
     'columnar': (13, 14, True,  True),
+    'http': (13, 14, True,  True),
     'pg_cron':        (9.5, 14, True,  True),
     'pg_stat_kcache': (9.4, 14, True,  False),
     'pg_partman':     (9.4, 14, False, True)

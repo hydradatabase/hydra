@@ -4,7 +4,10 @@ FROM spilo_base
 
 COPY --from=columnar_13 /pg_ext /
 COPY --from=columnar_14 /pg_ext /
-COPY files/default/postgres-appliance/scripts /scripts/
+COPY files/spilo/postgres-appliance/scripts /scripts/
+
+COPY --from=http_13 /pg_ext /
+COPY --from=http_14 /pg_ext /
 
 ARG POSTGRES_BASE_VERSION
 # Default envs

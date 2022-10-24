@@ -2,6 +2,18 @@
 
 FROM postgres_base
 
+# columnar ext
 COPY --from=columnar /pg_ext /
 
-RUN mkdir -p /docker-entrypoint-initdb.d && echo 'CREATE EXTENSION IF NOT EXISTS columnar;\nALTER EXTENSION columnar UPDATE;' > /docker-entrypoint-initdb.d/columnar.sql
+# http deps
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libcurl4-gnutls-dev \
+	; \
+	rm -rf /var/lib/apt/lists/*
+# http ext
+COPY --from=http /pg_ext /
+
+COPY files/postgres/docker-entrypoint-initdb.d /docker-entrypoint-initdb.d/
