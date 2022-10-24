@@ -18,7 +18,9 @@ Postgres is the foundation of the Modern Data Stack. Hydra's mission is to make 
 
 ## ⏩ Quick Start
 
-Try out Hydra locally using [docker-compose](https://docs.docker.com/compose/).
+The Hydra [Docker image](https://github.com/hydrasdb/hydra/pkgs/container/hydra) is a drop-in replacement for [postgres Docker image](https://hub.docker.com/_/postgres).
+
+You can also try out Hydra locally using [docker-compose](https://docs.docker.com/compose/).
 
 ```
 cp .env.example .env
@@ -61,7 +63,7 @@ Hydra is only possible by building on the shoulders of giants.
 The code in this repo is licensed under the [Apache 2.0 license](LICENSE). Pre-built images are
 subject to additional licenses as follows:
 
-* [Hydra columnar engine](https://github.com/HydrasDB/citus) - AGPL 3.0
+* [Hydra columnar engine](https://github.com/HydrasDB/hydra/tree/main/columnar) - AGPL 3.0
 * [Spilo](https://github.com/zalando/spilo) - Apache 2.0
 * The underlying Spilo image contains a large number of open source projects, including:
   * Postgres - [the Postgres license](https://www.postgresql.org/about/licence/)

@@ -5,7 +5,7 @@ services:
     ports:
       - ${POSTGRES_PORT}:5432
     environment:
-      PGUSER_SUPERUSER: ${POSTGRES_USER}
-      PGPASSWORD_SUPERUSER: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./volumes/db:/home/postgres/pgdata
+      - ./volumes/db:/var/lib/postgresql/data
