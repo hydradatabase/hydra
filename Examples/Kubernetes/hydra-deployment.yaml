@@ -1,11 +1,12 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: hydra
   namespace: default
   labels:
     app: hydra
 spec:
+  serviceName: hydra
   selector:
     matchLabels:
       app: hydra
@@ -27,8 +28,6 @@ spec:
             # Use secret in real usage
             - name: POSTGRES_USER
               value: postgres
-            - name: SPILO_PROVIDER
-              value: local
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
