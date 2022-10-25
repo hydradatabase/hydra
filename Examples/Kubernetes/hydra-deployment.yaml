@@ -20,7 +20,7 @@ spec:
         runAsGroup: 70
         fsGroup: 70
       containers:
-        - image: ghcr.io/hydrasco/hydra:cdae614_8eee2a8_243ba49
+        - image: ghcr.io/hydrasdb/hydra:14-416bd10a50e25e6a669f4090931e0c05916597eb
           name: container
           # command: ["/bin/sh"]
           # args: ["-c","postgres", "-c", "max_connections=200"]
