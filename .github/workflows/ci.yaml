@@ -236,3 +236,4 @@ jobs:
         set: |
           *.cache-from=type=gha
           spilo.tags=${{ env.SPILO_REPO }}:${{ github.sha }}
+          spilo.tags=${{ env.SPILO_REPO }}:latest
