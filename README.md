@@ -1,4 +1,4 @@
-![Hydra - the open source data warehouse](.images/header.png)
+![Hydra - the open source data warehouse](.images/header.svg)
 
 [Request Access](https://hydras.io/#early-access) - [Documentation](https://docs.hydras.io/getting-started/readme) - [Demo](https://www.youtube.com/watch?v=DD1oD1LWNOo) - [Website](https://hydras.io/)
 
