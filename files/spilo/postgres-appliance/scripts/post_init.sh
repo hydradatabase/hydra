@@ -197,8 +197,6 @@ UPDATE pg_catalog.pg_extension SET extname = 'columnar' WHERE extname = 'citus_c
 UPDATE pg_catalog.pg_proc SET probin = '\$libdir/columnar' WHERE probin = '\$libdir/citus_columnar';
 CREATE EXTENSION IF NOT EXISTS columnar;
 ALTER EXTENSION columnar UPDATE;
-CREATE EXTENSION IF NOT EXISTS http;
-ALTER EXTENSION http UPDATE;
 GRANT EXECUTE ON FUNCTION public.set_user(text) TO admin;
 GRANT EXECUTE ON FUNCTION public.pg_stat_statements_reset($RESET_ARGS) TO admin;"
     if [ "$PGVER" -lt 10 ]; then

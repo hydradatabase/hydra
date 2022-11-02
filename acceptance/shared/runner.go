@@ -8,15 +8,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// A ContainerManager provides a shared interface for managing the lifecycle of
+// A DockerComposeManager provides a shared interface for managing the lifecycle of
 // Hydra-based containers during testing.
-type ContainerManager interface {
-	// StartContainer is responsible for starting a Hydra-based container and
-	// then blocking until the container is able to accept Postgres connections.
-	StartContainer(t *testing.T, ctx context.Context, img string)
-	// TerminateContainer handles terminating the container, typically by using
-	// [TerminateContainer].
-	TerminateContainer(t *testing.T, ctx context.Context, kill bool)
+type DockerComposeManager interface {
+	// StartCompose is responsible for starting the Docker Compose that includes a Hydra-based container and its test dependencies
+	// then blocking until the Hydra container is able to accept Postgres connections.
+	// startEverything indicates whether to start the test dependencies besides the Hydra container.
+	StartCompose(t *testing.T, ctx context.Context, img string, startEverything bool)
+	// TerminateCompose handles terminating the Docker compose, typically by using
+	// [TerminateCompose].
+	TerminateCompose(t *testing.T, ctx context.Context, kill bool)
 	// Returns the image for the [ContainerManager]s.
 	Image() string
 	// Returns the UpgradeFromImage when the [ContainerManager] is used for
@@ -29,10 +30,10 @@ type ContainerManager interface {
 
 // RunAcceptanceTests runs the shared acceptance tests for a given
 // [ContainerManager] as well as any additional cases provided.
-func RunAcceptanceTests(t *testing.T, ctx context.Context, cm ContainerManager, additionalCases ...Case) {
-	cm.StartContainer(t, ctx, cm.Image())
+func RunAcceptanceTests(t *testing.T, ctx context.Context, cm DockerComposeManager, additionalCases ...Case) {
+	cm.StartCompose(t, ctx, cm.Image(), true)
 	t.Cleanup(func() {
-		cm.TerminateContainer(t, ctx, true)
+		cm.TerminateCompose(t, ctx, true)
 	})
 
 	pool := cm.PGPool()
@@ -42,7 +43,7 @@ func RunAcceptanceTests(t *testing.T, ctx context.Context, cm ContainerManager, 
 	for _, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(ctx, time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 
 			if val := c.Validate; val == nil {
@@ -57,13 +58,13 @@ func RunAcceptanceTests(t *testing.T, ctx context.Context, cm ContainerManager, 
 }
 
 // RunUpgradeTests runs the shared upgrade tests for a given [ContainerManager].
-func RunUpgradeTests(t *testing.T, ctx context.Context, cm ContainerManager) {
+func RunUpgradeTests(t *testing.T, ctx context.Context, cm DockerComposeManager) {
 	t.Cleanup(func() {
-		cm.TerminateContainer(t, ctx, true)
+		cm.TerminateCompose(t, ctx, true)
 	})
 
 	t.Run("Before Upgrade", func(t *testing.T) {
-		cm.StartContainer(t, ctx, cm.UpgradeFromImage())
+		cm.StartCompose(t, ctx, cm.UpgradeFromImage(), false)
 
 		for _, c := range BeforeUpgradeCases {
 			c := c
@@ -83,11 +84,11 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm ContainerManager) {
 			})
 		}
 
-		cm.TerminateContainer(t, ctx, false)
+		cm.TerminateCompose(t, ctx, false)
 	})
 
 	t.Run("After Upgrade", func(t *testing.T) {
-		cm.StartContainer(t, ctx, cm.Image())
+		cm.StartCompose(t, ctx, cm.Image(), false)
 
 		for _, c := range AfterUpgradeCases {
 			c := c

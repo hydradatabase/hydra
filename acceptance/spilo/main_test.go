@@ -1,6 +1,7 @@
 package spilo_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/HydrasDB/hydra/acceptance/shared"
@@ -18,6 +20,65 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joeshaw/envdecode"
 	"github.com/rs/xid"
+)
+
+type dockerComposeData struct {
+	Image               string
+	PostgresVersion     string
+	PostgresUser        string
+	PostgresPassword    string
+	PostgresPort        int
+	ReadinessPort       int
+	DataDir             string
+	MySQLFixtureSQLPath string
+	StartEverything     bool
+}
+
+var (
+	dockerComposeTmpl = template.Must(template.New("docker-compose.yml").Parse(`
+version: "3.9"
+services:
+  hydra:
+    image: {{ .Image }}
+    {{- if .StartEverything }}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    {{- end }}
+    environment:
+      PGUSER_SUPERUSER: {{ .PostgresUser }}
+      PGPASSWORD_SUPERUSER: {{ .PostgresPassword }}
+      PGVERSION: {{ .PostgresVersion }}
+	  {{- if .DataDir }}
+      PGROOT: /home/postgres/pgroot
+      PGDATA: /home/postgres/pgroot/pgdata
+	  {{- end }}
+    ports:
+      - "{{ .PostgresPort }}:5432"
+      - "{{ .ReadinessPort }}:8008"
+	{{- if .DataDir }}
+    volumes:
+      - {{ .DataDir }}:/home/postgres/pgroot/pgdata
+    {{- end }}
+{{- if .StartEverything }}
+  mysql:
+    image: mysql:8.0.31
+    environment:
+      MYSQL_USER: mysql
+      MYSQL_PASSWORD: mysql
+      MYSQL_ROOT_PASSWORD: mysql
+    {{- if .MySQLFixtureSQLPath }}
+    volumes:
+      - {{ .MySQLFixtureSQLPath }}:/docker-entrypoint-initdb.d/mysql.sql
+    {{- end}}
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+{{- end }}
+`))
 )
 
 type Config struct {
@@ -50,48 +111,62 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-type spiloAcceptanceContainer struct {
+type spiloAcceptanceCompose struct {
 	config    Config
 	pgdataDir string
 
-	containerName string
-	pool          *pgxpool.Pool
+	project string
+	pool    *pgxpool.Pool
 }
 
-func (c *spiloAcceptanceContainer) StartContainer(t *testing.T, ctx context.Context, img string) {
-	c.containerName = fmt.Sprintf("spilo-%s", xid.New())
+func (c *spiloAcceptanceCompose) StartCompose(t *testing.T, ctx context.Context, img string, startEverything bool) {
+	c.project = fmt.Sprintf("spilo-%s", xid.New())
 
-	cmd := []string{
-		"run", "--rm", "--detach", "--name", c.containerName,
-		"--publish", fmt.Sprintf("%d:5432", c.config.PostgresPort),
-		"--publish", fmt.Sprintf("%d:8008", c.config.ReadinessPort),
-		"--env", fmt.Sprintf("PGUSER_SUPERUSER=%s", pgusername),
-		"--env", fmt.Sprintf("PGPASSWORD_SUPERUSER=%s", pgpassword),
-		"--env", fmt.Sprintf("PGVERSION=%s", c.config.PostgresVersion),
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if c.pgdataDir != "" {
-		cmd = append(cmd,
-			"--env", fmt.Sprintf("PGROOT=%s", pgrootdir),
-			"--env", fmt.Sprintf("PGDATA=%s", pgdatadir),
-			"--volume", fmt.Sprintf("%s:%s", c.pgdataDir, pgdatadir),
-		)
+	dockerCompose := bytes.NewBuffer(nil)
+	if err := dockerComposeTmpl.Execute(dockerCompose, dockerComposeData{
+		Image:               img,
+		PostgresVersion:     c.config.PostgresVersion,
+		PostgresUser:        pgusername,
+		PostgresPassword:    pgpassword,
+		PostgresPort:        c.config.PostgresPort,
+		ReadinessPort:       c.config.ReadinessPort,
+		DataDir:             c.pgdataDir,
+		StartEverything:     startEverything,
+		MySQLFixtureSQLPath: filepath.Join(pwd, "..", "fixtures", "mysql.sql"),
+	}); err != nil {
+		t.Fatal(err)
 	}
 
-	cmd = append(cmd, img)
+	f, err := os.CreateTemp("", "docker-compose.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
 
-	runCmd := exec.CommandContext(ctx, "docker", cmd...)
+	if _, err := f.WriteString(dockerCompose.String()); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
-	t.Logf("Starting container %s", c.containerName)
+	runCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", c.project, "--file", f.Name(), "up", "--detach")
+
+	t.Logf("Starting docker compose %s", c.project)
 	if o, err := runCmd.CombinedOutput(); err != nil {
-		t.Fatalf("unable to start container %s: %s", err, o)
+		t.Fatalf("unable to start docker compose %s: %s", err, o)
 		return
 	}
 
 	c.WaitForContainerReady(t, ctx)
 }
 
-func (c *spiloAcceptanceContainer) WaitForContainerReady(t *testing.T, ctx context.Context) {
+func (c *spiloAcceptanceCompose) WaitForContainerReady(t *testing.T, ctx context.Context) {
 	done := make(chan bool, 1)
 	timeout := time.After(c.config.WaitForStartTimeout)
 	ticker := time.NewTicker(c.config.WaitForStartInterval)
@@ -127,38 +202,38 @@ func (c *spiloAcceptanceContainer) WaitForContainerReady(t *testing.T, ctx conte
 
 			pool, err := shared.CreatePGPool(t, ctx, pgusername, pgpassword, c.config.PostgresPort)
 			if err != nil {
-				c.TerminateContainer(t, ctx, true)
+				c.TerminateCompose(t, ctx, true)
 				t.Fatalf("unable to create PG Pool: %s", err)
 			}
 
 			c.pool = pool
 			done <- true
 		case <-timeout:
-			c.TerminateContainer(t, ctx, true)
+			c.TerminateCompose(t, ctx, true)
 			t.Fatalf("timed out waiting for container to start after %s", c.config.WaitForStartTimeout)
 		}
 	}
 }
 
-func (c spiloAcceptanceContainer) TerminateContainer(t *testing.T, ctx context.Context, kill bool) {
-	shared.TerminateContainer(t, ctx, c.containerName, c.config.ContainerLogDir, kill)
+func (c spiloAcceptanceCompose) TerminateCompose(t *testing.T, ctx context.Context, kill bool) {
+	shared.TerminateDockerComposeProject(t, ctx, c.project, c.config.ContainerLogDir, kill)
 }
 
-func (c spiloAcceptanceContainer) Image() string {
+func (c spiloAcceptanceCompose) Image() string {
 	return c.config.Image
 }
 
-func (c spiloAcceptanceContainer) UpgradeFromImage() string {
+func (c spiloAcceptanceCompose) UpgradeFromImage() string {
 	return c.config.UpgradeFromImage
 }
 
-func (c spiloAcceptanceContainer) PGPool() *pgxpool.Pool {
+func (c spiloAcceptanceCompose) PGPool() *pgxpool.Pool {
 	return c.pool
 }
 
 func Test_SpiloAcceptance(t *testing.T) {
 	shared.RunAcceptanceTests(
-		t, context.Background(), &spiloAcceptanceContainer{config: config}, shared.Case{
+		t, context.Background(), &spiloAcceptanceCompose{config: config}, shared.Case{
 			Name: "no timescaledb ext",
 			SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
@@ -225,7 +300,7 @@ func Test_SpiloUpgrade(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := spiloAcceptanceContainer{
+	c := spiloAcceptanceCompose{
 		config:    config,
 		pgdataDir: filepath.Join(tmpdir, "pgdata"),
 	}

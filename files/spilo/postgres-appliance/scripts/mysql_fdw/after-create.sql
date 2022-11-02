@@ -1,0 +1,1 @@
+GRANT USAGE ON FOREIGN DATA WRAPPER mysql_fdw TO admin;

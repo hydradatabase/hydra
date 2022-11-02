@@ -2,12 +2,26 @@
 
 FROM spilo_base
 
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+        # http deps
+        ca-certificates \
+        libcurl4-gnutls-dev \
+        # mysql deps
+        default-libmysqlclient-dev \
+	; \
+	rm -rf /var/lib/apt/lists/*
+
 COPY --from=columnar_13 /pg_ext /
 COPY --from=columnar_14 /pg_ext /
 COPY files/spilo/postgres-appliance/scripts /scripts/
 
 COPY --from=http_13 /pg_ext /
 COPY --from=http_14 /pg_ext /
+
+COPY --from=mysql_13 /pg_ext /
+COPY --from=mysql_14 /pg_ext /
 
 ARG POSTGRES_BASE_VERSION
 # Default envs

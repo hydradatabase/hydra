@@ -41,6 +41,7 @@ target "postgres" {
 
     columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
     http = "target:http_${POSTGRES_BASE_VERSION}"
+    mysql = "target:mysql_${POSTGRES_BASE_VERSION}"
   }
 
   tags = [
@@ -63,6 +64,8 @@ target "spilo" {
     columnar_14 = "target:columnar_14"
     http_13 = "target:http_13"
     http_14 = "target:http_14"
+    mysql_13 = "target:mysql_13"
+    mysql_14 = "target:mysql_14"
   }
 
   args = {
@@ -123,6 +126,46 @@ target "http_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/http_14"]
   cache-from = ["type=local,src=tmp/bake_cache/http_14"]
+}
+
+target "mysql" {
+  inherits = ["shared"]
+  context = "mysql"
+  target = "output"
+
+  args = {
+    MYSQL_FDW_TAG = "REL-2_8_0"
+  }
+}
+
+target "mysql_13" {
+  inherits = ["mysql"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:13"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/mysql_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/mysql_13"]
+}
+
+target "mysql_14" {
+  inherits = ["mysql"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:14"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/mysql_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/mysql_14"]
 }
 
 target "columnar" {

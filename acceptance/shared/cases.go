@@ -2,6 +2,7 @@ package shared
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -120,6 +121,165 @@ SELECT columnar.alter_columnar_table_set(
     stripe_row_limit => 10000);
 			`,
 	},
+	{
+		Name: "http ext available",
+		SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'http';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Errorf("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "enable http ext",
+		SQL: `
+CREATE EXTENSION http;
+			`,
+	},
+	{
+		Name: "http ext enabled",
+		SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'http';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Errorf("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "http put",
+		SQL: `
+SELECT status, content_type, content::json->>'data' AS data
+  FROM http_put('http://httpbin.org/put', 'some text', 'text/plain');
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var result struct {
+				Status      int
+				ContentType string
+				Data        string
+			}
+
+			if err := row.Scan(&result.Status, &result.ContentType, &result.Data); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 200, result.Status; want != got {
+				t.Errorf("http put response status should match: want=%d got=%d", want, got)
+			}
+			if want, got := "application/json", result.ContentType; want != got {
+				t.Errorf("http put response content type should match: want=%s got=%s", want, got)
+			}
+			if want, got := "some text", result.Data; want != got {
+				t.Errorf("http put response data should match: want=%s got=%s", want, got)
+			}
+		},
+	},
+	{
+		Name: "mysql_fdw available",
+		SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'mysql_fdw';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Errorf("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "enable mysql_fdw ext",
+		SQL: `
+CREATE EXTENSION mysql_fdw;
+			`,
+	},
+	{
+		Name: "mysql_fdw enabled",
+		SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'mysql_fdw';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Errorf("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "create mysql_fdw foreign table",
+		SQL: `
+CREATE SERVER mysql_server
+	FOREIGN DATA WRAPPER mysql_fdw
+	OPTIONS (host 'mysql', port '3306');
+
+CREATE USER MAPPING FOR CURRENT_USER
+	SERVER mysql_server
+	OPTIONS (username 'root', password 'mysql');
+
+CREATE FOREIGN TABLE warehouse
+	(
+		warehouse_id int,
+		warehouse_name text,
+		warehouse_created timestamp
+	)
+	SERVER mysql_server
+	OPTIONS (dbname 'test', table_name 'warehouse');
+			`,
+	},
+	{
+		Name: "insert data to mysql_fdw foreign table",
+		SQL: `
+INSERT INTO warehouse values (1, 'UPS', current_date);
+INSERT INTO warehouse values (2, 'TV', current_date);
+INSERT INTO warehouse values (3, 'Table', current_date);
+		`,
+	},
+	{
+		Name: "validate mysql_fdw foreign table",
+		SQL: `
+SELECT * FROM warehouse ORDER BY warehouse_id LIMIT 1;
+		`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var result struct {
+				WarehouseID      int
+				WarehouseName    string
+				WarehouseCreated time.Time
+			}
+			if err := row.Scan(&result.WarehouseID, &result.WarehouseName, &result.WarehouseCreated); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, result.WarehouseID; want != got {
+				t.Errorf("warehouse ID should equal")
+			}
+			if want, got := "UPS", result.WarehouseName; want != got {
+				t.Errorf("warehouse name should equal")
+			}
+			if result.WarehouseCreated.IsZero() {
+				t.Errorf("warehouse created time should not be zero value")
+			}
+		},
+	},
 }
 
 // These describe the shared setup and validation cases that occur to validate
@@ -195,66 +355,6 @@ CREATE TABLE columnar_table2
 
 				if result.T != "hydra" {
 					t.Errorf("t returned %s after upgrade, expected hydra", result.T)
-				}
-			},
-		},
-		{
-			Name: "http ext available",
-			SQL: `
-SELECT count(1) FROM pg_available_extensions WHERE name = 'http';
-			`,
-			Validate: func(t *testing.T, row pgx.Row) {
-				var count int
-				if err := row.Scan(&count); err != nil {
-					t.Fatal(err)
-				}
-
-				if want, got := 1, count; want != got {
-					t.Errorf("columnar ext should exist")
-				}
-			},
-		},
-		{
-			Name: "http ext enabled",
-			SQL: `
-SELECT count(1) FROM pg_extension WHERE extname = 'http';
-			`,
-			Validate: func(t *testing.T, row pgx.Row) {
-				var count int
-				if err := row.Scan(&count); err != nil {
-					t.Fatal(err)
-				}
-
-				if want, got := 1, count; want != got {
-					t.Errorf("columnar ext should exist")
-				}
-			},
-		},
-		{
-			Name: "http put",
-			SQL: `
-SELECT status, content_type, content::json->>'data' AS data
-  FROM http_put('http://httpbin.org/put', 'some text', 'text/plain');
-			`,
-			Validate: func(t *testing.T, row pgx.Row) {
-				var result struct {
-					Status      int
-					ContentType string
-					Data        string
-				}
-
-				if err := row.Scan(&result.Status, &result.ContentType, &result.Data); err != nil {
-					t.Fatal(err)
-				}
-
-				if want, got := 200, result.Status; want != got {
-					t.Errorf("http put response status should match: want=%d got=%d", want, got)
-				}
-				if want, got := "application/json", result.ContentType; want != got {
-					t.Errorf("http put response content type should match: want=%s got=%s", want, got)
-				}
-				if want, got := "some text", result.Data; want != got {
-					t.Errorf("http put response data should match: want=%s got=%s", want, got)
 				}
 			},
 		},

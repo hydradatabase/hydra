@@ -53,40 +53,42 @@ func CreatePGPool(t *testing.T, ctx context.Context, username, password string, 
 	return pool, nil
 }
 
-// TerminateContainer terminates a running docker container. If logDir is
+// TerminateDockerComposeProject terminates a running docker compose project. If logDir is
 // included then the container logs are saved to that directory before it is
 // terminated. If kill is false docker stop is used, otherwise docker kill is.
-func TerminateContainer(t *testing.T, ctx context.Context, containerName, logDir string, kill bool) {
-	if containerName == "" {
+func TerminateDockerComposeProject(t *testing.T, ctx context.Context, project, logDir string, kill bool) {
+	if project == "" {
 		return
 	}
 
-	writeLogs(t, ctx, containerName, logDir)
+	writeDockerComposeLogs(t, ctx, project, logDir)
 
-	var termCmd *exec.Cmd
 	if kill {
-		termCmd = exec.CommandContext(ctx, "docker", "kill", containerName)
-	} else {
-		termCmd = exec.CommandContext(ctx, "docker", "stop", "--time", "30", containerName)
+		termCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "kill")
+		if output, err := termCmd.CombinedOutput(); err != nil {
+			t.Fatalf("unable to terminate docker compose %s: %s", err, output)
+		}
 	}
 
-	if output, err := termCmd.CombinedOutput(); err != nil {
-		t.Fatalf("unable to terminate container %s: %s", err, output)
+	// always run docker compose down to clean up everything including the network
+	downCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "down", "--timeout", "30")
+	if output, err := downCmd.CombinedOutput(); err != nil {
+		t.Fatalf("unable to stop docker compose %s: %s", err, output)
 	}
 }
 
-func writeLogs(t *testing.T, ctx context.Context, containerName, logDir string) {
+func writeDockerComposeLogs(t *testing.T, ctx context.Context, project, logDir string) {
 	if logDir == "" {
 		return
 	}
 
-	logCmd := exec.CommandContext(ctx, "docker", "logs", containerName)
+	logCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "logs", "--no-color")
 	logOutput, err := logCmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("unable to fetch container log %s: %s", err, logOutput)
+		t.Fatalf("unable to fetch docker compose log %s: %s", err, logOutput)
 	}
 
-	if err := os.WriteFile(filepath.Join(logDir, fmt.Sprintf("%s.log", containerName)), logOutput, 0644); err != nil {
-		t.Fatalf("unable to write container log: %s", err)
+	if err := os.WriteFile(filepath.Join(logDir, fmt.Sprintf("%s.log", project)), logOutput, 0644); err != nil {
+		t.Fatalf("unable to write docker compose log: %s", err)
 	}
 }
