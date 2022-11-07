@@ -312,7 +312,7 @@ postgresql:
     bg_mon.history_buckets: 120
     pg_stat_statements.track_utility: 'off'
     extwlist.extensions: 'btree_gin,btree_gist,citext,extra_window_functions,first_last_agg,hll,\
-hstore,hypopg,intarray,ltree,pgcrypto,pgq,pgq_node,pg_trgm,postgres_fdw,http,mysql_fdw,tablefunc,uuid-ossp'
+hstore,hypopg,intarray,ltree,pgcrypto,pgq,pgq_node,pg_trgm,postgres_fdw,http,mysql_fdw,multicorn,tablefunc,uuid-ossp'
     extwlist.custom_path: /scripts
     cron.use_background_workers: 'on'
   pg_hba:

@@ -22,6 +22,10 @@ variable "SPILO_POSTGRES_OLD_VERSIONS" {
   default = "13"
 }
 
+variable "PYTHON_VERSION" {
+  default = "3.9"
+}
+
 group "default" {
   targets = ["postgres", "spilo"]
 }
@@ -42,6 +46,11 @@ target "postgres" {
     columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
     http = "target:http_${POSTGRES_BASE_VERSION}"
     mysql = "target:mysql_${POSTGRES_BASE_VERSION}"
+    multicorn = "target:multicorn_${POSTGRES_BASE_VERSION}"
+  }
+
+  args = {
+    PYTHON_VERSION = "${PYTHON_VERSION}"
   }
 
   tags = [
@@ -66,10 +75,13 @@ target "spilo" {
     http_14 = "target:http_14"
     mysql_13 = "target:mysql_13"
     mysql_14 = "target:mysql_14"
+    multicorn_13 = "target:multicorn_13"
+    multicorn_14 = "target:multicorn_14"
   }
 
   args = {
     POSTGRES_BASE_VERSION = "${SPILO_POSTGRES_VERSION}"
+    PYTHON_VERSION = "${PYTHON_VERSION}"
   }
 
   tags = [
@@ -166,6 +178,48 @@ target "mysql_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/mysql_14"]
   cache-from = ["type=local,src=tmp/bake_cache/mysql_14"]
+}
+
+target "multicorn" {
+  inherits = ["shared"]
+  context = "multicorn"
+  target = "output"
+
+  args = {
+    PYTHON_VERSION = "${PYTHON_VERSION}"
+    MULTICORN_TAG  = "v2.4"
+    S3CSV_FDW_COMMIT = "08ca3c082e2bfaa9ae60303fed67800c29a6fe6c"
+  }
+}
+
+target "multicorn_13" {
+  inherits = ["multicorn"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:13"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/multicorn_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/multicorn_13"]
+}
+
+target "multicorn_14" {
+  inherits = ["multicorn"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:14"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/multicorn_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/multicorn_14"]
 }
 
 target "columnar" {

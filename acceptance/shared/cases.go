@@ -280,6 +280,63 @@ SELECT * FROM warehouse ORDER BY warehouse_id LIMIT 1;
 			}
 		},
 	},
+	{
+		Name: "multicorn ext available",
+		SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'multicorn';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Errorf("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "enable multicorn ext",
+		SQL: `
+CREATE EXTENSION multicorn;
+			`,
+	},
+	{
+		Name: "multicorn ext enabled",
+		SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'multicorn';
+			`,
+		Validate: func(t *testing.T, row pgx.Row) {
+			var count int
+			if err := row.Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+
+			if want, got := 1, count; want != got {
+				t.Errorf("columnar ext should exist")
+			}
+		},
+	},
+	{
+		Name: "create multicorn ext foreign table",
+		SQL: `
+CREATE SERVER multicorn_s3 FOREIGN DATA WRAPPER multicorn
+options (
+  wrapper 's3fdw.s3fdw.S3Fdw'
+);
+
+create foreign table s3 (
+  id int,
+  name text
+) server multicorn_s3 options (
+  aws_access_key 'FAKE',
+  aws_secret_key 'FAKE',
+  bucket 'test-bucket',
+  filename 'test.csv'
+);
+		`,
+	},
 }
 
 // These describe the shared setup and validation cases that occur to validate
