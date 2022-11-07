@@ -319,7 +319,7 @@ SELECT count(1) FROM pg_extension WHERE extname = 'multicorn';
 		},
 	},
 	{
-		Name: "create multicorn ext foreign table",
+		Name: "create multicorn s3 ext foreign table",
 		SQL: `
 CREATE SERVER multicorn_s3 FOREIGN DATA WRAPPER multicorn
 options (
@@ -334,6 +334,22 @@ create foreign table s3 (
   aws_secret_key 'FAKE',
   bucket 'test-bucket',
   filename 'test.csv'
+);
+		`,
+	},
+	{
+		Name: "create multicorn gspreadsheet ext foreign table",
+		SQL: `
+CREATE SERVER multicorn_gspreadsheet FOREIGN DATA WRAPPER multicorn
+options (
+  wrapper 'gspreadsheet_fdw.GspreadsheetFdw' );
+
+CREATE FOREIGN TABLE test_spreadsheet (
+  id character varying,
+  name   character varying
+) server multicorn_gspreadsheet options(
+  gskey '1234',
+  serviceaccount '{}'
 );
 		`,
 	},

@@ -6,6 +6,7 @@ ARG MYSQL_FDW_TAG
 ARG MULTICORN_TAG
 ARG PYTHON_VERSION
 ARG S3CSV_FDW_COMMIT
+ARG GSPREADSHEET_FDW_COMMIT
 ARG POSTGRES_BASE_VERSION=14
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install gnupg postgresql-common git -y
@@ -45,7 +46,17 @@ RUN git clone https://github.com/pgsql-io/multicorn2 && \
   DESTDIR=/pg_ext USE_PGXS=1 make install
 
 # install runtime python deps
-RUN python3 -m pip install git+https://github.com/eligoenergy/s3csv_fdw.git@${S3CSV_FDW_COMMIT}
+RUN python3 -m pip install \
+    git+https://github.com/eligoenergy/s3csv_fdw.git@${S3CSV_FDW_COMMIT} \
+    # gspreadsheet_fdw deps
+    gspread \
+    oauth2client
+
+# Use a fork
+RUN git clone https://github.com/HydrasDB/gspreadsheet_fdw && \
+    cd gspreadsheet_fdw && \
+    git checkout ${GSPREADSHEET_FDW_COMMIT} && \
+    python3 setup.py install
 
 FROM scratch as output
 
