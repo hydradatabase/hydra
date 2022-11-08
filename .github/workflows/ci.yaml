@@ -192,6 +192,8 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Bake and push Postgres
       uses: docker/bake-action@v2.3.0
+      env:
+        POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
       with:
         push: true
         targets: postgres
