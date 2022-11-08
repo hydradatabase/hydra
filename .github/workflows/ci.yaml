@@ -108,6 +108,7 @@ jobs:
 
   build_validate_spilo:
     needs: [validate_columnar]
+    if: github.repository == 'hydrasdb/hydra-internal'
     name: Build and Validate Spilo
     runs-on: ubuntu-latest
     steps:
@@ -165,7 +166,7 @@ jobs:
           *.cache-to=type=gha,mode=max
 
   push_postgres:
-    needs: [build_validate_postgres, build_validate_spilo]
+    needs: [build_validate_postgres]
     if: github.repository == 'hydrasdb/hydra' && github.ref == 'refs/heads/main'
     strategy:
       matrix:
