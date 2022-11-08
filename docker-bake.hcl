@@ -110,7 +110,7 @@ target "spilo_base" {
 
 target "http" {
   inherits = ["shared"]
-  context = "http"
+  context = "third-party/http"
   target = "output"
 
   args = {
@@ -142,7 +142,7 @@ target "http_14" {
 
 target "mysql" {
   inherits = ["shared"]
-  context = "mysql"
+  context = "third-party/mysql"
   target = "output"
 
   args = {
@@ -182,7 +182,7 @@ target "mysql_14" {
 
 target "multicorn" {
   inherits = ["shared"]
-  context = "multicorn"
+  context = "third-party/multicorn"
   target = "output"
 
   args = {
