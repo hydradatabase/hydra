@@ -86,9 +86,9 @@ jobs:
         cache: true
     - name: Run Acceptance Tests
       env:
-        POSTGRES_UPGRADE_FROM_IMAGE: ${{ env.POSTGRES_IMAGE }}
+        POSTGRES_UPGRADE_FROM_IMAGE: ${{ format('{0}:{1}', env.POSTGRES_REPO, matrix.postgres) }}
         POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
-      run: make postgres_acceptance_test
+      run: make postgres_pull_upgrade_image postgres_acceptance_test
     - name: Upload test container logs
       if: failure()
       uses: actions/upload-artifact@v3
@@ -135,6 +135,18 @@ jobs:
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
           spilo.tags=${{ env.SPILO_IMAGE }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+        aws-region: us-east-1
+        mask-aws-account-id: no
+    - name: Login to Amazon ECR
+      id: spilo-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+      with:
+        registries: "011789831835"
     - uses: actions/setup-go@v3
       with:
         go-version-file: go.mod
@@ -142,10 +154,9 @@ jobs:
     - name: Run Acceptance Tests for Postgres 13
       env:
         SPILO_POSTGRES_VERSION: '13'
-      run: make spilo_acceptance_test
+      run: make spilo_pull_upgrade_image spilo_acceptance_test
     - name: Run Acceptance Tests for Postgres 14
       env:
-        SPILO_UPGRADE_FROM_IMAGE: ${{ env.SPILO_IMAGE }}
         SPILO_POSTGRES_VERSION: '14'
       run: make spilo_acceptance_test
     - name: Upload test container logs

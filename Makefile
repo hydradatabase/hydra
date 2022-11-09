@@ -4,6 +4,8 @@ DOCKER_CACHE_DIR=tmp/bake_cache
 TARGET ?= default
 POSTGRES_BASE_VERSION ?= 14
 
+ECR_REGISTRY ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com
+
 $(DOCKER_CACHE_DIR):
 	mkdir -p $(DOCKER_CACHE_DIR)
 
@@ -50,7 +52,7 @@ acceptance_test: postgres_acceptance_test spilo_acceptance_test
 acceptance_build_test: postgres_acceptance_build_test spilo_acceptance_build_test
 
 POSTGRES_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
-POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
+POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$(POSTGRES_BASE_VERSION)
 
 .PHONY: postgres_acceptance_test
 # Runs the postgres acceptance tests
@@ -61,12 +63,21 @@ postgres_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 		EXPECTED_POSTGRES_VERSION=$(POSTGRES_BASE_VERSION) \
 		go test ./acceptance/postgres/... $(GO_TEST_FLAGS) -count=1 -v
 
+.PHONY: postgres_pull_upgrade_image
+postgres_pull_upgrade_image:
+	docker pull $(POSTGRES_UPGRADE_FROM_IMAGE)
+
 .PHONY: postgres_acceptance_build_test
 # Builds the postgres image then runs the acceptance tests
-postgres_acceptance_build_test: docker_build_local_postgres postgres_acceptance_test
+postgres_acceptance_build_test: docker_build_local_postgres postgres_pull_upgrade_image postgres_acceptance_test
 
-SPILO_IMAGE ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo:latest
-SPILO_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$$(cat HYDRA_PROD_VER)
+.PHONY: ecr_login
+ecr_login:
+	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+
+SPILO_REPO ?= $(ECR_REGISTRY)/spilo
+SPILO_IMAGE ?= $(SPILO_REPO):latest
+SPILO_UPGRADE_FROM_IMAGE ?= $(SPILO_REPO):$$(cat HYDRA_PROD_VER)
 
 .PHONY: spilo_acceptance_test
 # Runs the spilo acceptance tests
@@ -76,9 +87,13 @@ spilo_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
 		SPILO_UPGRADE_FROM_IMAGE=$(SPILO_UPGRADE_FROM_IMAGE) \
 		go test ./acceptance/spilo/... $(GO_TEST_FLAGS) -count=1 -v
 
+.PHONY: spilo_pull_upgrade_image
+spilo_pull_upgrade_image: ecr_login
+	docker pull $(SPILO_UPGRADE_FROM_IMAGE)
+
 .PHONY: spilo_acceptance_build_test
 # Builds the spilo image then runs acceptance tests
-spilo_acceptance_build_test: docker_build_local_spilo spilo_acceptance_test
+spilo_acceptance_build_test: docker_build_local_spilo spilo_pull_upgrade_image spilo_acceptance_test
 
 .PHONY: lint_acceptance
 # Runs the go linter

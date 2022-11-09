@@ -9,9 +9,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -
 
 FROM setup as builder
 
-RUN git clone https://github.com/pramsey/pgsql-http && \
+RUN git clone https://github.com/pramsey/pgsql-http --branch ${PGSQL_HTTP_TAG} --single-branch && \
   cd pgsql-http && \
-  git checkout ${PGSQL_HTTP_TAG} && \
   DESTDIR=/pg_ext make && \
   DESTDIR=/pg_ext make install
 

@@ -39,9 +39,8 @@ RUN wget https://bootstrap.pypa.io/get-pip.py && python3 get-pip.py && rm get-pi
 
 FROM setup as builder
 
-RUN git clone https://github.com/pgsql-io/multicorn2 && \
+RUN git clone https://github.com/pgsql-io/multicorn2 --branch ${MULTICORN_TAG} --single-branch && \
   cd multicorn2 && \
-  git checkout ${MULTICORN_TAG} && \
   DESTDIR=/pg_ext USE_PGXS=1 make && \
   DESTDIR=/pg_ext USE_PGXS=1 make install
 
@@ -53,7 +52,7 @@ RUN python3 -m pip install \
     oauth2client
 
 # Use a fork
-RUN git clone https://github.com/HydrasDB/gspreadsheet_fdw && \
+RUN git clone https://github.com/HydrasDB/gspreadsheet_fdw --single-branch && \
     cd gspreadsheet_fdw && \
     git checkout ${GSPREADSHEET_FDW_COMMIT} && \
     python3 setup.py install

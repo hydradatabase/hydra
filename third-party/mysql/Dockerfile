@@ -26,9 +26,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
 
 FROM setup as builder
 
-RUN git clone https://github.com/EnterpriseDB/mysql_fdw && \
+RUN git clone https://github.com/EnterpriseDB/mysql_fdw --branch ${MYSQL_FDW_TAG} --single-branch && \
   cd mysql_fdw && \
-  git checkout ${MYSQL_FDW_TAG} && \
   DESTDIR=/pg_ext make USE_PGXS=1 && \
   DESTDIR=/pg_ext make USE_PGXS=1 install
 

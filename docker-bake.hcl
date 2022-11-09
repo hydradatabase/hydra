@@ -55,7 +55,7 @@ target "postgres" {
 
   tags = [
     "${POSTGRES_REPO}:latest",
-    "${POSTGRES_REPO}:${POSTGRES_BASE_VERSION}-latest"
+    "${POSTGRES_REPO}:${POSTGRES_BASE_VERSION}"
   ]
 
   cache-to = ["type=local,dest=tmp/bake_cache/postgres"]
