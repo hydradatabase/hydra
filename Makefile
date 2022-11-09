@@ -9,9 +9,9 @@ ECR_REGISTRY ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com
 $(DOCKER_CACHE_DIR):
 	mkdir -p $(DOCKER_CACHE_DIR)
 
-TEST_CONTAINER_LOG_DIR ?= $(CURDIR)/tmp/testlogs
-$(TEST_CONTAINER_LOG_DIR):
-	mkdir -p $(TEST_CONTAINER_LOG_DIR)
+TEST_ARTIFACT_DIR ?= $(CURDIR)/tmp/test_artifacts
+$(TEST_ARTIFACT_DIR):
+	mkdir -p $(TEST_ARTIFACT_DIR)
 
 .PHONY: docker_build
 # Runs a full multi-platform docker build
@@ -56,8 +56,8 @@ POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$(POSTGRES_BASE_VERSION)
 
 .PHONY: postgres_acceptance_test
 # Runs the postgres acceptance tests
-postgres_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
-	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) \
+postgres_acceptance_test: $(TEST_ARTIFACT_DIR)
+	ARTIFACT_DIR=$(TEST_ARTIFACT_DIR) \
 		POSTGRES_IMAGE=$(POSTGRES_IMAGE) \
 		POSTGRES_UPGRADE_FROM_IMAGE=$(POSTGRES_UPGRADE_FROM_IMAGE) \
 		EXPECTED_POSTGRES_VERSION=$(POSTGRES_BASE_VERSION) \
@@ -81,8 +81,8 @@ SPILO_UPGRADE_FROM_IMAGE ?= $(SPILO_REPO):$$(cat HYDRA_PROD_VER)
 
 .PHONY: spilo_acceptance_test
 # Runs the spilo acceptance tests
-spilo_acceptance_test: $(TEST_CONTAINER_LOG_DIR)
-	CONTAINER_LOG_DIR=$(TEST_CONTAINER_LOG_DIR) \
+spilo_acceptance_test: $(TEST_ARTIFACT_DIR)
+	ARTIFACT_DIR=$(TEST_ARTIFACT_DIR) \
 		SPILO_IMAGE=$(SPILO_IMAGE) \
 		SPILO_UPGRADE_FROM_IMAGE=$(SPILO_UPGRADE_FROM_IMAGE) \
 		go test ./acceptance/spilo/... $(GO_TEST_FLAGS) -count=1 -v

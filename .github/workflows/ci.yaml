@@ -7,7 +7,7 @@ on:
 env:
   POSTGRES_REPO: ghcr.io/hydrasdb/hydra
   SPILO_REPO: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
-  TEST_CONTAINER_LOG_DIR: /tmp/containerlogs
+  TEST_ARTIFACT_DIR: /tmp/test_artifacts
 
 jobs:
   lint_go:
@@ -94,7 +94,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: postgres_${{ matrix.postgres }}_container_logs
-        path: ${{ env.TEST_CONTAINER_LOG_DIR }}
+        path: ${{ env.TEST_ARTIFACT_DIR }}
         retention-days: 7
     - name: Bake multi-platform Postgres
       if: github.ref == 'refs/heads/main'
@@ -164,7 +164,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: spilo_container_logs
-        path: ${{ env.TEST_CONTAINER_LOG_DIR }}
+        path: ${{ env.TEST_ARTIFACT_DIR }}
         retention-days: 7
     - name: Bake multi-platform spilo
       if: github.ref == 'refs/heads/main'

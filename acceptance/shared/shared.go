@@ -19,12 +19,12 @@ import (
 // ErrPgPoolConnect is used when pgxpool cannot connect to a database.
 var ErrPgPoolConnect = errors.New("pgxpool did not connect")
 
-// MustHaveValidContainerLogDir ensures that if a container log directory is
+// MustHaveValidArtifactDir ensures that if a artifact directory is
 // present it is has an absolute path as go tests cannot determine the directory
 // that they are running from.
-func MustHaveValidContainerLogDir(logDir string) {
-	if logDir != "" && !filepath.IsAbs(logDir) {
-		log.Fatalf("the container log dir must be absolute, got %s", logDir)
+func MustHaveValidArtifactDir(dir string) {
+	if dir != "" && !filepath.IsAbs(dir) {
+		log.Fatalf("the artifact dir must be absolute, got %s", dir)
 	}
 }
 
@@ -55,23 +55,30 @@ func CreatePGPool(t *testing.T, ctx context.Context, username, password string, 
 
 // TerminateDockerComposeProject terminates a running docker compose project. If logDir is
 // included then the container logs are saved to that directory before it is
-// terminated. If kill is false docker stop is used, otherwise docker kill is.
-func TerminateDockerComposeProject(t *testing.T, ctx context.Context, project, logDir string, kill bool) {
+// terminated. If killAndCleanup is false docker stop is used, otherwise docker compose
+// kill is used and volumes are also deleted.
+func TerminateDockerComposeProject(t *testing.T, ctx context.Context, project, logDir string, killAndCleanup bool) {
 	if project == "" {
 		return
 	}
 
 	writeDockerComposeLogs(t, ctx, project, logDir)
 
-	if kill {
+	if killAndCleanup {
 		termCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "kill")
 		if output, err := termCmd.CombinedOutput(); err != nil {
 			t.Fatalf("unable to terminate docker compose %s: %s", err, output)
 		}
 	}
 
-	// always run docker compose down to clean up everything including the network
-	downCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "down", "--timeout", "30")
+	// always run docker compose down to clean up the containers and network
+	downCmdConfig := []string{"compose", "--project-name", project, "down", "--timeout", "30"}
+	if killAndCleanup {
+		// but only remove the volumes if killing the containers
+		downCmdConfig = append(downCmdConfig, "--volumes")
+	}
+
+	downCmd := exec.CommandContext(ctx, "docker", downCmdConfig...)
 	if output, err := downCmd.CombinedOutput(); err != nil {
 		t.Fatalf("unable to stop docker compose %s: %s", err, output)
 	}
@@ -82,13 +89,13 @@ func writeDockerComposeLogs(t *testing.T, ctx context.Context, project, logDir s
 		return
 	}
 
-	logCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "logs", "--no-color")
+	logCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", project, "logs", "--no-color", "hydra")
 	logOutput, err := logCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("unable to fetch docker compose log %s: %s", err, logOutput)
 	}
 
-	if err := os.WriteFile(filepath.Join(logDir, fmt.Sprintf("%s.log", project)), logOutput, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(logDir, fmt.Sprintf("%s-%s.log", project, time.Now().Format(time.RFC3339))), logOutput, 0644); err != nil {
 		t.Fatalf("unable to write docker compose log: %s", err)
 	}
 }

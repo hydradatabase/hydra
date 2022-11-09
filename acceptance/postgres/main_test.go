@@ -26,7 +26,6 @@ type dockerComposeData struct {
 	PostgresUser        string
 	PostgresPassword    string
 	PostgresPort        int
-	DataDir             string
 	StartEverything     bool
 	MySQLFixtureSQLPath string
 }
@@ -45,15 +44,11 @@ services:
     environment:
       POSTGRES_USER: {{ .PostgresUser }}
       POSTGRES_PASSWORD: {{ .PostgresPassword }}
-	  {{- if .DataDir }}
       PGDATA: /var/lib/postgresql/data/pgdata
-	  {{- end }}
     ports:
       - "{{ .PostgresPort }}:5432"
-	{{- if .DataDir }}
     volumes:
-      - {{ .DataDir }}:/var/lib/postgresql/data/pgdata
-    {{- end }}
+      - pg_data:/var/lib/postgresql/data/pgdata
 {{- if .StartEverything }}
   mysql:
     image: mysql:8.0.31
@@ -72,15 +67,17 @@ services:
       timeout: 10s
       retries: 5
 {{- end }}
+volumes:
+  pg_data:
 `))
 )
 
 type Config struct {
 	Image                   string        `env:"POSTGRES_IMAGE,required"`
 	UpgradeFromImage        string        `env:"POSTGRES_UPGRADE_FROM_IMAGE,required"`
-	ContainerLogDir         string        `env:"CONTAINER_LOG_DIR,default="`
+	ArtifactDir             string        `env:"ARTIFACT_DIR,default="`
 	WaitForStartTimeout     time.Duration `env:"WAIT_FOR_START_TIMEOUT,default=15s"`
-	WaitForStartInterval    time.Duration `env:"WAIT_FOR_START_INTERVAL,default=1s"`
+	WaitForStartInterval    time.Duration `env:"WAIT_FOR_START_INTERVAL,default=2s"`
 	PostgresPort            int           `env:"POSTGRES_PORT,default=5432"`
 	ExpectedPostgresVersion string        `env:"EXPECTED_POSTGRES_VERSION,required"`
 }
@@ -90,7 +87,6 @@ var config Config
 const (
 	pgusername = "hydra"
 	pgpassword = "hydra"
-	pgdatadir  = "/var/lib/postgresql/data/pgdata"
 )
 
 func TestMain(m *testing.M) {
@@ -98,21 +94,23 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 
-	shared.MustHaveValidContainerLogDir(config.ContainerLogDir)
+	shared.MustHaveValidArtifactDir(config.ArtifactDir)
 
 	os.Exit(m.Run())
 }
 
 type postgresAcceptanceCompose struct {
-	config    Config
-	pgdataDir string
+	config Config
 
 	project string
 	pool    *pgxpool.Pool
 }
 
 func (c *postgresAcceptanceCompose) StartCompose(t *testing.T, ctx context.Context, img string, startEverything bool) {
-	c.project = fmt.Sprintf("postgres-%s", xid.New())
+	// Only set the project on first start
+	if c.project == "" {
+		c.project = fmt.Sprintf("postgres-%s", xid.New())
+	}
 
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -125,18 +123,17 @@ func (c *postgresAcceptanceCompose) StartCompose(t *testing.T, ctx context.Conte
 		PostgresUser:        pgusername,
 		PostgresPassword:    pgpassword,
 		PostgresPort:        c.config.PostgresPort,
-		DataDir:             c.pgdataDir,
 		StartEverything:     startEverything,
 		MySQLFixtureSQLPath: filepath.Join(pwd, "..", "fixtures", "mysql.sql"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	f, err := os.CreateTemp("", "docker-compose.yml")
+	// ArtifactDir may be empty, in which case the system tmp directory is used
+	f, err := os.CreateTemp(c.config.ArtifactDir, "docker-compose.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
 
 	if _, err := f.WriteString(dockerCompose.String()); err != nil {
 		t.Fatal(err)
@@ -147,7 +144,7 @@ func (c *postgresAcceptanceCompose) StartCompose(t *testing.T, ctx context.Conte
 
 	runCmd := exec.CommandContext(ctx, "docker", "compose", "--project-name", c.project, "--file", f.Name(), "up", "--detach")
 
-	t.Logf("Starting docker compose %s", c.project)
+	t.Logf("Starting docker compose %s with %s", c.project, f.Name())
 	if o, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("unable to start docker compose %s: %s", err, o)
 		return
@@ -176,14 +173,13 @@ func (c *postgresAcceptanceCompose) WaitForContainerReady(t *testing.T, ctx cont
 			c.pool = pool
 			done <- true
 		case <-timeout:
-			c.TerminateCompose(t, ctx, true)
 			t.Fatalf("timed out waiting for container to start after %s", c.config.WaitForStartTimeout)
 		}
 	}
 }
 
 func (c postgresAcceptanceCompose) TerminateCompose(t *testing.T, ctx context.Context, kill bool) {
-	shared.TerminateDockerComposeProject(t, ctx, c.project, c.config.ContainerLogDir, kill)
+	shared.TerminateDockerComposeProject(t, ctx, c.project, c.config.ArtifactDir, kill)
 }
 
 func (c postgresAcceptanceCompose) Image() string {
@@ -219,21 +215,9 @@ func Test_PostgresAcceptance(t *testing.T) {
 }
 
 func Test_PostgresUpgrade(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "postgres_upgrade")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	c := postgresAcceptanceCompose{
-		config:    config,
-		pgdataDir: filepath.Join(tmpdir, "pgdata"),
+		config: config,
 	}
 
 	shared.RunUpgradeTests(t, context.Background(), &c)
-
-	t.Cleanup(func() {
-		if err := os.Remove(tmpdir); err != nil {
-			t.Logf("unable to cleanup tmpdir, %s", err)
-		}
-	})
 }
