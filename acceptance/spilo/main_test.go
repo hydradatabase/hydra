@@ -227,7 +227,10 @@ func (c spiloAcceptanceCompose) PGPool() *pgxpool.Pool {
 
 func Test_SpiloAcceptance(t *testing.T) {
 	shared.RunAcceptanceTests(
-		t, context.Background(), &spiloAcceptanceCompose{config: config}, shared.Case{
+		t,
+		context.Background(),
+		&spiloAcceptanceCompose{config: config},
+		shared.Case{
 			Name: "no timescaledb ext",
 			SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';

@@ -32,8 +32,8 @@ COPY --from=mysql_13 /pg_ext /
 COPY --from=mysql_14 /pg_ext /
 
 # http ext
-COPY --from=http_13 /pg_ext /
-COPY --from=http_14 /pg_ext /
+#COPY --from=http_13 /pg_ext /
+#COPY --from=http_14 /pg_ext /
 
 # multicorn ext
 COPY --from=multicorn_13 /pg_ext /

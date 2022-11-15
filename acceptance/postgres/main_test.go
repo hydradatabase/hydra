@@ -196,21 +196,93 @@ func (c postgresAcceptanceCompose) PGPool() *pgxpool.Pool {
 
 func Test_PostgresAcceptance(t *testing.T) {
 	shared.RunAcceptanceTests(
-		t, context.Background(), &postgresAcceptanceCompose{config: config},
-		shared.Case{
-			Name: "started with the expected postgres version",
-			SQL:  `SHOW server_version;`,
-			Validate: func(t *testing.T, row pgx.Row) {
-				var version string
-				if err := row.Scan(&version); err != nil {
-					t.Fatal(err)
-				}
+		t,
+		context.Background(),
+		&postgresAcceptanceCompose{config: config},
+		[]shared.Case{
+			// http ext cases are only available to postgres build for now
+			// move this back to AcceptanceCases when they are ready
+			{
+				Name: "http ext available",
+				SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'http';
+			`,
+				Validate: func(t *testing.T, row pgx.Row) {
+					var count int
+					if err := row.Scan(&count); err != nil {
+						t.Fatal(err)
+					}
 
-				if !strings.HasPrefix(version, config.ExpectedPostgresVersion) {
-					t.Errorf("incorrect postgres version, got %s, expected major version %s", version, config.ExpectedPostgresVersion)
-				}
+					if want, got := 1, count; want != got {
+						t.Errorf("columnar ext should exist")
+					}
+				},
 			},
-		},
+			{
+				Name: "enable http ext",
+				SQL: `
+CREATE EXTENSION http;
+			`,
+			},
+			{
+				Name: "http ext enabled",
+				SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'http';
+			`,
+				Validate: func(t *testing.T, row pgx.Row) {
+					var count int
+					if err := row.Scan(&count); err != nil {
+						t.Fatal(err)
+					}
+
+					if want, got := 1, count; want != got {
+						t.Errorf("columnar ext should exist")
+					}
+				},
+			},
+			{
+				Name: "http put",
+				SQL: `
+SELECT status, content_type, content::json->>'data' AS data
+  FROM http_put('http://httpbin.org/put', 'some text', 'text/plain');
+			`,
+				Validate: func(t *testing.T, row pgx.Row) {
+					var result struct {
+						Status      int
+						ContentType string
+						Data        string
+					}
+
+					if err := row.Scan(&result.Status, &result.ContentType, &result.Data); err != nil {
+						t.Fatal(err)
+					}
+
+					if want, got := 200, result.Status; want != got {
+						t.Errorf("http put response status should match: want=%d got=%d", want, got)
+					}
+					if want, got := "application/json", result.ContentType; want != got {
+						t.Errorf("http put response content type should match: want=%s got=%s", want, got)
+					}
+					if want, got := "some text", result.Data; want != got {
+						t.Errorf("http put response data should match: want=%s got=%s", want, got)
+					}
+				},
+			},
+			{
+				Name: "started with the expected postgres version",
+				SQL:  `SHOW server_version;`,
+				Validate: func(t *testing.T, row pgx.Row) {
+					var version string
+					if err := row.Scan(&version); err != nil {
+						t.Fatal(err)
+					}
+
+					if !strings.HasPrefix(version, config.ExpectedPostgresVersion) {
+						t.Errorf("incorrect postgres version, got %s, expected major version %s", version, config.ExpectedPostgresVersion)
+					}
+				},
+			},
+		}...,
 	)
 }
 
