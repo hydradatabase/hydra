@@ -46,7 +46,7 @@ RUN git clone https://github.com/pgsql-io/multicorn2 --branch ${MULTICORN_TAG} -
 
 # install runtime python deps
 RUN python3 -m pip install \
-    git+https://github.com/eligoenergy/s3csv_fdw.git@${S3CSV_FDW_COMMIT} \
+    git+https://github.com/HydrasDB/s3csv_fdw@${S3CSV_FDW_COMMIT} \
     # gspreadsheet_fdw deps
     gspread \
     oauth2client

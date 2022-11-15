@@ -188,7 +188,7 @@ target "multicorn" {
   args = {
     PYTHON_VERSION = "${PYTHON_VERSION}"
     MULTICORN_TAG  = "v2.4"
-    S3CSV_FDW_COMMIT = "08ca3c082e2bfaa9ae60303fed67800c29a6fe6c"
+    S3CSV_FDW_COMMIT = "f64e24f9fe3f7dbd1be76f9b8b3b5208f869e5e3"
     GSPREADSHEET_FDW_COMMIT = "d5bc5ae0b2d189abd6d2ee4610bd96ec39602594"
   }
 }
