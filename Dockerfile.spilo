@@ -19,6 +19,9 @@ RUN set -eux; \
     # multicorn deps
     python${PYTHON_VERSION} \
     python${PYTHON_VERSION}-dev \
+    # s3 deps
+    lsb-release \
+    wget \
 	; \
     rm -rf /var/lib/apt/lists/*
 
@@ -39,6 +42,16 @@ COPY --from=mysql_14 /pg_ext /
 COPY --from=multicorn_13 /pg_ext /
 COPY --from=multicorn_14 /pg_ext /
 COPY --from=multicorn_14 /python-dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
+
+# s3 ext
+COPY --from=s3_13 /pg_ext /
+COPY --from=s3_14 /pg_ext /
+COPY third-party/s3/scripts /tmp
+RUN set -eux; \
+    /tmp/install-arrow; \
+    rm -f /tmp/install
+COPY --from=s3_14 /lib/* /s3_lib/
+RUN cp -r /s3_lib/* /usr/lib/$(uname -m)-linux-gnu/
 
 ARG POSTGRES_BASE_VERSION
 # Default envs

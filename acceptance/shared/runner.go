@@ -38,11 +38,15 @@ func RunAcceptanceTests(t *testing.T, ctx context.Context, cm DockerComposeManag
 
 	pool := cm.PGPool()
 
-	cases := append(AcceptanceCases, additionalCases...)
+	cases := append(AcceptanceCases(), additionalCases...)
 
 	for _, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
+			if c.Skip {
+				t.Skip("Test skipped")
+			}
+
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 

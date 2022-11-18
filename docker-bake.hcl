@@ -47,6 +47,7 @@ target "postgres" {
     http = "target:http_${POSTGRES_BASE_VERSION}"
     mysql = "target:mysql_${POSTGRES_BASE_VERSION}"
     multicorn = "target:multicorn_${POSTGRES_BASE_VERSION}"
+    s3 = "target:s3_${POSTGRES_BASE_VERSION}"
   }
 
   args = {
@@ -77,6 +78,8 @@ target "spilo" {
     mysql_14 = "target:mysql_14"
     multicorn_13 = "target:multicorn_13"
     multicorn_14 = "target:multicorn_14"
+    s3_13 = "target:s3_spilo_13"
+    s3_14 = "target:s3_spilo_14"
   }
 
   args = {
@@ -138,6 +141,78 @@ target "http_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/http_14"]
   cache-from = ["type=local,src=tmp/bake_cache/http_14"]
+}
+
+target "s3" {
+  inherits = ["shared"]
+  context = "third-party/s3"
+  target = "output"
+
+  args = {
+    ARROW_TAG = "apache-arrow-10.0.0"
+    AWS_SDK_TAG = "1.10.4"
+    PARQUET_S3_FDW_COMMIT = "15dc2c9f0c57dc9f699f6cc645ac82663cea9fe1"
+  }
+}
+
+target "s3_13" {
+  inherits = ["s3"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:13"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/s3_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/s3_13"]
+}
+
+target "s3_14" {
+  inherits = ["s3"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:14"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/s3_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/s3_14"]
+}
+
+target "s3_spilo_13" {
+  inherits = ["s3"]
+
+  contexts = {
+    postgres_base = "target:spilo_base"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/s3_spilo_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_13"]
+}
+
+target "s3_spilo_14" {
+  inherits = ["s3"]
+
+  contexts = {
+    postgres_base = "target:spilo_base"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/s3_spilo_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_14"]
 }
 
 target "mysql" {

@@ -1,6 +1,9 @@
 package shared
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,46 +18,48 @@ type Case struct {
 	Name     string                          // name of the test
 	SQL      string                          // SQL to run during the test
 	Validate func(t *testing.T, row pgx.Row) // optional validation function
+	Skip     bool                            // whether this case should be skipped
 }
 
 // AcceptanceCases describe the shared acceptance criteria for any Hydra-based
 // images.
-var AcceptanceCases = []Case{
-	{
-		Name: "columnar ext available",
-		SQL: `
+func AcceptanceCases() []Case {
+	cases := []Case{
+		{
+			Name: "columnar ext available",
+			SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'columnar';
 			`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var count int
-			if err := row.Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, count; want != got {
-				t.Error("columnar ext should exist")
-			}
+				if want, got := 1, count; want != got {
+					t.Error("columnar ext should exist")
+				}
+			},
 		},
-	},
-	{
-		Name: "columnar ext enabled",
-		SQL: `
+		{
+			Name: "columnar ext enabled",
+			SQL: `
 SELECT count(1) FROM pg_extension WHERE extname = 'columnar';
 			`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var count int
-			if err := row.Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, count; want != got {
-				t.Error("columnar ext should exist")
-			}
+				if want, got := 1, count; want != got {
+					t.Error("columnar ext should exist")
+				}
+			},
 		},
-	},
-	{
-		Name: "using a columnar table",
-		SQL: `
+		{
+			Name: "using a columnar table",
+			SQL: `
 CREATE TABLE my_columnar_table
 (
     id INT,
@@ -64,10 +69,10 @@ CREATE TABLE my_columnar_table
     t TEXT
 ) USING columnar;
 			`,
-	},
-	{
-		Name: "convert between row and columnar",
-		SQL: `
+		},
+		{
+			Name: "convert between row and columnar",
+			SQL: `
 		CREATE TABLE my_table(i INT8 DEFAULT '7');
 		INSERT INTO my_table VALUES(1);
 		-- convert to columnar
@@ -76,18 +81,18 @@ CREATE TABLE my_columnar_table
 		-- TODO: reenable this after it's supported
 		-- SELECT alter_table_set_access_method('my_table', 'heap');
 		`,
-	},
-	{
-		Name: "convert by copying",
-		SQL: `
+		},
+		{
+			Name: "convert by copying",
+			SQL: `
 CREATE TABLE table_heap (i INT8);
 CREATE TABLE table_columnar (LIKE table_heap) USING columnar;
 INSERT INTO table_columnar SELECT * FROM table_heap;
 			`,
-	},
-	{
-		Name: "partition",
-		SQL: `
+		},
+		{
+			Name: "partition",
+			SQL: `
 CREATE TABLE parent(ts timestamptz, i int, n numeric, s text)
   PARTITION BY RANGE (ts);
 
@@ -111,57 +116,57 @@ CREATE INDEX p2_ts_idx ON p2 (ts);
 CREATE UNIQUE INDEX p2_i_unique ON p2 (i);
 ALTER TABLE p2 ADD UNIQUE (n);
 			`,
-	},
-	{
-		Name: "options",
-		SQL: `
+		},
+		{
+			Name: "options",
+			SQL: `
 SELECT columnar.alter_columnar_table_set(
     'my_columnar_table',
     compression => 'none',
     stripe_row_limit => 10000);
 			`,
-	},
-	{
-		Name: "mysql_fdw available",
-		SQL: `
+		},
+		{
+			Name: "mysql_fdw available",
+			SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'mysql_fdw';
 			`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var count int
-			if err := row.Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, count; want != got {
-				t.Errorf("columnar ext should exist")
-			}
+				if want, got := 1, count; want != got {
+					t.Errorf("columnar ext should exist")
+				}
+			},
 		},
-	},
-	{
-		Name: "enable mysql_fdw ext",
-		SQL: `
+		{
+			Name: "enable mysql_fdw ext",
+			SQL: `
 CREATE EXTENSION mysql_fdw;
 			`,
-	},
-	{
-		Name: "mysql_fdw enabled",
-		SQL: `
+		},
+		{
+			Name: "mysql_fdw enabled",
+			SQL: `
 SELECT count(1) FROM pg_extension WHERE extname = 'mysql_fdw';
 			`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var count int
-			if err := row.Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, count; want != got {
-				t.Errorf("columnar ext should exist")
-			}
+				if want, got := 1, count; want != got {
+					t.Errorf("columnar ext should exist")
+				}
+			},
 		},
-	},
-	{
-		Name: "create mysql_fdw foreign table",
-		SQL: `
+		{
+			Name: "create mysql_fdw foreign table",
+			SQL: `
 CREATE SERVER mysql_server
 	FOREIGN DATA WRAPPER mysql_fdw
 	OPTIONS (host 'mysql', port '3306');
@@ -179,82 +184,82 @@ CREATE FOREIGN TABLE warehouse
 	SERVER mysql_server
 	OPTIONS (dbname 'test', table_name 'warehouse');
 			`,
-	},
-	{
-		Name: "insert data to mysql_fdw foreign table",
-		SQL: `
+		},
+		{
+			Name: "insert data to mysql_fdw foreign table",
+			SQL: `
 INSERT INTO warehouse values (1, 'UPS', current_date);
 INSERT INTO warehouse values (2, 'TV', current_date);
 INSERT INTO warehouse values (3, 'Table', current_date);
 		`,
-	},
-	{
-		Name: "validate mysql_fdw foreign table",
-		SQL: `
+		},
+		{
+			Name: "validate mysql_fdw foreign table",
+			SQL: `
 SELECT * FROM warehouse ORDER BY warehouse_id LIMIT 1;
 		`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var result struct {
-				WarehouseID      int
-				WarehouseName    string
-				WarehouseCreated time.Time
-			}
-			if err := row.Scan(&result.WarehouseID, &result.WarehouseName, &result.WarehouseCreated); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var result struct {
+					WarehouseID      int
+					WarehouseName    string
+					WarehouseCreated time.Time
+				}
+				if err := row.Scan(&result.WarehouseID, &result.WarehouseName, &result.WarehouseCreated); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, result.WarehouseID; want != got {
-				t.Errorf("warehouse ID should equal")
-			}
-			if want, got := "UPS", result.WarehouseName; want != got {
-				t.Errorf("warehouse name should equal")
-			}
-			if result.WarehouseCreated.IsZero() {
-				t.Errorf("warehouse created time should not be zero value")
-			}
+				if want, got := 1, result.WarehouseID; want != got {
+					t.Errorf("warehouse ID should equal")
+				}
+				if want, got := "UPS", result.WarehouseName; want != got {
+					t.Errorf("warehouse name should equal")
+				}
+				if result.WarehouseCreated.IsZero() {
+					t.Errorf("warehouse created time should not be zero value")
+				}
+			},
 		},
-	},
-	{
-		Name: "multicorn ext available",
-		SQL: `
+		{
+			Name: "multicorn ext available",
+			SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'multicorn';
 			`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var count int
-			if err := row.Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, count; want != got {
-				t.Errorf("columnar ext should exist")
-			}
+				if want, got := 1, count; want != got {
+					t.Errorf("columnar ext should exist")
+				}
+			},
 		},
-	},
-	{
-		Name: "enable multicorn ext",
-		SQL: `
+		{
+			Name: "enable multicorn ext",
+			SQL: `
 CREATE EXTENSION multicorn;
 			`,
-	},
-	{
-		Name: "multicorn ext enabled",
-		SQL: `
+		},
+		{
+			Name: "multicorn ext enabled",
+			SQL: `
 SELECT count(1) FROM pg_extension WHERE extname = 'multicorn';
 			`,
-		Validate: func(t *testing.T, row pgx.Row) {
-			var count int
-			if err := row.Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
 
-			if want, got := 1, count; want != got {
-				t.Errorf("columnar ext should exist")
-			}
+				if want, got := 1, count; want != got {
+					t.Errorf("columnar ext should exist")
+				}
+			},
 		},
-	},
-	{
-		Name: "create multicorn s3 ext foreign table",
-		SQL: `
+		{
+			Name: "create multicorn s3 ext foreign table",
+			SQL: `
 CREATE SERVER multicorn_s3 FOREIGN DATA WRAPPER multicorn
 options (
   wrapper 's3fdw.s3fdw.S3Fdw'
@@ -270,10 +275,10 @@ create foreign table s3 (
   filename 'test.csv'
 );
 		`,
-	},
-	{
-		Name: "create multicorn gspreadsheet ext foreign table",
-		SQL: `
+		},
+		{
+			Name: "create multicorn gspreadsheet ext foreign table",
+			SQL: `
 CREATE SERVER multicorn_gspreadsheet FOREIGN DATA WRAPPER multicorn
 options (
   wrapper 'gspreadsheet_fdw.GspreadsheetFdw' );
@@ -286,7 +291,135 @@ CREATE FOREIGN TABLE test_spreadsheet (
   serviceaccount '{}'
 );
 		`,
-	},
+		},
+		{
+			Name: "parquet_s3_fdw available",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'parquet_s3_fdw';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, count; want != got {
+					t.Errorf("parquet_s3_fdw ext should exist")
+				}
+			},
+		},
+		{
+			Name: "enable parquet_s3_fdw ext",
+			SQL: `
+CREATE EXTENSION parquet_s3_fdw;
+			`,
+		},
+		{
+			Name: "create parquet_s3_fdw foreign table with no aws creds",
+			SQL: `
+CREATE SERVER parquet_s3_srv_1 FOREIGN DATA WRAPPER parquet_s3_fdw OPTIONS (aws_region 'us-east-1');
+CREATE USER MAPPING FOR public SERVER parquet_s3_srv_1;
+CREATE FOREIGN TABLE userdata_1 (
+    id int
+)
+SERVER parquet_s3_srv_1
+OPTIONS (
+	dirname 's3://FAKE'
+);
+			`,
+		},
+		{
+			Name: "parquet_s3_fdw foreign table with no aws creds raises error",
+			SQL: `
+SELECT count(*) FROM userdata_1;
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				err := row.Scan()
+				if err == nil {
+					t.Error("parquet_s3_fdw should raise error")
+				}
+
+				if !strings.Contains(err.Error(), "password is required") {
+					t.Errorf("parquet_s3_fdw error should contain password required error: %s", err.Error())
+				}
+			},
+		},
+		{
+			Name: "create parquet_s3_fdw foreign table with empty aws creds",
+			SQL: `
+CREATE SERVER parquet_s3_srv_2 FOREIGN DATA WRAPPER parquet_s3_fdw OPTIONS (aws_region 'us-east-1');
+CREATE USER MAPPING FOR public SERVER parquet_s3_srv_2 OPTIONS (user '', password '');
+CREATE FOREIGN TABLE userdata_2 (
+    id int
+)
+SERVER parquet_s3_srv_2
+OPTIONS (
+	dirname 's3://FAKE'
+);
+			`,
+		},
+		{
+			Name: "parquet_s3_fdw foreign table with empty aws creds raises error",
+			SQL: `
+SELECT count(*) FROM userdata_2;
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				err := row.Scan()
+				if err == nil {
+					t.Error("parquet_s3_fdw should raise error")
+				}
+
+				if !strings.Contains(err.Error(), "password is required") {
+					t.Errorf("parquet_s3_fdw error should contain password required error: %s", err.Error())
+				}
+			},
+		},
+	}
+
+	var (
+		awsAccessKey             = os.Getenv("AWS_ACCESS_KEY_ID")
+		awsSecretKey             = os.Getenv("AWS_SECRET_ACCESS_KEY")
+		awsRegion                = os.Getenv("AWS_REGION")
+		awsS3Bucket              = os.Getenv("AWS_S3_BUCKET")
+		shouldSkipParquetS3Tests = awsAccessKey == "" || awsSecretKey == "" || awsRegion == "" || awsS3Bucket == ""
+	)
+
+	cases = append(cases, []Case{
+		{
+			Name: "create parquet_s3_fdw happy path",
+			Skip: shouldSkipParquetS3Tests,
+			SQL: fmt.Sprintf(`
+CREATE SERVER parquet_s3_srv_3 FOREIGN DATA WRAPPER parquet_s3_fdw OPTIONS (aws_region '%s');
+CREATE USER MAPPING FOR public SERVER parquet_s3_srv_3 OPTIONS (user '%s', password '%s');
+CREATE FOREIGN TABLE userdata_3 (
+    id int
+)
+SERVER parquet_s3_srv_3
+OPTIONS (
+	dirname 's3://%s/parquet'
+);
+			`, awsRegion, awsAccessKey, awsSecretKey, awsS3Bucket),
+		},
+		{
+			Name: "validate parquet_s3_fdw happy path",
+			Skip: shouldSkipParquetS3Tests,
+			SQL: `
+SELECT count(*) FROM userdata_3;
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if count == 0 {
+					t.Error("number of parquet rows should be more than 0")
+				}
+			},
+		},
+	}...)
+
+	return cases
 }
 
 // These describe the shared setup and validation cases that occur to validate
