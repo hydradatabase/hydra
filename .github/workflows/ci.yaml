@@ -11,17 +11,20 @@ env:
 
 jobs:
   lint_go:
-    name: Run Go linters
+    name: Lint acceptance
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v3
     - uses: actions/setup-go@v3
       with:
-        go-version-file: go.mod
+        go-version-file: acceptance/go.mod
+        cache-dependency-path: acceptance/go.sum
         cache: true
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3
+      with:
+        working-directory: acceptance
 
   validate_columnar:
     strategy:
@@ -82,7 +85,8 @@ jobs:
           postgres.tags=${{ env.POSTGRES_IMAGE }}
     - uses: actions/setup-go@v3
       with:
-        go-version-file: go.mod
+        go-version-file: acceptance/go.mod
+        cache-dependency-path: acceptance/go.sum
         cache: true
     - name: Run Acceptance Tests
       env:
@@ -149,7 +153,8 @@ jobs:
         registries: "011789831835"
     - uses: actions/setup-go@v3
       with:
-        go-version-file: go.mod
+        go-version-file: acceptance/go.mod
+        cache-dependency-path: acceptance/go.sum
         cache: true
     - name: Run Acceptance Tests for Postgres 13
       env:

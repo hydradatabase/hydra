@@ -57,11 +57,12 @@ POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$(POSTGRES_BASE_VERSION)
 .PHONY: postgres_acceptance_test
 # Runs the postgres acceptance tests
 postgres_acceptance_test: $(TEST_ARTIFACT_DIR)
-	ARTIFACT_DIR=$(TEST_ARTIFACT_DIR) \
-		POSTGRES_IMAGE=$(POSTGRES_IMAGE) \
-		POSTGRES_UPGRADE_FROM_IMAGE=$(POSTGRES_UPGRADE_FROM_IMAGE) \
-		EXPECTED_POSTGRES_VERSION=$(POSTGRES_BASE_VERSION) \
-		go test ./acceptance/postgres/... $(GO_TEST_FLAGS) -count=1 -v
+	export ARTIFACT_DIR=$(TEST_ARTIFACT_DIR) && \
+		export POSTGRES_IMAGE=$(POSTGRES_IMAGE) && \
+		export POSTGRES_UPGRADE_FROM_IMAGE=$(POSTGRES_UPGRADE_FROM_IMAGE) && \
+		export EXPECTED_POSTGRES_VERSION=$(POSTGRES_BASE_VERSION) && \
+		cd acceptance && \
+		go test ./postgres/... $(GO_TEST_FLAGS) -count=1 -v
 
 .PHONY: postgres_pull_upgrade_image
 postgres_pull_upgrade_image:
@@ -79,13 +80,14 @@ SPILO_REPO ?= $(ECR_REGISTRY)/spilo
 SPILO_IMAGE ?= $(SPILO_REPO):latest
 SPILO_UPGRADE_FROM_IMAGE ?= $(SPILO_REPO):$$(cat HYDRA_PROD_VER)
 
-.PHONY: spilo_acceptance_test
 # Runs the spilo acceptance tests
+.PHONY: spilo_acceptance_test
 spilo_acceptance_test: $(TEST_ARTIFACT_DIR)
-	ARTIFACT_DIR=$(TEST_ARTIFACT_DIR) \
-		SPILO_IMAGE=$(SPILO_IMAGE) \
-		SPILO_UPGRADE_FROM_IMAGE=$(SPILO_UPGRADE_FROM_IMAGE) \
-		go test ./acceptance/spilo/... $(GO_TEST_FLAGS) -count=1 -v
+	export ARTIFACT_DIR=$(TEST_ARTIFACT_DIR) && \
+		export SPILO_IMAGE=$(SPILO_IMAGE) && \
+		export SPILO_UPGRADE_FROM_IMAGE=$(SPILO_UPGRADE_FROM_IMAGE) && \
+		cd acceptance && \
+		go test ./spilo/... $(GO_TEST_FLAGS) -count=1 -v
 
 .PHONY: spilo_pull_upgrade_image
 spilo_pull_upgrade_image: ecr_login
@@ -98,9 +100,9 @@ spilo_acceptance_build_test: docker_build_local_spilo spilo_pull_upgrade_image s
 .PHONY: lint_acceptance
 # Runs the go linter
 lint_acceptance:
-	golangci-lint run
+	cd acceptance && golangci-lint run
 
 .PHONY: lint_fix_acceptance
 # Runs the go linter with the auto-fixer
 lint_fix_acceptance:
-	golangci-lint run --fix
+	cd acceptance && golangci-lint run --fix
