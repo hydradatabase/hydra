@@ -4,7 +4,7 @@
 
 The open source Snowflake alternative. OLAP Postgres.
 
-[Hydra](https://hydras.io/) is an open source data warehouse built on Postgres. It’s easy to use and designed for OLAP and HTAP workloads. Hydra serves analytical reporting with parallelized query execution and vectorization on columnar storage. Operational work and high-throughput transactions write to standard Postgres heap tables. All Postgres extension, tools, and connectors work with Hydra.
+[Hydra](https://hydras.io/) is an open source data warehouse built on Postgres. It’s easy to use and designed for OLAP and HTAP workloads. Hydra serves analytical reporting with parallelized query execution and vectorization on columnar storage. Operational work and high-throughput transactions write to standard Postgres heap tables. All Postgres extensions, tools, and connectors work with Hydra.
 
 Eliminate data silos today. Solve hard problems fast.
 
