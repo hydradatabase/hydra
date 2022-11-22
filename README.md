@@ -2,9 +2,11 @@
 
 [Request Access](https://hydras.io/#early-access) - [Documentation](https://docs.hydras.io/getting-started/readme) - [Demo](https://www.youtube.com/watch?v=DD1oD1LWNOo) - [Website](https://hydras.io/)
 
-Data driven decisions at every stage - [Hydra](https://hydras.io/) is your open source data warehouse built on Postgres.
+The open source Snowflake alternative. OLAP Postgres.
 
-Postgres is the foundation of the Modern Data Stack. Hydra's mission is to make data-driven decisions accessible at every stage. We built Hydra on an open Postgres foundation that's easy to use. Everything that works with Postgres works with Hydra.
+[Hydra](https://hydras.io/) is an open source data warehouse built on Postgres. It’s easy to use and designed for OLAP and HTAP workloads. Hydra serves analytical reporting with parallelized query execution and vectorization on columnar storage. Operational work and high-throughput transactions write to standard Postgres heap tables. All Postgres extension, tools, and connectors work with Hydra.
+
+Eliminate data silos today. Solve hard problems fast.
 
 * [x] 🗃 hosted postgres database - [docs](https://docs.hydras.io/getting-started/hydra-with-postgres)
 * [x] 📎 append-only columnar store - [docs](https://docs.hydras.io/features/columnar)
