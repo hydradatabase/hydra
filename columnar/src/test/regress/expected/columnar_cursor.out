@@ -5,15 +5,18 @@ CREATE TABLE test_cursor (a int, b int) USING columnar;
 INSERT INTO test_cursor SELECT i, j FROM generate_series(0, 100)i, generate_series(100, 200)j;
 -- A case where the WHERE clause might filter out some chunks
 EXPLAIN (analyze on, costs off, timing off, summary off) SELECT * FROM test_cursor WHERE a = 25;
-                             QUERY PLAN                              
----------------------------------------------------------------------
- Custom Scan (ColumnarScan) on test_cursor (actual rows=101 loops=1)
-   Filter: (a = 25)
-   Rows Removed by Filter: 9899
-   Columnar Projected Columns: a, b
-   Columnar Chunk Group Filters: (a = 25)
-   Columnar Chunk Groups Removed by Filter: 1
-(6 rows)
+                                    QUERY PLAN                                     
+-----------------------------------------------------------------------------------
+ Gather (actual rows=101 loops=1)
+   Workers Planned: 7
+   Workers Launched: 7
+   ->  Parallel Custom Scan (ColumnarScan) on test_cursor (actual rows=13 loops=8)
+         Filter: (a = 25)
+         Rows Removed by Filter: 1237
+         Columnar Projected Columns: a, b
+         Columnar Chunk Group Filters: (a = 25)
+         Columnar Chunk Groups Removed by Filter: 0
+(9 rows)
 
 BEGIN;
 DECLARE a_25 SCROLL CURSOR

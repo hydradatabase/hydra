@@ -3,6 +3,7 @@
  * columnar_metadata.c
  *
  * Copyright (c) Citus Data, Inc.
+ * Copyright (c) Hydra, Inc.
  *
  * Manages metadata for columnar relations in separate, shared metadata tables
  * in the "columnar" schema.
@@ -703,6 +704,69 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 {
 	return StripeMetadataLookupRowNumber(relation, rowNumber, snapshot,
 										 FIND_LESS_OR_EQUAL);
+}
+
+/* FindNextStripeForParallelWorker returns next stripe that should be assigned
+ * for worker. Approach here is to calculate module of stripe id with total number
+ * of workers that are running for execution. 
+ */
+
+StripeMetadata * 
+FindNextStripeForParallelWorker(Relation relation,
+								Snapshot snapshot,
+								uint32 workerId,
+								uint32 nWorkers,
+								uint32 lastWorkerStripeModuloRowIdx)
+{
+	StripeMetadata *foundStripeMetadata = NULL;
+
+	uint64 storageId = ColumnarStorageGetStorageId(relation, false);
+	ScanKeyData scanKey;
+
+	ScanKeyInit(&scanKey, Anum_columnar_stripe_storageid,
+				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+
+	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
+
+	Relation index = index_open(ColumnarStripeFirstRowNumberIndexRelationId(),
+								AccessShareLock);
+
+	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarStripes, index,
+															snapshot, 1,
+															&scanKey);
+
+	uint64 modCount = 0;
+
+	while(true)
+	{
+
+		HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, ForwardScanDirection);
+
+		if (HeapTupleIsValid(heapTuple))
+		{
+			foundStripeMetadata = BuildStripeMetadata(columnarStripes, heapTuple);
+			int mod = foundStripeMetadata->id % nWorkers;
+
+			if (mod == workerId)
+			{
+				modCount++;
+
+				if (modCount == lastWorkerStripeModuloRowIdx)
+					break;
+			}
+		}
+		else
+		{
+			foundStripeMetadata = NULL;
+			break;
+		}
+	}
+
+	systable_endscan_ordered(scanDescriptor);
+	index_close(index, AccessShareLock);
+	table_close(columnarStripes, AccessShareLock);
+
+	return foundStripeMetadata;
 }
 
 

@@ -137,14 +137,14 @@ select
 explain table t_uncompressed;
                                    QUERY PLAN                                    
 ---------------------------------------------------------------------------------
- Custom Scan (ColumnarScan) on t_uncompressed  (cost=0.00..0.00 rows=1 width=32)
+ Custom Scan (ColumnarScan) on t_uncompressed  (cost=0.00..0.00 rows=0 width=32)
    Columnar Projected Columns: a
 (2 rows)
 
 explain table t_compressed;
                                   QUERY PLAN                                   
 -------------------------------------------------------------------------------
- Custom Scan (ColumnarScan) on t_compressed  (cost=0.00..0.00 rows=1 width=32)
+ Custom Scan (ColumnarScan) on t_compressed  (cost=0.00..0.00 rows=0 width=32)
    Columnar Projected Columns: a
 (2 rows)
 

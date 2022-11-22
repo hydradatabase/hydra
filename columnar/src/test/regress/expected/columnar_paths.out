@@ -53,7 +53,7 @@ $$
 );
  uses_custom_scan 
 ------------------
- t
+ f
 (1 row)
 
 BEGIN;
@@ -96,7 +96,7 @@ $$
 );
  uses_custom_scan 
 ------------------
- t
+ f
 (1 row)
 
 BEGIN;
@@ -173,7 +173,7 @@ $$
 );
  uses_custom_scan 
 ------------------
- t
+ f
 (1 row)
 
 BEGIN;
@@ -344,11 +344,13 @@ LIMIT 100;
                            ->  GroupAggregate
                                  Group Key: full_correlated.b
                                  Filter: (count(DISTINCT full_correlated.a) > 0)
-                                 ->  Sort
-                                       Sort Key: full_correlated.b DESC
-                                       ->  Custom Scan (ColumnarScan) on full_correlated
-                                             Filter: (a > 2)
-                                             Columnar Projected Columns: a, b
+                                 ->  Gather Merge
+                                       Workers Planned: 7
+                                       ->  Sort
+                                             Sort Key: full_correlated.b DESC
+                                             ->  Parallel Custom Scan (ColumnarScan) on full_correlated
+                                                   Filter: (a > 2)
+                                                   Columnar Projected Columns: a, b
                      ->  Materialize
                            ->  Limit
                                  ->  GroupAggregate
@@ -366,7 +368,7 @@ LIMIT 100;
                                              Filter: (sum(full_correlated_2.a) > 10)
                                              ->  Index Scan using full_correlated_btree on full_correlated full_correlated_2
                                                    Index Cond: (a > 2)
-(32 rows)
+(34 rows)
 
 DROP INDEX full_correlated_btree;
 CREATE INDEX full_correlated_hash ON full_correlated USING hash(a);
@@ -511,7 +513,7 @@ $$
 );
  uses_custom_scan 
 ------------------
- t
+ f
 (1 row)
 
 BEGIN;
@@ -581,15 +583,11 @@ ANALYZE correlated, uncorrelated;
 -- should choose chunk group filtering; selective and correlated
 EXPLAIN (analyze on, costs off, timing off, summary off)
 SELECT * FROM correlated WHERE x = 78910;
-                            QUERY PLAN                            
-------------------------------------------------------------------
- Custom Scan (ColumnarScan) on correlated (actual rows=1 loops=1)
-   Filter: (x = 78910)
-   Rows Removed by Filter: 999
-   Columnar Projected Columns: x
-   Columnar Chunk Group Filters: (x = 78910)
-   Columnar Chunk Groups Removed by Filter: 99
-(6 rows)
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Index Scan using correlated_idx on correlated (actual rows=1 loops=1)
+   Index Cond: (x = 78910)
+(2 rows)
 
 SELECT * FROM correlated WHERE x = 78910;
    x   

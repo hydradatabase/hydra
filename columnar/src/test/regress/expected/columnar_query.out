@@ -135,19 +135,20 @@ explain (costs off, summary off) select * from
   (select b.q1 as bq1, c.q1 as cq1, least(a.q1,b.q1,c.q1) from
    INT8_TBL_columnar b cross join INT8_TBL_columnar c) ss
   on a.q2 = ss.bq1;
-                          QUERY PLAN                           
----------------------------------------------------------------
+                             QUERY PLAN                              
+---------------------------------------------------------------------
  Nested Loop Left Join
    ->  Custom Scan (ColumnarScan) on int8_tbl_columnar a
          Columnar Projected Columns: q1, q2
    ->  Nested Loop
-         ->  Custom Scan (ColumnarScan) on int8_tbl_columnar c
-               Columnar Projected Columns: q1
          ->  Custom Scan (ColumnarScan) on int8_tbl_columnar b
                Filter: (a.q2 = q1)
                Columnar Projected Columns: q1
                Columnar Chunk Group Filters: (a.q2 = q1)
-(10 rows)
+         ->  Materialize
+               ->  Custom Scan (ColumnarScan) on int8_tbl_columnar c
+                     Columnar Projected Columns: q1
+(11 rows)
 
 explain (costs off, summary off)
   SELECT COUNT(*) FROM INT8_TBL_columnar t1 JOIN

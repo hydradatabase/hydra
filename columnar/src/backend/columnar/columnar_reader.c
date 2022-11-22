@@ -7,6 +7,7 @@
  * and skipping unrelated row chunks and columns.
  *
  * Copyright (c) 2016, Citus Data, Inc.
+ * Copyright (c) Hydra, Inc.
  *
  * $Id$
  *
@@ -96,6 +97,12 @@ struct ColumnarReadState
 
 	Snapshot snapshot;
 	bool snapshotRegisteredByUs;
+
+	/* Parallel exeuction */
+
+	uint32 workerId;
+	uint32 nWorkers;
+	uint64 lastReadStripeRowId;
 };
 
 /* static function declarations */
@@ -179,7 +186,8 @@ ColumnarReadState *
 ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 				  List *projectedColumnList, List *whereClauseList,
 				  MemoryContext scanContext, Snapshot snapshot,
-				  bool randomAccess)
+				  bool randomAccess,
+				  uint32 workerId, uint32 nWorkers)
 {
 	/*
 	 * We allocate all stripe specific data in the stripeReadContext, and reset
@@ -205,6 +213,10 @@ ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 	 */
 	readState->snapshot = snapshot;
 	readState->snapshotRegisteredByUs = false;
+
+	/* Parallel execution */
+	readState->nWorkers = nWorkers;
+	readState->workerId = workerId;
 
 	if (!randomAccess)
 	{
@@ -688,20 +700,39 @@ AdvanceStripeRead(ColumnarReadState *readState)
 {
 	MemoryContext oldContext = MemoryContextSwitchTo(readState->scanContext);
 
-	/* if not read any stripes yet, start from the first one .. */
-	uint64 lastReadRowNumber = COLUMNAR_INVALID_ROW_NUMBER;
-	if (StripeReadInProgress(readState))
+	if (readState->nWorkers == 0)
 	{
-		/* .. otherwise, continue with the next stripe */
-		lastReadRowNumber = StripeGetHighestRowNumber(readState->currentStripeMetadata);
+		/* if not read any stripes yet, start from the first one .. */
+		uint64 lastReadRowNumber = COLUMNAR_INVALID_ROW_NUMBER;
+		if (StripeReadInProgress(readState))
+		{
+			/* .. otherwise, continue with the next stripe */
+			lastReadRowNumber = StripeGetHighestRowNumber(readState->currentStripeMetadata);
 
-		readState->chunkGroupsFiltered +=
-			readState->stripeReadState->chunkGroupsFiltered;
+			readState->chunkGroupsFiltered +=
+				readState->stripeReadState->chunkGroupsFiltered;
+		}
+
+		readState->currentStripeMetadata = FindNextStripeByRowNumber(readState->relation,
+																	lastReadRowNumber,
+																	readState->snapshot);
 	}
+	else
+	{
+		readState->lastReadStripeRowId++;
 
-	readState->currentStripeMetadata = FindNextStripeByRowNumber(readState->relation,
-																 lastReadRowNumber,
-																 readState->snapshot);
+		if (StripeReadInProgress(readState))
+		{
+			readState->chunkGroupsFiltered +=
+				readState->stripeReadState->chunkGroupsFiltered;
+		}
+
+		readState->currentStripeMetadata = FindNextStripeForParallelWorker(readState->relation,
+																	 	   readState->snapshot,
+																		   readState->workerId,
+																		   readState->nWorkers,
+																		   readState->lastReadStripeRowId);
+	}
 
 	if (readState->currentStripeMetadata &&
 		StripeWriteState(readState->currentStripeMetadata) != STRIPE_WRITE_FLUSHED &&

@@ -5,6 +5,9 @@
  * This file contains the implementation of a postgres custom scan that
  * we use to push down the projections into the table access methods.
  *
+ * Copyright (c) Citus Data, Inc.
+ * Copyright (c) Hydra, Inc.
+ *
  * $Id$
  *
  *-------------------------------------------------------------------------
@@ -56,7 +59,18 @@ typedef struct ColumnarScanState
 
 	ExprContext *css_RuntimeContext;
 	List *qual;
+
+	/* Parallel execution */
+	uint32 nWorkers;
+	uint32 workerId;
 } ColumnarScanState;
+
+typedef struct ParallelColumnarTableScanData
+{
+	pg_atomic_uint32 nextWorkerID;		/* fetch and increment for next worker id */
+	uint32 numberOfWorkers;				/* Total number of workers */
+} ParallelColumnarTableScanData;
+typedef struct ParallelColumnarTableScanData *ParallelColumnarTableScan;
 
 
 typedef bool (*PathPredicate)(Path *path);
@@ -67,6 +81,7 @@ static void CostColumnarPaths(PlannerInfo *root, RelOptInfo *rel, Oid relationId
 static void CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 								  IndexPath *indexPath);
 static void CostColumnarSeqPath(RelOptInfo *rel, Oid relationId, Path *path);
+static void AdjustColumnarParallelScanCost(Path *path);
 static void CostColumnarScan(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 							 CustomPath *cpath, int numberOfColumnsRead,
 							 int nClauses);
@@ -74,8 +89,8 @@ static void CostColumnarScan(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 /* functions to add new paths */
 static void AddColumnarScanPaths(PlannerInfo *root, RelOptInfo *rel,
 								 RangeTblEntry *rte);
-static void AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel,
-								RangeTblEntry *rte, Relids required_relids);
+static Path * AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel,
+								  RangeTblEntry *rte, Relids required_relids);
 
 /* helper functions to be used when costing paths or altering them */
 static void RemovePathsByPredicate(RelOptInfo *rel, PathPredicate removePathPredicate);
@@ -116,6 +131,17 @@ static void ColumnarScan_EndCustomScan(CustomScanState *node);
 static void ColumnarScan_ReScanCustomScan(CustomScanState *node);
 static void ColumnarScan_ExplainCustomScan(CustomScanState *node, List *ancestors,
 										   ExplainState *es);
+static Size Columnar_EstimateDSMCustomScan(CustomScanState *node,
+										   ParallelContext *pcxt);
+static void Columnar_InitializeDSMCustomScan(CustomScanState *node,
+											ParallelContext *pcxt,
+											void *coordinate);
+static void Columnar_ReinitializeDSMCustomScan(CustomScanState *node,
+											   ParallelContext *pcxt,
+											   void *coordinate);
+static void Columnar_InitializeWorkerCustomScan(CustomScanState *node,
+												shm_toc *toc,
+												void *coordinate); 
 
 /* helper functions to build strings for EXPLAIN */
 static const char * ColumnarPushdownClausesStr(List *context, List *clauses);
@@ -161,6 +187,11 @@ const struct CustomExecMethods ColumnarScanExecuteMethods = {
 	.ReScanCustomScan = ColumnarScan_ReScanCustomScan,
 
 	.ExplainCustomScan = ColumnarScan_ExplainCustomScan,
+
+	.EstimateDSMCustomScan = Columnar_EstimateDSMCustomScan,
+	.InitializeDSMCustomScan = Columnar_InitializeDSMCustomScan,
+	.ReInitializeDSMCustomScan = Columnar_ReinitializeDSMCustomScan,
+	.InitializeWorkerCustomScan = Columnar_InitializeWorkerCustomScan
 };
 
 static const struct config_enum_entry debug_level_options[] = {
@@ -285,15 +316,6 @@ ColumnarSetRelPathlistHook(PlannerInfo *root, RelOptInfo *rel, Index rti,
 							errmsg("sample scans not supported on columnar tables")));
 		}
 
-		if (list_length(rel->partial_pathlist) != 0)
-		{
-			/*
-			 * Parallel scans on columnar tables are already discardad by
-			 * ColumnarGetRelationInfoHook but be on the safe side.
-			 */
-			elog(ERROR, "parallel scans on columnar are not supported");
-		}
-
 		/*
 		 * There are cases where IndexPath is normally more preferrable over
 		 * SeqPath for heapAM but not for columnarAM. In such cases, an
@@ -367,6 +389,7 @@ static void
 RemovePathsByPredicate(RelOptInfo *rel, PathPredicate removePathPredicate)
 {
 	List *filteredPathList = NIL;
+	List *filteredPartialPathList = NIL;
 
 	Path *path = NULL;
 	foreach_ptr(path, rel->pathlist)
@@ -378,6 +401,16 @@ RemovePathsByPredicate(RelOptInfo *rel, PathPredicate removePathPredicate)
 	}
 
 	rel->pathlist = filteredPathList;
+
+	foreach_ptr(path, rel->partial_pathlist)
+	{
+		if (!removePathPredicate(path))
+		{
+			filteredPartialPathList = lappend(filteredPartialPathList, path);
+		}
+	}
+
+	rel->partial_pathlist = filteredPartialPathList;
 }
 
 
@@ -582,6 +615,7 @@ CostColumnarSeqPath(RelOptInfo *rel, Oid relationId, Path *path)
 	double stripesToRead = ColumnarTableStripeCount(relationId);
 	int numberOfColumnsRead = RelationIdGetNumberOfAttributes(relationId);
 
+	path->rows = rel->tuples;
 	path->startup_cost = 0;
 	path->total_cost = stripesToRead *
 					   ColumnarPerStripeScanCost(rel, relationId, numberOfColumnsRead);
@@ -1161,7 +1195,43 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 	check_stack_depth();
 
 	Assert(!bms_overlap(paramRelids, candidateRelids));
-	AddColumnarScanPath(root, rel, rte, paramRelids);
+
+	Path *columnarScanPath = AddColumnarScanPath(root, rel, rte, paramRelids);
+	add_path(rel, columnarScanPath);
+	if (columnar_enable_parallel_execution)
+		columnarScanPath->total_cost += columnarScanPath->rows * 0.1;
+
+	/* For columnar custom scan we should also do planning for parallel exeuction
+	 * if it is enabled.
+	 */
+	if (columnar_enable_parallel_execution)
+	{
+		int columnar_min_parallel_process_running = columnar_min_parallel_processes;
+
+		if (columnar_min_parallel_processes > max_parallel_workers)
+		{
+			elog(DEBUG1, "columnar.min_parallel_proceses is set higher than max_parallel_workers.");
+			elog(DEBUG1, "Using max_parallel_workers instead for columnar scan.");
+			columnar_min_parallel_process_running = 
+				Min(max_parallel_workers, columnar_min_parallel_processes);
+		}
+
+		if (parallel_leader_participation)
+			columnar_min_parallel_process_running--;
+
+		if (rel->consider_parallel && rel->lateral_relids == NULL && 
+			columnar_min_parallel_process_running > 0)
+		{
+			Path *parallelColumnarScanPath = 
+				AddColumnarScanPath(root, rel, rte, paramRelids);
+
+			parallelColumnarScanPath->parallel_workers = columnar_min_parallel_process_running;
+			parallelColumnarScanPath->parallel_aware = true;
+			AdjustColumnarParallelScanCost(parallelColumnarScanPath);
+
+			add_partial_path(rel, parallelColumnarScanPath);
+		}
+	}
 
 	/* recurse for all candidateRelids, unless we hit the depth limit */
 	Assert(depthLimit >= 0);
@@ -1265,7 +1335,7 @@ ContainsExecParams(Node *node, void *notUsed)
  * XXX: Consider refactoring to be more like postgresGetForeignPaths(). The
  * only differences are param_info and custom_private.
  */
-static void
+static Path *
 AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 					Relids paramRelids)
 {
@@ -1343,6 +1413,13 @@ AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 	int numberOfColumnsRead = bms_num_members(rte->selectedCols);
 	int numberOfClausesPushed = list_length(allClauses);
 
+	/* Queries that contain only aggregate with STAR doesn't have any
+	 * selectedCols so we should consider at least one column that needs
+	 * read (for better cost calculation).
+	 */
+	if (numberOfColumnsRead == 0)
+		numberOfColumnsRead = 1;
+
 	CostColumnarScan(root, rel, rte->relid, cpath, numberOfColumnsRead,
 					 numberOfClausesPushed);
 
@@ -1356,7 +1433,36 @@ AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 					   ParameterizationAsString(root, paramRelids, &buf),
 					   numberOfClausesPushed)));
 
-	add_path(rel, path);
+	return path;
+}
+
+
+/*
+ * AdjustColumnarParallelScanCost calculates path cost based on
+ * number of parallel workers (based on postgres code).
+ */
+static void
+AdjustColumnarParallelScanCost(Path *path) 
+{
+	/* Adjust costing for parallelism, if used. */
+	if (path->parallel_workers > 0)
+	{
+		double parallel_divisor = path->parallel_workers;
+
+		if (parallel_leader_participation)
+		{
+			double leader_contribution;
+
+			leader_contribution = 1.0 - (0.3 * path->parallel_workers);
+			if (leader_contribution > 0)
+				parallel_divisor += leader_contribution;
+		}
+
+		/* The CPU cost is divided among all the workers. */
+		path->total_cost /= parallel_divisor;
+
+		path->rows = clamp_row_est(path->rows / parallel_divisor);
+	}
 }
 
 
@@ -1383,7 +1489,7 @@ CostColumnarScan(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 	double stripesToRead = clauseSel * ColumnarTableStripeCount(relationId);
 	stripesToRead = Max(stripesToRead, 1.0);
 
-	path->rows = rel->rows;
+	path->rows = rel->tuples;
 	path->startup_cost = 0;
 	path->total_cost = stripesToRead *
 					   ColumnarPerStripeScanCost(rel, relationId, numberOfColumnsRead);
@@ -1723,7 +1829,9 @@ ColumnarScanNext(ColumnarScanState *columnarScanState)
 		scandesc = columnar_beginscan_extended(node->ss.ss_currentRelation,
 											   estate->es_snapshot,
 											   0, NULL, NULL, flags, attr_needed,
-											   columnarScanState->qual);
+											   columnarScanState->qual,
+											   columnarScanState->workerId, 
+											   columnarScanState->nWorkers);
 		bms_free(attr_needed);
 
 		node->ss.ss_currentScanDesc = scandesc;
@@ -1847,6 +1955,63 @@ ColumnarScan_ExplainCustomScan(CustomScanState *node, List *ancestors,
 				NULL, ColumnarScanChunkGroupsFiltered(columnarScanDesc), es);
 		}
 	}
+}
+
+
+/* Parallel Execution */
+
+static Size 
+Columnar_EstimateDSMCustomScan(CustomScanState *node,
+							   ParallelContext *pcxt)
+{
+	return sizeof(ParallelColumnarTableScanData);
+}
+
+
+static void 
+Columnar_InitializeDSMCustomScan(CustomScanState *node,
+								 ParallelContext *pcxt,
+								 void *coordinate)
+{
+	ParallelColumnarTableScan pscan = (ParallelColumnarTableScan) coordinate;
+	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
+
+	/* Check if leader is also doing in participation in
+	 * query execution and adjust workers 
+	 */
+	if (parallel_leader_participation)
+	{
+		columnarScanState->nWorkers = pcxt->nworkers + 1;
+		columnarScanState->workerId = 0;
+		pscan->numberOfWorkers = pcxt->nworkers + 1;
+		pg_atomic_init_u32(&pscan->nextWorkerID, 1);
+	}
+	else
+	{
+		pscan->numberOfWorkers = pcxt->nworkers;
+		pg_atomic_init_u32(&pscan->nextWorkerID, 0);
+	}
+}
+
+
+static void 
+Columnar_ReinitializeDSMCustomScan(CustomScanState *node,
+								   ParallelContext *pcxt,
+								   void *coordinate)
+{
+	elog(DEBUG1, "ReinitializeDSMCustomScan not supported.");
+}
+
+
+static void 
+Columnar_InitializeWorkerCustomScan(CustomScanState *node,
+									shm_toc *toc,
+									void *coordinate)
+{
+	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
+	ParallelColumnarTableScan pscan = (ParallelColumnarTableScan) coordinate;
+	columnarScanState->workerId = pg_atomic_fetch_add_u32(&pscan->nextWorkerID, 1);
+	columnarScanState->nWorkers = pscan->numberOfWorkers;
 }
 
 

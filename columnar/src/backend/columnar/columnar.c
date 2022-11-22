@@ -5,6 +5,7 @@
  * This file contains...
  *
  * Copyright (c) 2016, Citus Data, Inc.
+ * Copyright (c) Hydra, Inc.
  *
  * $Id$
  *
@@ -40,6 +41,8 @@ int columnar_compression = DEFAULT_COMPRESSION_TYPE;
 int columnar_stripe_row_limit = DEFAULT_STRIPE_ROW_COUNT;
 int columnar_chunk_group_row_limit = DEFAULT_CHUNK_ROW_COUNT;
 int columnar_compression_level = 3;
+bool columnar_enable_parallel_execution = true;
+int columnar_min_parallel_processes = 8;
 
 static const struct config_enum_entry columnar_compression_options[] =
 {
@@ -110,6 +113,30 @@ columnar_init_gucs()
 							DEFAULT_CHUNK_ROW_COUNT,
 							CHUNK_ROW_COUNT_MINIMUM,
 							CHUNK_ROW_COUNT_MAXIMUM,
+							PGC_USERSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
+
+	DefineCustomBoolVariable("columnar.enable_parallel_execution",
+							 gettext_noop("Enables parallel execution"),
+							 NULL,
+							 &columnar_enable_parallel_execution,
+							 true,
+							 PGC_USERSET,
+							 GUC_NO_SHOW_ALL,
+							 NULL, 
+							 NULL, 
+							 NULL);
+
+	DefineCustomIntVariable("columnar.min_parallel_processes",
+							"Minimum number of parallel processes",
+							NULL,
+							&columnar_min_parallel_processes,
+							8,
+							1,
+							32,
 							PGC_USERSET,
 							0,
 							NULL,

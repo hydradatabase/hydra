@@ -5,6 +5,7 @@
  * Type and function declarations for Columnar
  *
  * Copyright (c) Citus Data, Inc.
+ * Copyright (c) Hydra, Inc.
  *
  *-------------------------------------------------------------------------
  */
@@ -210,6 +211,8 @@ extern int columnar_compression;
 extern int columnar_stripe_row_limit;
 extern int columnar_chunk_group_row_limit;
 extern int columnar_compression_level;
+extern bool columnar_enable_parallel_execution;
+extern int columnar_min_parallel_processes;
 
 /* called when the user changes options on the given relation */
 typedef void (*ColumnarTableSetOptions_hook_type)(Oid relid, ColumnarOptions options);
@@ -239,7 +242,9 @@ extern ColumnarReadState * ColumnarBeginRead(Relation relation,
 											 List *qualConditions,
 											 MemoryContext scanContext,
 											 Snapshot snaphot,
-											 bool randomAccess);
+											 bool randomAccess,
+											 uint32 workerId,
+											 uint32 nWorkers);
 extern void ColumnarReadFlushPendingWrites(ColumnarReadState *readState);
 extern void ColumnarEndRead(ColumnarReadState *state);
 extern void ColumnarResetRead(ColumnarReadState *readState);
@@ -300,6 +305,11 @@ extern StripeMetadata * FindStripeByRowNumber(Relation relation, uint64 rowNumbe
 extern StripeMetadata * FindStripeWithMatchingFirstRowNumber(Relation relation,
 															 uint64 rowNumber,
 															 Snapshot snapshot);
+extern StripeMetadata *  FindNextStripeForParallelWorker(Relation relation,
+														 Snapshot snapshot,
+														 uint32 workerId,
+														 uint32 nWorkers,
+														 uint32 lastWorkerStripeModuloRowIdx);
 extern StripeWriteStateEnum StripeWriteState(StripeMetadata *stripeMetadata);
 extern uint64 StripeGetHighestRowNumber(StripeMetadata *stripeMetadata);
 extern StripeMetadata * FindStripeWithHighestRowNumber(Relation relation,
