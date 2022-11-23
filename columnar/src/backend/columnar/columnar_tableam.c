@@ -58,6 +58,8 @@
 #include "columnar/columnar_version_compat.h"
 #include "columnar/utils/listutils.h"
 
+#include "columnar/vectorization/columnar_vector_types.h"
+
 /*
  * Timing parameters for truncate locking heuristics.
  *
@@ -86,6 +88,9 @@ typedef struct ColumnarScanDescData
 	/* Parallel Scan */
 	uint32 workerId;
 	uint32 nWorkers;
+
+	/* Vectorization */
+	bool returnVectorizedTuple;
 } ColumnarScanDescData;
 
 
@@ -201,7 +206,7 @@ columnar_beginscan(Relation relation, Snapshot snapshot,
 	TableScanDesc scandesc = columnar_beginscan_extended(relation, snapshot, nkeys, key,
 														 parallel_scan,
 														 flags, attr_needed, NULL,
-														 0, 0);
+														 0, 0, false);
 
 	bms_free(attr_needed);
 
@@ -214,7 +219,8 @@ columnar_beginscan_extended(Relation relation, Snapshot snapshot,
 							int nkeys, ScanKey key,
 							ParallelTableScanDesc parallel_scan,
 							uint32 flags, Bitmapset *attr_needed, List *scanQual,
-							uint32 workerId, uint32 nWorkers)
+							uint32 workerId, uint32 nWorkers,
+							bool returnVectorizedTuple)
 {
 	CheckCitusColumnarVersion(ERROR);
 	Oid relfilenode = relation->rd_node.relNode;
@@ -250,6 +256,9 @@ columnar_beginscan_extended(Relation relation, Snapshot snapshot,
 	/* Parallel execution */;
 	scan->workerId = workerId;
 	scan->nWorkers = nWorkers;
+
+	/* Vectorized result */
+	scan->returnVectorizedTuple = returnVectorizedTuple;
 
 	if (PendingWritesInUpperTransactions(relfilenode, GetCurrentSubTransactionId()))
 	{
@@ -353,19 +362,41 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 
 	ExecClearTuple(slot);
 
-	uint64 rowNumber;
-	bool nextRowFound = ColumnarReadNextRow(scan->cs_readState, slot->tts_values,
-											slot->tts_isnull, &rowNumber);
-
-	if (!nextRowFound)
+	if (scan->returnVectorizedTuple)
 	{
-		return false;
+		VectorTupleTableSlot * vectorTTS = (VectorTupleTableSlot *) slot;
+	
+		int newVectorSize = 0;
+
+		bool nextRowFound = ColumnarReadNextVector(scan->cs_readState, 
+												   vectorTTS->tts.tts_values,
+												   vectorTTS->tts.tts_isnull,
+												   &newVectorSize);
+
+		if (!nextRowFound)
+			return false;
+
+		vectorTTS->dimension = newVectorSize;
+		
+		memset(vectorTTS->skip, 0, newVectorSize);
+
+		ExecStoreVirtualTuple(slot);
 	}
+	else
+	{
+		uint64 rowNumber;
+		bool nextRowFound = ColumnarReadNextRow(scan->cs_readState, slot->tts_values,
+												slot->tts_isnull, &rowNumber);
 
-	ExecStoreVirtualTuple(slot);
+		if (!nextRowFound)
+		{
+			return false;
+		}
 
-	slot->tts_tid = row_number_to_tid(rowNumber);
-
+		ExecStoreVirtualTuple(slot);
+		slot->tts_tid = row_number_to_tid(rowNumber);
+	}
+	
 	return true;
 }
 

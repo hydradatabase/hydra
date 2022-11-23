@@ -49,13 +49,18 @@
 #include "columnar/columnar_tableam.h"
 #include "columnar/utils/listutils.h"
 
+#include "columnar/vectorization/columnar_vector_execution.h"
+#include "columnar/vectorization/columnar_vector_types.h"
+
 /*
  * ColumnarScanState represents the state for a columnar scan. It's a
  * CustomScanState with additional fields specific to columnar scans.
  */
+
 typedef struct ColumnarScanState
 {
 	CustomScanState custom_scanstate; /* must be first field */
+	Bitmapset *attrNeeded;
 
 	ExprContext *css_RuntimeContext;
 	List *qual;
@@ -63,6 +68,17 @@ typedef struct ColumnarScanState
 	/* Parallel execution */
 	uint32 nWorkers;
 	uint32 workerId;
+
+	/* Vectorization */
+	struct
+	{
+		bool vectorizationEnabled;
+		TupleTableSlot *scanVectorSlot;
+		uint32 vectorPendingRowNumber;
+		uint32 vectorRowIndex;
+		List *vectorizedQualList;
+		List *constructedVectorizedQualList;
+	} vectorization;
 } ColumnarScanState;
 
 typedef struct ParallelColumnarTableScanData
@@ -126,6 +142,10 @@ static Node * ColumnarScan_CreateCustomScanState(CustomScan *cscan);
 
 static void ColumnarScan_BeginCustomScan(CustomScanState *node, EState *estate,
 										 int eflags);
+
+static TupleTableSlot * CustomExecScan(ColumnarScanState *node,
+									   ExecScanAccessMtd accessMtd,
+									   ExecScanRecheckMtd recheckMtd);
 static TupleTableSlot * ColumnarScan_ExecCustomScan(CustomScanState *node);
 static void ColumnarScan_EndCustomScan(CustomScanState *node);
 static void ColumnarScan_ReScanCustomScan(CustomScanState *node);
@@ -154,7 +174,7 @@ static List * set_deparse_context_planstate(List *dpcontext, Node *node,
 
 /* other helpers */
 static List * ColumnarVarNeeded(ColumnarScanState *columnarScanState);
-static Bitmapset * ColumnarAttrNeeded(ScanState *ss);
+static Bitmapset * ColumnarAttrNeeded(ScanState *ss, List *customList);
 
 /* saved hook value in case of unload */
 static set_rel_pathlist_hook_type PreviousSetRelPathlistHook = NULL;
@@ -1197,6 +1217,7 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 	Assert(!bms_overlap(paramRelids, candidateRelids));
 
 	Path *columnarScanPath = AddColumnarScanPath(root, rel, rte, paramRelids);
+
 	add_path(rel, columnarScanPath);
 	if (columnar_enable_parallel_execution)
 		columnarScanPath->total_cost += columnarScanPath->rows * 0.1;
@@ -1616,6 +1637,20 @@ ColumnarScanPath_PlanCustomPath(PlannerInfo *root,
 	cscan->scan.plan.targetlist = list_copy(tlist);
 	cscan->scan.scanrelid = best_path->path.parent->relid;
 
+	/*
+	 * Vectorized QUAL execution. Split QUAL list into vectorized list 
+	 * stored in cscan->custom_private and rest in scan.plan.qual
+	 */
+	if (columnar_enable_vectorization)
+	{
+		List *candidateQualList = CreateVectorizedExprList(cscan->scan.plan.qual);
+		cscan->custom_private = list_difference(candidateQualList,
+												cscan->scan.plan.qual);
+		if (cscan->custom_private != NULL)
+			cscan->scan.plan.qual = list_intersection(cscan->scan.plan.qual,
+													candidateQualList);
+	}
+
 	return (Plan *) cscan;
 }
 
@@ -1752,6 +1787,29 @@ ColumnarScan_BeginCustomScan(CustomScanState *cscanstate, EState *estate, int ef
 	columnarScanState->qual = (List *) EvalParamsMutator(
 		(Node *) plainClauses, columnarScanState->css_RuntimeContext);
 
+	/*
+	 * IF custom_private is NOT NULL it contains vectorized qual list 
+	 */
+	if (cscan->custom_private)
+		columnarScanState->vectorization.vectorizedQualList = cscan->custom_private;
+
+	/*
+	 * Vectorization is enabled if global variable is set and there is at least one
+	 * filter which can be vectorized.
+	 */
+	columnarScanState->vectorization.vectorizationEnabled =
+		columnarScanState->vectorization.vectorizedQualList != NULL &&
+		columnar_enable_vectorization;
+
+	if (columnarScanState->vectorization.vectorizationEnabled)
+	{
+		columnarScanState->vectorization.scanVectorSlot =
+			CreateVectorTupleTableSlot(cscanstate->ss.ss_ScanTupleSlot->tts_tupleDescriptor);
+	}
+
+	columnarScanState->attrNeeded = 
+		ColumnarAttrNeeded(&cscanstate->ss, columnarScanState->vectorization.vectorizedQualList);
+
 	/* scan slot is already initialized */
 }
 
@@ -1763,7 +1821,7 @@ ColumnarScan_BeginCustomScan(CustomScanState *cscanstate, EState *estate, int ef
  * by ColumnarScan.
  */
 static Bitmapset *
-ColumnarAttrNeeded(ScanState *ss)
+ColumnarAttrNeeded(ScanState *ss, List *customList)
 {
 	TupleTableSlot *slot = ss->ss_ScanTupleSlot;
 	int natts = slot->tts_tupleDescriptor->natts;
@@ -1773,6 +1831,10 @@ ColumnarAttrNeeded(ScanState *ss)
 				PVC_RECURSE_WINDOWFUNCS | PVC_RECURSE_PLACEHOLDERS;
 	List *vars = list_concat(pull_var_clause((Node *) plan->targetlist, flags),
 							 pull_var_clause((Node *) plan->qual, flags));
+
+	if (customList != NULL)
+		vars = list_concat(vars, pull_var_clause((Node *)customList, flags));
+
 	ListCell *lc;
 
 	foreach(lc, vars)
@@ -1803,6 +1865,300 @@ ColumnarAttrNeeded(ScanState *ss)
 }
 
 
+/*
+ * ExecScanFetch -- check interrupts & fetch next potential tuple
+ *
+ * This routine is concerned with substituting a test tuple if we are
+ * inside an EvalPlanQual recheck.  If we aren't, just execute
+ * the access method's next-tuple routine.
+ */
+static inline TupleTableSlot *
+ExecScanFetch(ScanState *node,
+			  ExecScanAccessMtd accessMtd,
+			  ExecScanRecheckMtd recheckMtd)
+{
+	EState	   *estate = node->ps.state;
+
+	CHECK_FOR_INTERRUPTS();
+
+	if (estate->es_epq_active != NULL)
+	{
+		EPQState   *epqstate = estate->es_epq_active;
+
+		/*
+		 * We are inside an EvalPlanQual recheck.  Return the test tuple if
+		 * one is available, after rechecking any access-method-specific
+		 * conditions.
+		 */
+		Index		scanrelid = ((Scan *) node->ps.plan)->scanrelid;
+
+		if (scanrelid == 0)
+		{
+			/*
+			 * This is a ForeignScan or CustomScan which has pushed down a
+			 * join to the remote side.  The recheck method is responsible not
+			 * only for rechecking the scan/join quals but also for storing
+			 * the correct tuple in the slot.
+			 */
+
+			TupleTableSlot *slot = node->ss_ScanTupleSlot;
+
+			if (!(*recheckMtd) (node, slot))
+				ExecClearTuple(slot);	/* would not be returned by scan */
+			return slot;
+		}
+		else if (epqstate->relsubs_done[scanrelid - 1])
+		{
+			/*
+			 * Return empty slot, as we already performed an EPQ substitution
+			 * for this relation.
+			 */
+
+			TupleTableSlot *slot = node->ss_ScanTupleSlot;
+
+			/* Return empty slot, as we already returned a tuple */
+			return ExecClearTuple(slot);
+		}
+		else if (epqstate->relsubs_slot[scanrelid - 1] != NULL)
+		{
+			/*
+			 * Return replacement tuple provided by the EPQ caller.
+			 */
+
+			TupleTableSlot *slot = epqstate->relsubs_slot[scanrelid - 1];
+
+			Assert(epqstate->relsubs_rowmark[scanrelid - 1] == NULL);
+
+			/* Mark to remember that we shouldn't return more */
+			epqstate->relsubs_done[scanrelid - 1] = true;
+
+			/* Return empty slot if we haven't got a test tuple */
+			if (TupIsNull(slot))
+				return NULL;
+
+			/* Check if it meets the access-method conditions */
+			if (!(*recheckMtd) (node, slot))
+				return ExecClearTuple(slot);	/* would not be returned by
+												 * scan */
+			return slot;
+		}
+		else if (epqstate->relsubs_rowmark[scanrelid - 1] != NULL)
+		{
+			/*
+			 * Fetch and return replacement tuple using a non-locking rowmark.
+			 */
+
+			TupleTableSlot *slot = node->ss_ScanTupleSlot;
+
+			/* Mark to remember that we shouldn't return more */
+			epqstate->relsubs_done[scanrelid - 1] = true;
+
+			if (!EvalPlanQualFetchRowMark(epqstate, scanrelid, slot))
+				return NULL;
+
+			/* Return empty slot if we haven't got a test tuple */
+			if (TupIsNull(slot))
+				return NULL;
+
+			/* Check if it meets the access-method conditions */
+			if (!(*recheckMtd) (node, slot))
+				return ExecClearTuple(slot);	/* would not be returned by
+												 * scan */
+			return slot;
+		}
+	}
+
+	/*
+	 * Run the node-type-specific access method function to get the next tuple
+	 */
+	return (*accessMtd) (node);
+}
+
+static TupleTableSlot *
+CustomExecScan(ColumnarScanState *columnarScanState,
+			   ExecScanAccessMtd accessMtd,
+			   ExecScanRecheckMtd recheckMtd)
+{
+	ExprContext *econtext;
+	ExprState  *qual;
+	ProjectionInfo *projInfo;
+
+	ScanState *node = (ScanState *) &columnarScanState->custom_scanstate.ss;
+
+	/*
+	 * Fetch data from node
+	 */
+	qual = node->ps.qual;
+	projInfo = node->ps.ps_ProjInfo;
+	econtext = node->ps.ps_ExprContext;
+
+	/* interrupt checks are in ExecScanFetch */
+
+	/*
+	 * No qual to check and no projection to do and vectorization is not enabled,
+	 * just skip all the overhead and return the raw scan tuple.
+	 */
+	if (!qual && !projInfo && !columnarScanState->vectorization.vectorizationEnabled)
+	{
+		ResetExprContext(econtext);
+		return ExecScanFetch(node, accessMtd, recheckMtd);
+	}
+
+	/*
+	 * Reset per-tuple memory context to free any expression evaluation
+	 * storage allocated in the previous tuple cycle.
+	 */
+	ResetExprContext(econtext);
+
+	/*
+	 * get a tuple from the access method.  Loop until we obtain a tuple that
+	 * passes the qualification.
+	 */
+	for (;;)
+	{
+		TupleTableSlot *slot = NULL;
+
+		/*
+		 * No vectorizaion in place so fetch slot by slot.
+		 */
+		if (!columnarScanState->vectorization.vectorizationEnabled)
+		{
+			slot = ExecScanFetch(node, accessMtd, recheckMtd);
+
+			/*
+			 * if the slot returned by the accessMtd contains NULL, then it means
+			 * there is nothing more to scan so we just return an empty slot,
+			 * being careful to use the projection result slot so it has correct
+			 * tupleDesc.
+			 */
+			if (TupIsNull(slot))
+			{
+				if (projInfo)
+					return ExecClearTuple(projInfo->pi_state.resultslot);
+				else
+					return slot;
+			}
+		}
+		/*
+		 * Get next tuple from vector tuple slot if vectorization exeuction is enabled
+		 * and if we exhausted previous vector.
+		 */
+		else if (columnarScanState->vectorization.vectorizationEnabled &&
+				 columnarScanState->vectorization.vectorPendingRowNumber == 0)
+		{
+			slot = ExecScanFetch(node, accessMtd, recheckMtd);
+
+			/*
+			 * if the slot returned by the accessMtd contains NULL, then it means
+			 * there is nothing more to scan so we just return an empty slot,
+			 * being careful to use the projection result slot so it has correct
+			 * tupleDesc.
+			 */
+			if (TupIsNull(slot))
+			{
+				if (projInfo)
+					return ExecClearTuple(projInfo->pi_state.resultslot);
+				else
+					return slot;
+			}
+
+			if (columnarScanState->vectorization.constructedVectorizedQualList == NULL)
+			{
+				columnarScanState->vectorization.constructedVectorizedQualList =
+					ConstructVectorizedQualList(slot, columnarScanState->vectorization.vectorizedQualList);
+			}
+
+			VectorTupleTableSlot *vectorSlot = (VectorTupleTableSlot *) slot;
+
+			bool *resultQual = 
+				ExecuteVectorizedQual(slot,
+									  columnarScanState->vectorization.constructedVectorizedQualList,
+									  AND_EXPR);
+			
+			int i;
+			for (i = 0; i < vectorSlot->dimension; i++)
+			{
+				if (!resultQual[i])
+					vectorSlot->skip[i] = true;
+			}
+		}
+
+		/*
+		 * Get next tuple from vector tuple slot if vectorization execution 
+		 * is enabled.
+		 */
+		if (columnarScanState->vectorization.vectorizationEnabled)
+		{
+			VectorTupleTableSlot *vectorSlot = 
+				(VectorTupleTableSlot *) columnarScanState->vectorization.scanVectorSlot;
+
+			bool rowFound = false;
+
+			while (columnarScanState->vectorization.vectorPendingRowNumber != 0 &&
+				   rowFound == false)
+			{
+				if (!vectorSlot->skip[columnarScanState->vectorization.vectorRowIndex])
+				{
+					slot = columnarScanState->custom_scanstate.ss.ss_ScanTupleSlot;
+					ExecClearTuple(slot);
+					extractTupleFromVectorSlot(slot,
+											   vectorSlot,
+											   columnarScanState->vectorization.vectorRowIndex,
+											   columnarScanState->attrNeeded);
+					rowFound = true;
+				}
+				columnarScanState->vectorization.vectorPendingRowNumber--;
+				columnarScanState->vectorization.vectorRowIndex++;
+			}
+
+			if (rowFound == false)
+				continue;
+		}
+
+		/*
+		 * place the current tuple into the expr context
+		 */
+		econtext->ecxt_scantuple = slot;
+
+		/*
+		 * check that the current tuple satisfies the qual-clause
+		 *
+		 * check for non-null qual here to avoid a function call to ExecQual()
+		 * when the qual is null ... saves only a few cycles, but they add up
+		 * ...
+		 */
+		if (qual == NULL || ExecQual(qual, econtext))
+		{
+			/*
+			 * Found a satisfactory scan tuple.
+			 */
+			if (projInfo)
+			{
+				/*
+				 * Form a projection tuple, store it in the result tuple slot
+				 * and return it.
+				 */
+				return ExecProject(projInfo);
+			}
+			else
+			{
+				/*
+				 * Here, we aren't projecting, so just return scan tuple.
+				 */
+				return slot;
+			}
+		}
+		else
+			InstrCountFiltered1(node, 1);
+
+		/*
+		 * Tuple fails qual, so free per-tuple memory and try again.
+		 */
+		ResetExprContext(econtext);
+	}
+}
+
+
 static TupleTableSlot *
 ColumnarScanNext(ColumnarScanState *columnarScanState)
 {
@@ -1814,13 +2170,19 @@ ColumnarScanNext(ColumnarScanState *columnarScanState)
 	TableScanDesc scandesc = node->ss.ss_currentScanDesc;
 	EState *estate = node->ss.ps.state;
 	ScanDirection direction = estate->es_direction;
-	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
+	bool vectorizationEnabled = columnarScanState->vectorization.vectorizationEnabled;
+
+	TupleTableSlot *slot = NULL;
+
+	if (vectorizationEnabled)
+		slot = columnarScanState->vectorization.scanVectorSlot;
+	else
+		slot = node->ss.ss_ScanTupleSlot;
 
 	if (scandesc == NULL)
 	{
 		/* the columnar access method does not use the flags, they are specific to heap */
 		uint32 flags = 0;
-		Bitmapset *attr_needed = ColumnarAttrNeeded(&node->ss);
 
 		/*
 		 * We reach here if the scan is not parallel, or if we're serially
@@ -1828,22 +2190,46 @@ ColumnarScanNext(ColumnarScanState *columnarScanState)
 		 */
 		scandesc = columnar_beginscan_extended(node->ss.ss_currentRelation,
 											   estate->es_snapshot,
-											   0, NULL, NULL, flags, attr_needed,
+											   0, NULL, NULL, flags,
+											   columnarScanState->attrNeeded,
 											   columnarScanState->qual,
 											   columnarScanState->workerId, 
-											   columnarScanState->nWorkers);
-		bms_free(attr_needed);
+											   columnarScanState->nWorkers,
+											   vectorizationEnabled);
 
 		node->ss.ss_currentScanDesc = scandesc;
 	}
 
-	/*
-	 * get the next tuple from the table
+	/* 
+	* Cleanup vector tuple table slot when reading next chunk
 	 */
+	if (vectorizationEnabled)
+	{
+		VectorTupleTableSlot *vectorSlot = (VectorTupleTableSlot *) slot;
+		int attrIndex = -1;
+		while ((attrIndex = bms_next_member(columnarScanState->attrNeeded, attrIndex)) >= 0)
+		{
+			VectorColumn *column = (VectorColumn *) vectorSlot->tts.tts_values[attrIndex];
+			column->dimension = 0;
+		}
+		vectorSlot->dimension = 0;
+	}
+
 	if (table_scan_getnextslot(scandesc, direction, slot))
 	{
+		/*
+		* Setup custom scan state for reading tuples directly from stored
+		* vector tuple table slot
+		*/
+		if (vectorizationEnabled)
+		{
+			columnarScanState->vectorization.vectorPendingRowNumber = 
+				((VectorTupleTableSlot *) slot)->dimension;
+			columnarScanState->vectorization.vectorRowIndex = 0;
+		}
 		return slot;
 	}
+
 	return NULL;
 }
 
@@ -1861,9 +2247,9 @@ ColumnarScanRecheck(ColumnarScanState *node, TupleTableSlot *slot)
 static TupleTableSlot *
 ColumnarScan_ExecCustomScan(CustomScanState *node)
 {
-	return ExecScan(&node->ss,
-					(ExecScanAccessMtd) ColumnarScanNext,
-					(ExecScanRecheckMtd) ColumnarScanRecheck);
+	return CustomExecScan((ColumnarScanState *) node,
+						  (ExecScanAccessMtd) ColumnarScanNext,
+						  (ExecScanRecheckMtd) ColumnarScanRecheck);
 }
 
 
@@ -1874,6 +2260,11 @@ ColumnarScan_EndCustomScan(CustomScanState *node)
 	 * get information from node
 	 */
 	TableScanDesc scanDesc = node->ss.ss_currentScanDesc;
+
+	/*
+	 * Cleanup BMS of selected scan attributes
+	 */
+	bms_free(((ColumnarScanState *)node)->attrNeeded);
 
 	/*
 	 * Free the exprcontext
@@ -1955,6 +2346,14 @@ ColumnarScan_ExplainCustomScan(CustomScanState *node, List *ancestors,
 				NULL, ColumnarScanChunkGroupsFiltered(columnarScanDesc), es);
 		}
 	}
+
+	if (columnarScanState->vectorization.vectorizationEnabled)
+	{
+		const char *vectorizedWhereClauses = ColumnarPushdownClausesStr(
+					context, columnarScanState->vectorization.vectorizedQualList);
+		ExplainPropertyText("Columnar Vectorized Filter", 
+							vectorizedWhereClauses, es);
+	}
 }
 
 
@@ -1964,7 +2363,7 @@ static Size
 Columnar_EstimateDSMCustomScan(CustomScanState *node,
 							   ParallelContext *pcxt)
 {
-	return sizeof(ParallelColumnarTableScanData);
+	return  sizeof(ParallelColumnarTableScanData);
 }
 
 
@@ -2073,7 +2472,9 @@ ColumnarVarNeeded(ColumnarScanState *columnarScanState)
 
 	List *varList = NIL;
 
-	Bitmapset *neededAttrSet = ColumnarAttrNeeded(scanState);
+	Bitmapset *neededAttrSet =
+		ColumnarAttrNeeded(scanState, columnarScanState->vectorization.vectorizedQualList);
+
 	int bmsMember = -1;
 	while ((bmsMember = bms_next_member(neededAttrSet, bmsMember)) >= 0)
 	{

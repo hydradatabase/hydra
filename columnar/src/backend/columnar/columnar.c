@@ -43,6 +43,7 @@ int columnar_chunk_group_row_limit = DEFAULT_CHUNK_ROW_COUNT;
 int columnar_compression_level = 3;
 bool columnar_enable_parallel_execution = true;
 int columnar_min_parallel_processes = 8;
+bool columnar_enable_vectorization = true;
 
 static const struct config_enum_entry columnar_compression_options[] =
 {
@@ -142,6 +143,17 @@ columnar_init_gucs()
 							NULL,
 							NULL,
 							NULL);
+
+	DefineCustomBoolVariable("columnar.enable_vectorization",
+							 gettext_noop("Enables vectorized execution"),
+							 NULL,
+							 &columnar_enable_vectorization,
+							 true,
+							 PGC_USERSET,
+							 GUC_NO_SHOW_ALL,
+							 NULL, 
+							 NULL, 
+							 NULL);
 }
 
 

@@ -176,6 +176,13 @@ static ChunkData * DeserializeChunkData(StripeBuffers *stripeBuffers, uint64 chu
 static Datum ColumnDefaultValue(TupleConstr *tupleConstraints,
 								Form_pg_attribute attributeForm);
 
+/* Vectorization */
+static bool ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
+								 bool *columnNulls, int *newVectorSize);
+static bool ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *columnValues,
+									 bool *columnNulls, TupleDesc tupleDesc, 
+									 int32 *columnValueOffset, int *chunkReadRows);
+
 /*
  * ColumnarBeginRead initializes a columnar read operation. This function returns a
  * read handle that's used during reading rows and finishing the read operation.
@@ -1718,4 +1725,162 @@ ColumnDefaultValue(TupleConstr *tupleConstraints, Form_pg_attribute attributeFor
 						errhint("Expression is either mutable or "
 								"does not evaluate to constant value")));
 	}
+}
+
+/* Vectorization */
+
+#include "columnar/vectorization/columnar_vector_types.h"
+
+bool
+ColumnarReadNextVector(ColumnarReadState *readState,  Datum *columnValues,
+					   bool *columnNulls, int *newVectorSize)
+{
+	while (true)
+	{
+		if (!StripeReadInProgress(readState))
+		{
+			if (!HasUnreadStripe(readState))
+			{
+				return false;
+			}
+
+			readState->stripeReadState = BeginStripeRead(readState->currentStripeMetadata,
+														 readState->relation,
+														 readState->tupleDescriptor,
+														 readState->projectedColumnList,
+														 readState->whereClauseList,
+														 readState->whereClauseVars,
+														 readState->stripeReadContext,
+														 readState->snapshot);
+		}
+
+		if (!ReadStripeNextVector(readState->stripeReadState, columnValues, columnNulls, newVectorSize))
+		{
+			AdvanceStripeRead(readState);
+			
+			// We have collected rows from last stripe, break loop
+			if (*newVectorSize)
+				return true;
+			
+			continue;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+
+static bool
+ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
+					 bool *columnNulls, int *newVectorSize)
+{
+	if (stripeReadState->currentRow >= stripeReadState->rowCount)
+	{
+		Assert(stripeReadState->currentRow == stripeReadState->rowCount);
+		return false;
+	}
+
+	int32 *columnValueOffset = palloc(sizeof(int32) * stripeReadState->tupleDescriptor->natts);
+	memset(columnValueOffset, 0, sizeof(int32) * stripeReadState->tupleDescriptor->natts);
+
+	while (true)
+	{
+		if (stripeReadState->chunkGroupReadState == NULL)
+		{
+			stripeReadState->chunkGroupReadState = BeginChunkGroupRead(
+				stripeReadState->stripeBuffers,
+				stripeReadState->
+				chunkGroupIndex,
+				stripeReadState->
+				tupleDescriptor,
+				stripeReadState->
+				projectedColumnList,
+				stripeReadState->
+				stripeReadContext);
+		}
+
+		if (!ReadChunkGroupNextVector(stripeReadState->chunkGroupReadState,
+									  columnValues, columnNulls, 
+									  stripeReadState->tupleDescriptor,
+									  columnValueOffset, 
+									  newVectorSize))
+		{
+			/* if this chunk group is exhausted, fetch the next one and loop */
+			EndChunkGroupRead(stripeReadState->chunkGroupReadState);
+			stripeReadState->chunkGroupReadState = NULL;
+			stripeReadState->chunkGroupIndex++;
+
+			if (*newVectorSize == 0)
+				continue;
+		}
+
+		stripeReadState->currentRow += *newVectorSize;
+
+		return true;
+	}
+
+	return false;
+}
+
+
+static bool
+ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *columnValues,
+						 bool *columnNulls, TupleDesc tupleDesc, 
+						 int32 *columnValueOffset, int *chunkReadRows)
+{
+	if (chunkGroupReadState->currentRow >= chunkGroupReadState->rowCount)
+	{
+		Assert(chunkGroupReadState->currentRow == chunkGroupReadState->rowCount);
+		return false;
+	}
+
+	/*
+	 * Initialize to all-NULL. Only non-NULL projected attributes will be set.
+	 */
+	memset(columnNulls, true, sizeof(bool) * chunkGroupReadState->columnCount);
+
+	int i;
+
+	for (i = 0; i < chunkGroupReadState->rowCount; i ++)
+	{
+		if (chunkGroupReadState->currentRow >= chunkGroupReadState->rowCount)
+			return false;
+		
+		if (*chunkReadRows >= COLUMNAR_VECTOR_COLUMN_SIZE)
+			break;
+
+		int attno;
+		foreach_int(attno, chunkGroupReadState->projectedColumnList)
+		{
+			const ChunkData *chunkGroupData = chunkGroupReadState->chunkGroupData;
+			const int rowIndex = chunkGroupReadState->currentRow;
+
+			/* attno is 1-indexed; existsArray is 0-indexed */
+			const uint32 columnIndex = attno - 1;
+
+			if (chunkGroupData->existsArray[columnIndex][rowIndex])
+			{
+				VectorColumn* vectorColumn = (VectorColumn*) columnValues[columnIndex];
+
+				int8 *writeColumnRowPosition = 
+					(int8 *) vectorColumn->value + columnValueOffset[columnIndex];
+
+				store_att_byval(writeColumnRowPosition, 
+								chunkGroupData->valueArray[columnIndex][rowIndex], 
+								vectorColumn->columnTypeLen);
+							
+				vectorColumn->isnull[vectorColumn->dimension] = false;
+				vectorColumn->dimension++;
+
+				columnValueOffset[columnIndex] += vectorColumn->columnTypeLen;
+			}
+		}
+
+		(*chunkReadRows)++;
+		chunkGroupReadState->currentRow++;
+	}
+
+	return true;
 }

@@ -55,7 +55,8 @@ extern TableScanDesc columnar_beginscan_extended(Relation relation, Snapshot sna
 												 ParallelTableScanDesc parallel_scan,
 												 uint32 flags, Bitmapset *attr_needed,
 												 List *scanQual,
-												 uint32 workerId, uint32 nWorkers);
+												 uint32 workerId, uint32 nWorkers,
+												 bool returnVectorResult);
 extern int64 ColumnarScanChunkGroupsFiltered(ColumnarScanDesc columnarScanDesc);
 extern bool ColumnarSupportsIndexAM(char *indexAMName);
 extern bool IsColumnarTableAmTable(Oid relationId);

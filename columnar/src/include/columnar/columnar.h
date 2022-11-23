@@ -213,6 +213,8 @@ extern int columnar_chunk_group_row_limit;
 extern int columnar_compression_level;
 extern bool columnar_enable_parallel_execution;
 extern int columnar_min_parallel_processes;
+extern bool columnar_enable_vectorization;
+
 
 /* called when the user changes options on the given relation */
 typedef void (*ColumnarTableSetOptions_hook_type)(Oid relid, ColumnarOptions options);
@@ -252,6 +254,8 @@ extern void ColumnarResetRead(ColumnarReadState *readState);
 /* functions only applicable for sequential access */
 extern bool ColumnarReadNextRow(ColumnarReadState *state, Datum *columnValues,
 								bool *columnNulls, uint64 *rowNumber);
+extern bool ColumnarReadNextVector(ColumnarReadState *readState, Datum *columnValues,
+								   bool *columnNulls, int *newVectorSize);
 extern int64 ColumnarReadChunkGroupsFiltered(ColumnarReadState *state);
 extern void ColumnarRescan(ColumnarReadState *readState, List *scanQual);
 

@@ -334,9 +334,9 @@ EXPLAIN (COSTS OFF) EXECUTE p3;
                QUERY PLAN                
 -----------------------------------------
  Custom Scan (ColumnarScan) on t
-   Filter: (a = 8)
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: (a = 8)
+   Columnar Vectorized Filter: (a = 8)
 (4 rows)
 
 EXECUTE p3;
@@ -350,12 +350,11 @@ EXPLAIN (ANALYZE true, COSTS off, TIMING off, SUMMARY off) EXECUTE p3;
                        QUERY PLAN                        
 ---------------------------------------------------------
  Custom Scan (ColumnarScan) on t (actual rows=2 loops=1)
-   Filter: (a = 8)
-   Rows Removed by Filter: 2
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: (a = 8)
    Columnar Chunk Groups Removed by Filter: 8
-(6 rows)
+   Columnar Vectorized Filter: (a = 8)
+(5 rows)
 
 SELECT * FROM t ORDER BY a;
  a  | b  
@@ -391,9 +390,9 @@ EXPLAIN (COSTS OFF) EXECUTE p5(16);
                 QUERY PLAN                
 ------------------------------------------
  Custom Scan (ColumnarScan) on t
-   Filter: (a = 16)
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: (a = 16)
+   Columnar Vectorized Filter: (a = 16)
 (4 rows)
 
 EXECUTE p5(16);
@@ -405,12 +404,11 @@ EXPLAIN (ANALYZE true, COSTS off, TIMING off, SUMMARY off) EXECUTE p5(9);
                        QUERY PLAN                        
 ---------------------------------------------------------
  Custom Scan (ColumnarScan) on t (actual rows=2 loops=1)
-   Filter: (a = 9)
-   Rows Removed by Filter: 2
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: (a = 9)
    Columnar Chunk Groups Removed by Filter: 8
-(6 rows)
+   Columnar Vectorized Filter: (a = 9)
+(5 rows)
 
 SELECT * FROM t ORDER BY a;
  a  | b  
@@ -446,9 +444,9 @@ EXPLAIN (COSTS OFF) EXECUTE p6(30, 40);
                        QUERY PLAN                        
 ---------------------------------------------------------
  Custom Scan (ColumnarScan) on t
-   Filter: ((a = 31) AND (b = 41))
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: ((a = 31) AND (b = 41))
+   Columnar Vectorized Filter: ((a = 31) AND (b = 41))
 (4 rows)
 
 EXECUTE p6(30, 40);
@@ -461,12 +459,11 @@ EXPLAIN (ANALYZE true, COSTS off, TIMING off, SUMMARY off) EXECUTE p6(50, 60);
                        QUERY PLAN                        
 ---------------------------------------------------------
  Custom Scan (ColumnarScan) on t (actual rows=1 loops=1)
-   Filter: ((a = 51) AND (b = 61))
-   Rows Removed by Filter: 3
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: ((a = 51) AND (b = 61))
    Columnar Chunk Groups Removed by Filter: 9
-(6 rows)
+   Columnar Vectorized Filter: ((a = 51) AND (b = 61))
+(5 rows)
 
 SELECT * FROM t ORDER BY a;
  a  | b  

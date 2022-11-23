@@ -11,12 +11,11 @@ EXPLAIN (analyze on, costs off, timing off, summary off) SELECT * FROM test_curs
    Workers Planned: 7
    Workers Launched: 7
    ->  Parallel Custom Scan (ColumnarScan) on test_cursor (actual rows=13 loops=8)
-         Filter: (a = 25)
-         Rows Removed by Filter: 1237
          Columnar Projected Columns: a, b
          Columnar Chunk Group Filters: (a = 25)
          Columnar Chunk Groups Removed by Filter: 0
-(9 rows)
+         Columnar Vectorized Filter: (a = 25)
+(8 rows)
 
 BEGIN;
 DECLARE a_25 SCROLL CURSOR
@@ -114,12 +113,11 @@ EXPLAIN (analyze on, costs off, timing off, summary off) SELECT * FROM test_curs
                               QUERY PLAN                              
 ----------------------------------------------------------------------
  Custom Scan (ColumnarScan) on test_cursor (actual rows=7575 loops=1)
-   Filter: (a > 25)
-   Rows Removed by Filter: 2626
    Columnar Projected Columns: a, b
    Columnar Chunk Group Filters: (a > 25)
    Columnar Chunk Groups Removed by Filter: 0
-(6 rows)
+   Columnar Vectorized Filter: (a > 25)
+(5 rows)
 
 BEGIN;
 DECLARE a_25 SCROLL CURSOR

@@ -1,7 +1,7 @@
 citus_subdir = src/backend/columnar
 citus_top_builddir = ../../..
 safestringlib_srcdir = $(citus_abs_top_srcdir)/vendor/safestringlib
-SUBDIRS = . safeclib
+SUBDIRS = . safeclib vectorization vectorization/types
 SUBDIRS +=
 ENSURE_SUBDIRS_EXIST := $(shell mkdir -p $(SUBDIRS))
 OBJS += \
