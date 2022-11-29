@@ -78,8 +78,7 @@ CREATE TABLE my_columnar_table
 		-- convert to columnar
 		SELECT columnar.alter_table_set_access_method('my_table', 'columnar');
 		-- back to row
-		-- TODO: reenable this after it's supported
-		-- SELECT alter_table_set_access_method('my_table', 'heap');
+		SELECT columnar.alter_table_set_access_method('my_table', 'heap');
 		`,
 		},
 		{

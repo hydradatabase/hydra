@@ -1,7 +1,7 @@
 --
 -- Testing alter_table_set_access_method
 --
--- 1. check conversion of 'normal' tables
+-- 1. check conversion of 'heap' table to 'columnar'
 CREATE TABLE t (a INT) USING heap;
 SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
  count 
@@ -35,7 +35,41 @@ SELECT COUNT(*)  = 3 FROM t;
 (1 row)
 
 DROP TABLE t;
--- 2. check conversion of tables with trigger
+-- 2. check conversion of 'columnar' table to 'heap'
+CREATE TABLE t (a INT) USING columnar;
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+INSERT INTO t VALUES (1),(2),(3);
+SELECT COUNT(*) = 3 FROM t;
+ ?column? 
+----------
+ t
+(1 row)
+
+SELECT columnar.alter_table_set_access_method('t', 'heap');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*)  = 3 FROM t;
+ ?column? 
+----------
+ t
+(1 row)
+
+DROP TABLE t;
+-- 3. check conversion of tables with trigger
 CREATE TABLE t (a INT) USING heap;
 CREATE or REPLACE FUNCTION trs_before() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -105,7 +139,37 @@ INSERT INTO t VALUES (1);
 NOTICE:  BEFORE STATEMENT INSERT
 NOTICE:  BEFORE ROW INSERT: (1)
 NOTICE:  AFTER STATEMENT INSERT
--- 3. check conversion of tables with indexes which can be created with columnar
+-- Convert back to 'heap'
+SELECT columnar.alter_table_set_access_method('t', 'heap');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) = 3 FROM pg_trigger WHERE tgrelid = 't'::regclass::oid;
+ ?column? 
+----------
+ t
+(1 row)
+
+INSERT INTO t VALUES (1);
+NOTICE:  BEFORE STATEMENT INSERT
+NOTICE:  BEFORE ROW INSERT: (1)
+NOTICE:  AFTER STATEMENT INSERT
+SELECT COUNT(*) = 3 FROM t;
+ ?column? 
+----------
+ t
+(1 row)
+
+DROP TABLE t;
+-- 4. check conversion of tables with indexes which can be created with columnar
 CREATE TABLE index_table (a INT) USING heap;
 CREATE INDEX idx1 ON index_table (a);
 -- also create an index with statistics
@@ -117,7 +181,7 @@ SELECT COUNT(1) FROM pg_class WHERE relname = 'index_table' AND relam = (SELECT 
      1
 (1 row)
 
-SELECT indexname FROM pg_indexes WHERE tablename = 'index_table';
+SELECT indexname FROM pg_indexes WHERE tablename = 'index_table' ORDER BY indexname;
  indexname 
 -----------
  idx1
@@ -136,7 +200,27 @@ SELECT COUNT(1) FROM pg_class WHERE relname = 'index_table' AND relam = (SELECT 
      1
 (1 row)
 
-SELECT indexname FROM pg_indexes WHERE tablename = 'index_table';
+SELECT indexname FROM pg_indexes WHERE tablename = 'index_table' ORDER BY indexname;
+ indexname 
+-----------
+ idx1
+ idx2
+(2 rows)
+
+-- Convert back to 'heap'
+SELECT columnar.alter_table_set_access_method('index_table', 'heap');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'index_table' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'index_table' ORDER BY indexname;
  indexname 
 -----------
  idx1
@@ -144,7 +228,7 @@ SELECT indexname FROM pg_indexes WHERE tablename = 'index_table';
 (2 rows)
 
 DROP TABLE index_table;
--- 4. Convert table with indexes and constraints
+-- 5. Convert table with indexes and constraints
 CREATE TABLE tbl (
   c1 CIRCLE,
   c2 TEXT,
@@ -206,13 +290,45 @@ SELECT COUNT(1) FROM pg_class WHERE relname = 'tbl' AND relam = (SELECT oid FROM
      1
 (1 row)
 
-SELECT indexname FROM pg_indexes WHERE tablename = 'tbl';
+SELECT indexname FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
   indexname   
 --------------
- tbl_hash
  tbl_a_p_excl
- tbl_unique
+ tbl_hash
  tbl_pkey
+ tbl_unique
+(4 rows)
+
+SELECT conname FROM pg_constraint
+WHERE conrelid = 'tbl'::regclass
+ORDER BY conname;
+   conname    
+--------------
+ tbl_a_p_excl
+ tbl_pkey
+ tbl_unique
+(3 rows)
+
+-- Convert back to 'heap'
+SELECT columnar.alter_table_set_access_method('tbl', 'heap');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'tbl' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+  indexname   
+--------------
+ tbl_a_p_excl
+ tbl_hash
+ tbl_pkey
+ tbl_unique
 (4 rows)
 
 SELECT conname FROM pg_constraint
@@ -226,7 +342,7 @@ ORDER BY conname;
 (3 rows)
 
 DROP TABLE tbl;
--- 5. check non existing table
+-- 6. Check non existing table
 SELECT columnar.alter_table_set_access_method('some_test', 'columnar');
 WARNING:  Table public.some_test does not exist.
  alter_table_set_access_method 
@@ -234,9 +350,8 @@ WARNING:  Table public.some_test does not exist.
  f
 (1 row)
 
--- 6. check if method is different than columnar
+-- 7. Check if method is different than columnar / heap
 CREATE TABLE t(a INT);
-ERROR:  relation "t" already exists
 SELECT columnar.alter_table_set_access_method('t', 'other');
 WARNING:  Cannot convert table: Allowed access methods are heap and columnar.
  alter_table_set_access_method 
@@ -245,7 +360,7 @@ WARNING:  Cannot convert table: Allowed access methods are heap and columnar.
 (1 row)
 
 DROP TABLE t;
--- 7. check if table have identity columns
+-- 8. Check if table have identity columns
 CREATE TABLE identity_cols_test (a INT, b INT GENERATED BY DEFAULT AS IDENTITY (INCREMENT BY 42));
 SELECT columnar.alter_table_set_access_method('identity_cols_test', 'columnar');
 WARNING:  Cannot convert table: table public.identity_cols_test must not use GENERATED ... AS IDENTITY.
@@ -255,3 +370,60 @@ WARNING:  Cannot convert table: table public.identity_cols_test must not use GEN
 (1 row)
 
 DROP TABLE identity_cols_test;
+-- 9. Check conversion to same AM
+CREATE TABLE t(a INT);
+-- fail (heap -> heap)
+SELECT columnar.alter_table_set_access_method('t', 'heap');
+WARNING:  Cannot convert table: conversion to same access method.
+ alter_table_set_access_method 
+-------------------------------
+ f
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+-- ok (heap -> columnar)
+SELECT columnar.alter_table_set_access_method('t', 'columnar');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+-- fail (columnar -> columnar)
+SELECT columnar.alter_table_set_access_method('t', 'columnar');
+WARNING:  Cannot convert table: conversion to same access method.
+ alter_table_set_access_method 
+-------------------------------
+ f
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+-- ok (columnar -> heap)
+SELECT columnar.alter_table_set_access_method('t', 'heap');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+DROP TABLE t;

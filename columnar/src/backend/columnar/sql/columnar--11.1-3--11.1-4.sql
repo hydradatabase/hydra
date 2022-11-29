@@ -1,6 +1,8 @@
 
 -- columnar--11.1-3--11.1-4.sql
 
+#include "udfs/alter_table_set_access_method/11.1-4.sql"
+
 -- Operators with vectorized execution
 
 -- char
