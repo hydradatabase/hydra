@@ -99,10 +99,7 @@ struct ColumnarReadState
 	bool snapshotRegisteredByUs;
 
 	/* Parallel exeuction */
-
-	uint32 workerId;
-	uint32 nWorkers;
-	uint64 lastReadStripeRowId;
+	ParallelColumnarScan parallelColumnarScan;
 };
 
 /* static function declarations */
@@ -194,7 +191,7 @@ ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 				  List *projectedColumnList, List *whereClauseList,
 				  MemoryContext scanContext, Snapshot snapshot,
 				  bool randomAccess,
-				  uint32 workerId, uint32 nWorkers)
+				  ParallelColumnarScan parallelColumnarScan)
 {
 	/*
 	 * We allocate all stripe specific data in the stripeReadContext, and reset
@@ -222,8 +219,7 @@ ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 	readState->snapshotRegisteredByUs = false;
 
 	/* Parallel execution */
-	readState->nWorkers = nWorkers;
-	readState->workerId = workerId;
+	readState->parallelColumnarScan = parallelColumnarScan;
 
 	if (!randomAccess)
 	{
@@ -707,7 +703,7 @@ AdvanceStripeRead(ColumnarReadState *readState)
 {
 	MemoryContext oldContext = MemoryContextSwitchTo(readState->scanContext);
 
-	if (readState->nWorkers == 0)
+	if (readState->parallelColumnarScan == 0)
 	{
 		/* if not read any stripes yet, start from the first one .. */
 		uint64 lastReadRowNumber = COLUMNAR_INVALID_ROW_NUMBER;
@@ -726,19 +722,19 @@ AdvanceStripeRead(ColumnarReadState *readState)
 	}
 	else
 	{
-		readState->lastReadStripeRowId++;
-
 		if (StripeReadInProgress(readState))
 		{
 			readState->chunkGroupsFiltered +=
 				readState->stripeReadState->chunkGroupsFiltered;
 		}
 
+		/* Fetch atomic next stripe id to be read by this scan. */
+		uint32 nextStripeId = 
+			pg_atomic_fetch_add_u64(&readState->parallelColumnarScan->nextStripeId, 1);
+
 		readState->currentStripeMetadata = FindNextStripeForParallelWorker(readState->relation,
 																	 	   readState->snapshot,
-																		   readState->workerId,
-																		   readState->nWorkers,
-																		   readState->lastReadStripeRowId);
+																		   nextStripeId);
 	}
 
 	if (readState->currentStripeMetadata &&

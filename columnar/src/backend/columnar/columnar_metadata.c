@@ -714,9 +714,7 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 StripeMetadata * 
 FindNextStripeForParallelWorker(Relation relation,
 								Snapshot snapshot,
-								uint32 workerId,
-								uint32 nWorkers,
-								uint32 lastWorkerStripeModuloRowIdx)
+								uint32 nextStripeId)
 {
 	StripeMetadata *foundStripeMetadata = NULL;
 
@@ -735,25 +733,15 @@ FindNextStripeForParallelWorker(Relation relation,
 															snapshot, 1,
 															&scanKey);
 
-	uint64 modCount = 0;
-
 	while(true)
 	{
-
 		HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, ForwardScanDirection);
 
 		if (HeapTupleIsValid(heapTuple))
 		{
 			foundStripeMetadata = BuildStripeMetadata(columnarStripes, heapTuple);
-			int mod = foundStripeMetadata->id % nWorkers;
-
-			if (mod == workerId)
-			{
-				modCount++;
-
-				if (modCount == lastWorkerStripeModuloRowIdx)
-					break;
-			}
+			if (foundStripeMetadata->id == nextStripeId)
+				break;
 		}
 		else
 		{

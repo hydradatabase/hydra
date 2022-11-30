@@ -17,6 +17,7 @@
 #include "fmgr.h"
 #include "lib/stringinfo.h"
 #include "nodes/parsenodes.h"
+#include "port/atomics.h"
 #include "storage/bufpage.h"
 #include "storage/lockdefs.h"
 #include "storage/relfilenode.h"
@@ -192,6 +193,15 @@ typedef enum StripeWriteStateEnum
 	STRIPE_WRITE_IN_PROGRESS
 } StripeWriteStateEnum;
 
+
+/* Parallel Custom Scan shared data */
+typedef struct ParallelColumnarScanData
+{
+	pg_atomic_uint64 nextStripeId;	/* Fetch next stripe id to be read and increment */
+} ParallelColumnarScanData;
+typedef struct ParallelColumnarScanData *ParallelColumnarScan;
+
+
 typedef bool (*ColumnarSupportsIndexAM_type)(char *);
 typedef const char *(*CompressionTypeStr_type)(CompressionType);
 typedef bool (*IsColumnarTableAmTable_type)(Oid);
@@ -245,8 +255,7 @@ extern ColumnarReadState * ColumnarBeginRead(Relation relation,
 											 MemoryContext scanContext,
 											 Snapshot snaphot,
 											 bool randomAccess,
-											 uint32 workerId,
-											 uint32 nWorkers);
+											 ParallelColumnarScan parallaleColumnarScan);
 extern void ColumnarReadFlushPendingWrites(ColumnarReadState *readState);
 extern void ColumnarEndRead(ColumnarReadState *state);
 extern void ColumnarResetRead(ColumnarReadState *readState);
@@ -311,9 +320,7 @@ extern StripeMetadata * FindStripeWithMatchingFirstRowNumber(Relation relation,
 															 Snapshot snapshot);
 extern StripeMetadata *  FindNextStripeForParallelWorker(Relation relation,
 														 Snapshot snapshot,
-														 uint32 workerId,
-														 uint32 nWorkers,
-														 uint32 lastWorkerStripeModuloRowIdx);
+														 uint32 nextStripeId);
 extern StripeWriteStateEnum StripeWriteState(StripeMetadata *stripeMetadata);
 extern uint64 StripeGetHighestRowNumber(StripeMetadata *stripeMetadata);
 extern StripeMetadata * FindStripeWithHighestRowNumber(Relation relation,

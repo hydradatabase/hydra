@@ -85,9 +85,8 @@ typedef struct ColumnarScanDescData
 	Bitmapset *attr_needed;
 	List *scanQual;
 
-	/* Parallel Scan */
-	uint32 workerId;
-	uint32 nWorkers;
+	/* Parallel Scan Data */
+	ParallelColumnarScan parallelColumnarScan;
 
 	/* Vectorization */
 	bool returnVectorizedTuple;
@@ -206,7 +205,8 @@ columnar_beginscan(Relation relation, Snapshot snapshot,
 	TableScanDesc scandesc = columnar_beginscan_extended(relation, snapshot, nkeys, key,
 														 parallel_scan,
 														 flags, attr_needed, NULL,
-														 0, 0, false);
+														 NULL, 
+														 false);
 
 	bms_free(attr_needed);
 
@@ -219,7 +219,7 @@ columnar_beginscan_extended(Relation relation, Snapshot snapshot,
 							int nkeys, ScanKey key,
 							ParallelTableScanDesc parallel_scan,
 							uint32 flags, Bitmapset *attr_needed, List *scanQual,
-							uint32 workerId, uint32 nWorkers,
+							ParallelColumnarScan parallelColumnarScan,
 							bool returnVectorizedTuple)
 {
 	CheckCitusColumnarVersion(ERROR);
@@ -253,9 +253,8 @@ columnar_beginscan_extended(Relation relation, Snapshot snapshot,
 	scan->scanQual = copyObject(scanQual);
 	scan->scanContext = scanContext;
 
-	/* Parallel execution */;
-	scan->workerId = workerId;
-	scan->nWorkers = nWorkers;
+	/* Parallel execution scan data */;
+	scan->parallelColumnarScan = parallelColumnarScan;
 
 	/* Vectorized result */
 	scan->returnVectorizedTuple = returnVectorizedTuple;
@@ -292,7 +291,7 @@ static ColumnarReadState *
 init_columnar_read_state(Relation relation, TupleDesc tupdesc, Bitmapset *attr_needed,
 						 List *scanQual, MemoryContext scanContext, Snapshot snapshot,
 						 bool randomAccess,
-						 uint32 workerId, uint32 nWorkers)
+						 ParallelColumnarScan parallelColumnarScan)
 {
 	MemoryContext oldContext = MemoryContextSwitchTo(scanContext);
 
@@ -300,7 +299,7 @@ init_columnar_read_state(Relation relation, TupleDesc tupdesc, Bitmapset *attr_n
 	ColumnarReadState *readState = ColumnarBeginRead(relation, tupdesc, neededColumnList,
 													 scanQual, scanContext, snapshot,
 													 randomAccess,
-													 workerId, nWorkers);
+													 parallelColumnarScan);
 
 	MemoryContextSwitchTo(oldContext);
 
@@ -357,7 +356,7 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 									 scan->attr_needed, scan->scanQual,
 									 scan->scanContext, scan->cs_base.rs_snapshot,
 									 randomAccess,
-									 scan->workerId, scan->nWorkers);
+									 scan->parallelColumnarScan);
 	}
 
 	ExecClearTuple(slot);
@@ -567,7 +566,7 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 													  attr_needed, scanQual,
 													  scan->scanContext,
 													  snapshot, randomAccess,
-													  0, 0);
+													  NULL);
 	}
 
 	uint64 rowNumber = tid_to_row_number(*tid);
@@ -1030,7 +1029,7 @@ columnar_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 															attr_needed, scanQual,
 															scanContext, snapshot,
 															randomAccess,
-															0, 0);
+															NULL);
 
 	Datum *values = palloc0(sourceDesc->natts * sizeof(Datum));
 	bool *nulls = palloc0(sourceDesc->natts * sizeof(bool));

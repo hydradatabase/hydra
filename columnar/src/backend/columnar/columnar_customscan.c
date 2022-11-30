@@ -56,7 +56,6 @@
  * ColumnarScanState represents the state for a columnar scan. It's a
  * CustomScanState with additional fields specific to columnar scans.
  */
-
 typedef struct ColumnarScanState
 {
 	CustomScanState custom_scanstate; /* must be first field */
@@ -66,8 +65,7 @@ typedef struct ColumnarScanState
 	List *qual;
 
 	/* Parallel execution */
-	uint32 nWorkers;
-	uint32 workerId;
+	ParallelColumnarScan parallelColumnarScan;
 
 	/* Vectorization */
 	struct
@@ -80,14 +78,6 @@ typedef struct ColumnarScanState
 		List *constructedVectorizedQualList;
 	} vectorization;
 } ColumnarScanState;
-
-typedef struct ParallelColumnarTableScanData
-{
-	pg_atomic_uint32 nextWorkerID;		/* fetch and increment for next worker id */
-	uint32 numberOfWorkers;				/* Total number of workers */
-} ParallelColumnarTableScanData;
-typedef struct ParallelColumnarTableScanData *ParallelColumnarTableScan;
-
 
 typedef bool (*PathPredicate)(Path *path);
 
@@ -161,7 +151,7 @@ static void Columnar_ReinitializeDSMCustomScan(CustomScanState *node,
 											   void *coordinate);
 static void Columnar_InitializeWorkerCustomScan(CustomScanState *node,
 												shm_toc *toc,
-												void *coordinate); 
+												void *coordinate);
 
 /* helper functions to build strings for EXPLAIN */
 static const char * ColumnarPushdownClausesStr(List *context, List *clauses);
@@ -1217,13 +1207,12 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 	Assert(!bms_overlap(paramRelids, candidateRelids));
 
 	Path *columnarScanPath = AddColumnarScanPath(root, rel, rte, paramRelids);
-
 	add_path(rel, columnarScanPath);
 	if (columnar_enable_parallel_execution)
 		columnarScanPath->total_cost += columnarScanPath->rows * 0.1;
 
 	/* For columnar custom scan we should also do planning for parallel exeuction
-	 * if it is enabled.
+	 * if it is enabled with GUC.
 	 */
 	if (columnar_enable_parallel_execution)
 	{
@@ -1232,7 +1221,7 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 		if (columnar_min_parallel_processes > max_parallel_workers)
 		{
 			elog(DEBUG1, "columnar.min_parallel_proceses is set higher than max_parallel_workers.");
-			elog(DEBUG1, "Using max_parallel_workers instead for columnar scan.");
+			elog(DEBUG1, "Using max_parallel_workers instead for parallel columnar scan.");
 			columnar_min_parallel_process_running = 
 				Min(max_parallel_workers, columnar_min_parallel_processes);
 		}
@@ -1240,11 +1229,23 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 		if (parallel_leader_participation)
 			columnar_min_parallel_process_running--;
 
+		/*
+		 * We know how many workers are we going to run. Since workers are using single stripe
+		 * probably it doesn't have much sense to spawn more workers than stripes in table.
+		 */
+		columnar_min_parallel_process_running = Min(columnar_min_parallel_process_running,
+													parallel_leader_participation ?
+													ColumnarTableStripeCount(rte->relid) - 1 :
+													ColumnarTableStripeCount(rte->relid));
+
 		if (rel->consider_parallel && rel->lateral_relids == NULL && 
 			columnar_min_parallel_process_running > 0)
 		{
+			/*
+			 * Passing NULL for JOIN quals in parallel execution.
+			 */
 			Path *parallelColumnarScanPath = 
-				AddColumnarScanPath(root, rel, rte, paramRelids);
+				AddColumnarScanPath(root, rel, rte, NULL);
 
 			parallelColumnarScanPath->parallel_workers = columnar_min_parallel_process_running;
 			parallelColumnarScanPath->parallel_aware = true;
@@ -2193,8 +2194,7 @@ ColumnarScanNext(ColumnarScanState *columnarScanState)
 											   0, NULL, NULL, flags,
 											   columnarScanState->attrNeeded,
 											   columnarScanState->qual,
-											   columnarScanState->workerId, 
-											   columnarScanState->nWorkers,
+											   columnarScanState->parallelColumnarScan,
 											   vectorizationEnabled);
 
 		node->ss.ss_currentScanDesc = scandesc;
@@ -2363,7 +2363,7 @@ static Size
 Columnar_EstimateDSMCustomScan(CustomScanState *node,
 							   ParallelContext *pcxt)
 {
-	return  sizeof(ParallelColumnarTableScanData);
+	return sizeof(ParallelColumnarScanData);
 }
 
 
@@ -2372,24 +2372,16 @@ Columnar_InitializeDSMCustomScan(CustomScanState *node,
 								 ParallelContext *pcxt,
 								 void *coordinate)
 {
-	ParallelColumnarTableScan pscan = (ParallelColumnarTableScan) coordinate;
+	ParallelColumnarScan pscan = (ParallelColumnarScan) coordinate;
 	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
+	
+	/* Stripe numbers are starting from index 1 */
+	pg_atomic_init_u64(&pscan->nextStripeId, 1);
 
-	/* Check if leader is also doing in participation in
-	 * query execution and adjust workers 
-	 */
-	if (parallel_leader_participation)
-	{
-		columnarScanState->nWorkers = pcxt->nworkers + 1;
-		columnarScanState->workerId = 0;
-		pscan->numberOfWorkers = pcxt->nworkers + 1;
-		pg_atomic_init_u32(&pscan->nextWorkerID, 1);
-	}
+	if(parallel_leader_participation)
+		columnarScanState->parallelColumnarScan = pscan;
 	else
-	{
-		pscan->numberOfWorkers = pcxt->nworkers;
-		pg_atomic_init_u32(&pscan->nextWorkerID, 0);
-	}
+		columnarScanState->parallelColumnarScan = NULL;
 }
 
 
@@ -2398,7 +2390,16 @@ Columnar_ReinitializeDSMCustomScan(CustomScanState *node,
 								   ParallelContext *pcxt,
 								   void *coordinate)
 {
-	elog(DEBUG1, "ReinitializeDSMCustomScan not supported.");
+	ParallelColumnarScan pscan = (ParallelColumnarScan) coordinate;
+	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
+
+	/* Reset atomic nextStripeId to initial value */
+	pg_atomic_init_u64(&pscan->nextStripeId, 1);
+
+	if(parallel_leader_participation)
+		columnarScanState->parallelColumnarScan = pscan;
+	else
+		columnarScanState->parallelColumnarScan = NULL;
 }
 
 
@@ -2408,9 +2409,8 @@ Columnar_InitializeWorkerCustomScan(CustomScanState *node,
 									void *coordinate)
 {
 	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
-	ParallelColumnarTableScan pscan = (ParallelColumnarTableScan) coordinate;
-	columnarScanState->workerId = pg_atomic_fetch_add_u32(&pscan->nextWorkerID, 1);
-	columnarScanState->nWorkers = pscan->numberOfWorkers;
+	ParallelColumnarScan pscan = (ParallelColumnarScan) coordinate;
+	columnarScanState->parallelColumnarScan = pscan;
 }
 
 

@@ -11,6 +11,8 @@
 #include "catalog/indexing.h"
 #include "utils/acl.h"
 
+#include "columnar/columnar.h"
+
 /*
  * Number of valid ItemPointer Offset's for "row number" <> "ItemPointer"
  * mapping.
@@ -55,7 +57,7 @@ extern TableScanDesc columnar_beginscan_extended(Relation relation, Snapshot sna
 												 ParallelTableScanDesc parallel_scan,
 												 uint32 flags, Bitmapset *attr_needed,
 												 List *scanQual,
-												 uint32 workerId, uint32 nWorkers,
+												 ParallelColumnarScan parallelColumnarScan,
 												 bool returnVectorResult);
 extern int64 ColumnarScanChunkGroupsFiltered(ColumnarScanDesc columnarScanDesc);
 extern bool ColumnarSupportsIndexAM(char *indexAMName);

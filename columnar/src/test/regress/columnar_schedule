@@ -17,7 +17,7 @@ test: columnar_cursor
 test: columnar_copyto
 test: columnar_alter
 test: columnar_alter_set_type
-#test: columnar_lz4 columnar_zstd
+test: columnar_lz4 columnar_zstd
 test: columnar_rollback
 test: columnar_truncate
 test: columnar_vacuum

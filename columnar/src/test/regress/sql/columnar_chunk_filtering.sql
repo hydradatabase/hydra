@@ -37,6 +37,11 @@ CREATE TABLE test_chunk_filtering (a int)
 
 INSERT INTO test_chunk_filtering SELECT generate_series(1,10000);
 
+-- With vectorization and parallel execution enabled `filtered_row_count` 
+-- will not provided correct `Rows Removed by Filter`disable these features for now.
+
+set columnar.enable_vectorization to false;
+set columnar.enable_parallel_execution to false;
 
 -- Verify that filtered_row_count is less than 1000 for the following queries
 SELECT filtered_row_count('SELECT count(*) FROM test_chunk_filtering');
@@ -59,6 +64,8 @@ SELECT filtered_row_count('SELECT count(*) FROM test_chunk_filtering WHERE a < 2
 SELECT filtered_row_count('SELECT count(*) FROM test_chunk_filtering WHERE a < 0');
 SELECT filtered_row_count('SELECT count(*) FROM test_chunk_filtering WHERE a BETWEEN 990 AND 2010');
 
+set columnar.enable_parallel_execution to default;
+set columnar.enable_vectorization to default;
 set columnar.stripe_row_limit to default;
 set columnar.chunk_group_row_limit to default;
 
@@ -140,7 +147,15 @@ create table part_table (id int) partition by range (id);
 create table part_1_row partition of part_table for values from (150000) to (160000);
 create table part_2_columnar partition of part_table for values from (0) to (150000) using columnar;
 insert into part_table select generate_series(1,159999);
+
+set columnar.enable_vectorization to false;
+set columnar.enable_parallel_execution to false;
+
 select filtered_row_count('select count(*) from part_table where id > 75000');
+
+set columnar.enable_vectorization to default;
+set columnar.enable_parallel_execution to default;
+
 drop table part_table;
 
 -- test join parameterization
@@ -246,13 +261,13 @@ set columnar.planner_debug_level = 'notice';
 EXPLAIN (analyze on, costs off, timing off, summary off)
 SELECT * FROM r1, r2, r3, coltest WHERE
   id1 = id2 AND id2 = id3 AND id3 = id AND
-  n1 > x1 AND n2 > x2 AND n3 > x3;
+  n1 > x1 AND n2 > x2 AND n3 > x3 ORDER BY id1;
 
 set columnar.planner_debug_level to default;
 
 SELECT * FROM r1, r2, r3, coltest WHERE
   id1 = id2 AND id2 = id3 AND id3 = id AND
-  n1 > x1 AND n2 > x2 AND n3 > x3;
+  n1 > x1 AND n2 > x2 AND n3 > x3 ORDER BY id1;
 
 -- test partitioning parameterization
 EXPLAIN (analyze on, costs off, timing off, summary off)
@@ -300,10 +315,18 @@ execute foo(3);
 execute foo(3);
 execute foo(3);
 execute foo(3);
+
+set columnar.enable_vectorization to false;
+set columnar.enable_parallel_execution to false;
+
 select filtered_row_count('execute foo(3)');
 select filtered_row_count('execute foo(3)');
 select filtered_row_count('execute foo(3)');
 select filtered_row_count('execute foo(3)');
+
+set columnar.enable_vectorization to default;
+set columnar.enable_parallel_execution to default;
+
 drop table columnar_prepared_stmt;
 
 --

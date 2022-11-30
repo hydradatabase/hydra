@@ -345,7 +345,7 @@ LIMIT 100;
                                  Group Key: full_correlated.b
                                  Filter: (count(DISTINCT full_correlated.a) > 0)
                                  ->  Gather Merge
-                                       Workers Planned: 7
+                                       Workers Planned: 6
                                        ->  Sort
                                              Sort Key: full_correlated.b DESC
                                              ->  Parallel Custom Scan (ColumnarScan) on full_correlated
