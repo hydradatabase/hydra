@@ -269,6 +269,9 @@ ConstructVectorizedQualList(TupleTableSlot *slot, List *vectorizedQual)
 
 				newVectorQual->u.expr.fmgrInfo = palloc0(sizeof(FmgrInfo));
 				newVectorQual->u.expr.fcInfo  = palloc0(SizeForFunctionCallInfo(nargs));
+				newVectorQual->u.expr.vectorFnArguments = 
+					(VectorFnArgument *) palloc0(sizeof(VectorFnArgument) * nargs);
+
 
 				fmgr_info(opExprNode->opfuncid, newVectorQual->u.expr.fmgrInfo);
 				fmgr_info_set_expr((Node *) node, newVectorQual->u.expr.fmgrInfo);
@@ -283,18 +286,28 @@ ConstructVectorizedQualList(TupleTableSlot *slot, List *vectorizedQual)
 				{
 					Expr *arg = (Expr *) lfirst(lcOpExprArgs);
 
+					VectorFnArgument *vectorFnArgument = 
+						newVectorQual->u.expr.vectorFnArguments + argno;
+
 					if (IsA(arg, Const))
 					{
 						Const *con = (Const *) arg;
 
-						newVectorQual->u.expr.fcInfo->args[argno].value = con->constvalue;
+						vectorFnArgument->type = VECTOR_FN_ARG_CONSTANT;
+						vectorFnArgument->arg = con->constvalue;
+						
+						newVectorQual->u.expr.fcInfo->args[argno].value = (Datum) vectorFnArgument;
 						newVectorQual->u.expr.fcInfo->args[argno].isnull = con->constisnull;
 					}
 					else if (IsA(arg, Var))
 					{
 						Var *variable = (Var *) arg;
 						int columnIdx = variable->varattno - 1;
-						newVectorQual->u.expr.fcInfo->args[argno].value = vectorSlot->tts.tts_values[columnIdx];
+
+						vectorFnArgument->type = VECTOR_FN_ARG_VAR;
+						vectorFnArgument->arg = vectorSlot->tts.tts_values[columnIdx];
+
+						newVectorQual->u.expr.fcInfo->args[argno].value = (Datum) vectorFnArgument;
 						newVectorQual->u.expr.fcInfo->args[argno].isnull = false;
 					}
 					

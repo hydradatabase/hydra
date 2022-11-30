@@ -57,6 +57,21 @@ typedef enum VectorQualType
 	VECTOR_QUAL_EXPR
 } VectorQualTypeEnum;
 
+
+typedef enum VectorArgType
+{
+	VECTOR_FN_ARG_CONSTANT,
+	VECTOR_FN_ARG_VAR
+} VectorFnArgTypeEnum;
+
+
+typedef struct VectorFnArgument
+{
+	VectorFnArgTypeEnum type;
+	Datum arg;
+} VectorFnArgument;
+
+
 typedef struct VectorQual
 {
 	VectorQualTypeEnum vectorQualType;
@@ -66,6 +81,7 @@ typedef struct VectorQual
 		{
 			FmgrInfo *fmgrInfo;
 			FunctionCallInfo fcInfo;
+			VectorFnArgument *vectorFnArguments;
 		} expr;
 		struct
 		{
