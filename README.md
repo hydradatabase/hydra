@@ -25,6 +25,7 @@ The Hydra [Docker image](https://github.com/hydrasdb/hydra/pkgs/container/hydra)
 You can also try out Hydra locally using [docker-compose](https://docs.docker.com/compose/).
 
 ```
+git clone https://github.com/HydrasDB/hydra && cd hydra
 cp .env.example .env
 docker compose up
 psql postgres://postgres:hydra@127.0.0.1:5432
