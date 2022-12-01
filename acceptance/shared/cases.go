@@ -376,10 +376,10 @@ SELECT count(*) FROM userdata_2;
 	}
 
 	var (
-		awsAccessKey             = os.Getenv("AWS_ACCESS_KEY_ID")
-		awsSecretKey             = os.Getenv("AWS_SECRET_ACCESS_KEY")
-		awsRegion                = os.Getenv("AWS_REGION")
-		awsS3Bucket              = os.Getenv("AWS_S3_BUCKET")
+		awsAccessKey             = os.Getenv("TEST_AWS_ACCESS_KEY_ID")
+		awsSecretKey             = os.Getenv("TEST_AWS_SECRET_ACCESS_KEY")
+		awsRegion                = os.Getenv("TEST_AWS_REGION")
+		awsS3Bucket              = os.Getenv("TEST_AWS_S3_BUCKET")
 		shouldSkipParquetS3Tests = awsAccessKey == "" || awsSecretKey == "" || awsRegion == "" || awsS3Bucket == ""
 	)
 

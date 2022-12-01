@@ -92,10 +92,10 @@ jobs:
       env:
         POSTGRES_UPGRADE_FROM_IMAGE: ${{ format('{0}:{1}', env.POSTGRES_REPO, matrix.postgres) }}
         POSTGRES_BASE_VERSION: ${{ matrix.postgres }}
-        AWS_ACCESS_KEY_ID: ${{ secrets.TEST_FIXTURE_AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_FIXTURE_AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: us-east-1
-        AWS_S3_BUCKET: hydra-test-fixtures
+        TEST_AWS_ACCESS_KEY_ID: ${{ secrets.TEST_FIXTURE_AWS_ACCESS_KEY_ID }}
+        TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_FIXTURE_AWS_SECRET_ACCESS_KEY }}
+        TEST_AWS_REGION: us-east-1
+        TEST_AWS_S3_BUCKET: hydra-test-fixtures
       run: make postgres_pull_upgrade_image postgres_acceptance_test
     - name: Upload test container logs
       if: failure()
@@ -163,18 +163,18 @@ jobs:
     - name: Run Acceptance Tests for Postgres 13
       env:
         SPILO_POSTGRES_VERSION: '13'
-        AWS_ACCESS_KEY_ID: ${{ secrets.TEST_FIXTURE_AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_FIXTURE_AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: us-east-1
-        AWS_S3_BUCKET: hydra-test-fixtures
+        TEST_AWS_ACCESS_KEY_ID: ${{ secrets.TEST_FIXTURE_AWS_ACCESS_KEY_ID }}
+        TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_FIXTURE_AWS_SECRET_ACCESS_KEY }}
+        TEST_AWS_REGION: us-east-1
+        TEST_AWS_S3_BUCKET: hydra-test-fixtures
       run: make spilo_pull_upgrade_image spilo_acceptance_test
     - name: Run Acceptance Tests for Postgres 14
       env:
         SPILO_POSTGRES_VERSION: '14'
-        AWS_ACCESS_KEY_ID: ${{ secrets.TEST_FIXTURE_AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_FIXTURE_AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: us-east-1
-        AWS_S3_BUCKET: hydra-test-fixtures
+        TEST_AWS_ACCESS_KEY_ID: ${{ secrets.TEST_FIXTURE_AWS_ACCESS_KEY_ID }}
+        TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_FIXTURE_AWS_SECRET_ACCESS_KEY }}
+        TEST_AWS_REGION: us-east-1
+        TEST_AWS_S3_BUCKET: hydra-test-fixtures
       run: make spilo_acceptance_test
     - name: Upload test container logs
       if: failure()
