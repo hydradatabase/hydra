@@ -130,7 +130,7 @@ jobs:
       uses: docker/setup-buildx-action@v2
       with:
         version: latest
-        platforms: linux/amd64,linux/arm64/v8
+        platforms: linux/amd64
         driver-opts: network=host
     - name: Bake and load amd64 spilo image
       uses: docker/bake-action@v2.3.0
@@ -183,13 +183,14 @@ jobs:
         name: spilo_container_logs
         path: ${{ env.TEST_ARTIFACT_DIR }}
         retention-days: 7
-    - name: Bake multi-platform spilo
+    - name: Bake amd64 spilo
       if: github.ref == 'refs/heads/main'
       uses: docker/bake-action@v2.3.0
       with:
         pull: true
         targets: spilo
         set: |
+          *.platform=linux/amd64
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
 
@@ -245,7 +246,7 @@ jobs:
       uses: docker/setup-buildx-action@v2
       with:
         version: latest
-        platforms: linux/amd64,linux/arm64/v8
+        platforms: linux/amd64
         driver-opts: network=host
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
