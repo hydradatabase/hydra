@@ -111,6 +111,7 @@ jobs:
         pull: true
         targets: postgres
         set: |
+          *.platform=linux/amd64,linux/arm64/v8
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
 
@@ -227,6 +228,7 @@ jobs:
         push: true
         targets: postgres
         set: |
+          *.platform=linux/amd64,linux/arm64/v8
           *.cache-from=type=gha
           postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}
           postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
@@ -267,5 +269,6 @@ jobs:
         targets: spilo
         set: |
           *.cache-from=type=gha
+          *.platform=linux/amd64
           spilo.tags=${{ env.SPILO_REPO }}:${{ github.sha }}
           spilo.tags=${{ env.SPILO_REPO }}:latest

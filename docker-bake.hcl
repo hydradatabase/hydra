@@ -31,10 +31,6 @@ group "default" {
 }
 
 target "shared" {
-  platforms = [
-    "linux/amd64",
-    "linux/arm64/v8"
-  ]
 }
 
 target "postgres" {

@@ -18,12 +18,11 @@ $(TEST_ARTIFACT_DIR):
 docker_build: $(DOCKER_CACHE_DIR)
 	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --pull $(TARGET)
 
-PLATFORM ?= linux/arm64
 .PHONY: docker_build_local
 # Runs a docker build for the target platform and loads it into the local docker
 # environment
 docker_build_local: $(DOCKER_CACHE_DIR)
-	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --pull --load $(TARGET)
+	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --pull --load $(TARGET)
 
 .PHONY: docker_build_local_postgres
 docker_build_local_postgres: TARGET = postgres
@@ -39,7 +38,7 @@ docker_build_local_spilo: docker_build_local
 
 .PHONY: docker_check_columnar
 docker_check_columnar:
-	docker buildx bake --set *.platform=$(PLATFORM) --set columnar.target=checker columnar_13 columnar_14
+	docker buildx bake --set columnar.target=checker columnar_13 columnar_14
 
 GO_TEST_FLAGS ?=
 
