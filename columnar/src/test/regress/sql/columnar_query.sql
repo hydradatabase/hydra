@@ -128,3 +128,19 @@ INSERT INTO tbl1(c0) VALUES('[0,1]'::int4range);
 SELECT tbl1.c0 FROM tbl1 JOIN tbl2 ON tbl1.c0=tbl2.c0 WHERE tbl2.c0<=tbl2.c0 ISNULL;
 DROP TABLE tbl1;
 DROP TABLE tbl2;
+
+--
+-- [columnar] Handle NULL rows with vectorized execution
+--
+
+CREATE TABLE t (a INT, b TEXT) USING columnar;
+
+INSERT INTO t SELECT 1 FROM generate_series(0,100000) AS g;
+INSERT INTO t SELECT 1, 'abc' || g FROM generate_series(0,100000) AS g;
+
+EXPLAIN (analyze off, costs off, timing off, summary off)
+SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
+
+SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
+
+DROP TABLE t;

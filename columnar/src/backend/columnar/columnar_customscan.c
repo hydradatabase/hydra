@@ -1640,16 +1640,24 @@ ColumnarScanPath_PlanCustomPath(PlannerInfo *root,
 
 	/*
 	 * Vectorized QUAL execution. Split QUAL list into vectorized list 
-	 * stored in cscan->custom_private and rest in scan.plan.qual
+	 * stored in third position of custom_exprs list and rest of
+	 * qual list (which can't be vectorized) in scan.plan.qual.
 	 */
 	if (columnar_enable_vectorization)
 	{
 		List *candidateQualList = CreateVectorizedExprList(cscan->scan.plan.qual);
-		cscan->custom_private = list_difference(candidateQualList,
-												cscan->scan.plan.qual);
-		if (cscan->custom_private != NULL)
+		List *listDifference = list_difference(candidateQualList, cscan->scan.plan.qual);
+
+		cscan->custom_exprs = lappend(cscan->custom_exprs, listDifference);
+
+		if (listDifference != NULL)
 			cscan->scan.plan.qual = list_intersection(cscan->scan.plan.qual,
-													candidateQualList);
+													  candidateQualList);
+	}
+	else
+	{
+		/* We still need to create third entry in custom_exprs */
+		cscan->custom_exprs = lappend(cscan->custom_exprs, NIL);
 	}
 
 	return (Plan *) cscan;
@@ -1789,18 +1797,19 @@ ColumnarScan_BeginCustomScan(CustomScanState *cscanstate, EState *estate, int ef
 		(Node *) plainClauses, columnarScanState->css_RuntimeContext);
 
 	/*
-	 * IF custom_private is NOT NULL it contains vectorized qual list 
+	 * Third list in custom_exprs should contain vectorized qual list if not 
+	 * NULL.
 	 */
-	if (cscan->custom_private)
-		columnarScanState->vectorization.vectorizedQualList = cscan->custom_private;
+	if (lthird(cscan->custom_exprs) != NIL)
+		columnarScanState->vectorization.vectorizedQualList =  lthird(cscan->custom_exprs);
 
 	/*
 	 * Vectorization is enabled if global variable is set and there is at least one
 	 * filter which can be vectorized.
 	 */
 	columnarScanState->vectorization.vectorizationEnabled =
-		columnarScanState->vectorization.vectorizedQualList != NULL &&
-		columnar_enable_vectorization;
+		columnar_enable_vectorization &&
+		columnarScanState->vectorization.vectorizedQualList != NULL;
 
 	if (columnarScanState->vectorization.vectorizationEnabled)
 	{
@@ -2210,6 +2219,7 @@ ColumnarScanNext(ColumnarScanState *columnarScanState)
 		while ((attrIndex = bms_next_member(columnarScanState->attrNeeded, attrIndex)) >= 0)
 		{
 			VectorColumn *column = (VectorColumn *) vectorSlot->tts.tts_values[attrIndex];
+			memset(column->isnull, 1, COLUMNAR_VECTOR_COLUMN_SIZE);
 			column->dimension = 0;
 		}
 		vectorSlot->dimension = 0;

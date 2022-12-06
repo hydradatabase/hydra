@@ -413,7 +413,7 @@ ExecuteVectorizedQual(TupleTableSlot *slot, List *vectorizedQualList, BoolExprTy
 			}
 		}
 
-		if (result ==  NULL)
+		if (result == NULL)
 		{
 			result = qualResult;
 		}

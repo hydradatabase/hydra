@@ -239,3 +239,31 @@ SELECT tbl1.c0 FROM tbl1 JOIN tbl2 ON tbl1.c0=tbl2.c0 WHERE tbl2.c0<=tbl2.c0 ISN
 
 DROP TABLE tbl1;
 DROP TABLE tbl2;
+--
+-- [columnar] Handle NULL rows with vectorized execution
+--
+CREATE TABLE t (a INT, b TEXT) USING columnar;
+INSERT INTO t SELECT 1 FROM generate_series(0,100000) AS g;
+INSERT INTO t SELECT 1, 'abc' || g FROM generate_series(0,100000) AS g;
+EXPLAIN (analyze off, costs off, timing off, summary off)
+SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
+                         QUERY PLAN                         
+------------------------------------------------------------
+ Limit
+   ->  Sort
+         Sort Key: b
+         ->  Gather
+               Workers Planned: 1
+               ->  Parallel Custom Scan (ColumnarScan) on t
+                     Columnar Projected Columns: a, b
+                     Columnar Chunk Group Filters: (a = 1)
+                     Columnar Vectorized Filter: (a = 1)
+(9 rows)
+
+SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
+ a |  b   
+---+------
+ 1 | abc0
+(1 row)
+
+DROP TABLE t;

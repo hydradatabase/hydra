@@ -1856,10 +1856,10 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 			/* attno is 1-indexed; existsArray is 0-indexed */
 			const uint32 columnIndex = attno - 1;
 
+			VectorColumn* vectorColumn = (VectorColumn*) columnValues[columnIndex];
+
 			if (chunkGroupData->existsArray[columnIndex][rowIndex])
 			{
-				VectorColumn* vectorColumn = (VectorColumn*) columnValues[columnIndex];
-
 				int8 *writeColumnRowPosition = 
 					(int8 *) vectorColumn->value + columnValueOffset[columnIndex];
 
@@ -1868,10 +1868,11 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 								vectorColumn->columnTypeLen);
 							
 				vectorColumn->isnull[vectorColumn->dimension] = false;
-				vectorColumn->dimension++;
 
-				columnValueOffset[columnIndex] += vectorColumn->columnTypeLen;
 			}
+
+			vectorColumn->dimension++;
+			columnValueOffset[columnIndex] += vectorColumn->columnTypeLen;
 		}
 
 		(*chunkReadRows)++;

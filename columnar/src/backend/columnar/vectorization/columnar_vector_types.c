@@ -62,8 +62,8 @@ CreateVectorTupleTableSlot(TupleDesc tupleDesc)
 		int16 vectorColumnTypeLen = 
 			columnTypeLen == -1 ?  sizeof(Datum) : get_typlen(columnTypeOid);
 
-		vectorColumn = BuildVectorColumn(COLUMNAR_VECTOR_COLUMN_SIZE, 
-										 vectorColumnTypeLen, 
+		vectorColumn = BuildVectorColumn(COLUMNAR_VECTOR_COLUMN_SIZE,
+										 vectorColumnTypeLen,
 										 columnTypeLen == -1);
 
 		vectorTTS->tts.tts_values[i] = PointerGetDatum(vectorColumn);
@@ -86,6 +86,7 @@ extractTupleFromVectorSlot(TupleTableSlot *out, VectorTupleTableSlot *vectorSlot
 		int8 *rawColumRawData = (int8*) column->value + column->columnTypeLen * index;
 
 		out->tts_values[bmsMember] = fetch_att(rawColumRawData, true, column->columnTypeLen);
+		out->tts_isnull[bmsMember] = column->isnull[index];
 	}
 
 	ExecStoreVirtualTuple(out);

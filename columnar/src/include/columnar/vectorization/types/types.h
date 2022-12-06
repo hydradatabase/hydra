@@ -36,12 +36,14 @@ Datum v##FNAME##OPSTR(PG_FUNCTION_ARGS) 									\
 		res = BuildVectorColumn(vectorColumn->dimension, 1, true);			\
 																			\
 		LTYPE *vectorValue = (LTYPE *) vectorColumn->value;					\
+		bool *vectorNull = (bool *) vectorColumn->isnull;					\
 		bool *resIdx = (bool *) res->value;									\
+		bool *resNull = (bool *) res->isnull;								\
 																			\
 		for (i = 0; i < vectorColumn->dimension; i++)						\
 		{																	\
-			res->isnull[i] = vectorColumn->isnull[i];						\
-			resIdx[i] = vectorValue[i] OPSYM constValue;					\
+			resNull[i] = vectorNull[i];										\
+			resIdx[i] = !vectorNull[i] && vectorValue[i] OPSYM constValue;	\
 		}																	\
 																			\
 		res->dimension = vectorColumn->dimension;							\
@@ -55,12 +57,14 @@ Datum v##FNAME##OPSTR(PG_FUNCTION_ARGS) 									\
 		res = BuildVectorColumn(vectorColumn->dimension, 1, true);			\
 																			\
 		RTYPE *vectorValue = (RTYPE *) vectorColumn->value;					\
+		bool *vectorNull = (bool *) vectorColumn->isnull;					\
 		bool *resIdx = (bool *) res->value;									\
+		bool *resNull = (bool *) res->isnull;								\
 																			\
 		for (i = 0; i < vectorColumn->dimension; i++)						\
 		{																	\
-			res->isnull[i] = vectorColumn->isnull[i];						\
-			resIdx[i] = vectorValue[i] OPSYM constValue;					\
+			resNull[i] = vectorNull[i];										\
+			resIdx[i] = !vectorNull[i] && vectorValue[i] OPSYM constValue;	\
 		}																	\
 																			\
 		res->dimension = vectorColumn->dimension;							\
