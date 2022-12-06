@@ -209,8 +209,8 @@ bootstrap:
         max_connections: {{postgresql.parameters.max_connections}}
         max_replication_slots: 10
         hot_standby: 'on'
-        tcp_keepalives_idle: 900
-        tcp_keepalives_interval: 100
+        tcp_keepalives_idle: 300
+        tcp_keepalives_interval: 30
         log_line_prefix: '%t [%p]: [%l-1] %c %x %d %u %a %h '
         log_checkpoints: 'on'
         log_lock_waits: 'on'
