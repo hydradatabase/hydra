@@ -136,6 +136,7 @@ static void EndChunkGroupRead(ChunkGroupReadState *chunkGroupReadState);
 static bool ReadChunkGroupNextRow(ChunkGroupReadState *chunkGroupReadState,
 								  Datum *columnValues,
 								  bool *columnNulls);
+static void FreeChunkBufferValueArray(ChunkData *chunkData);
 static StripeBuffers * LoadFilteredStripeBuffers(Relation relation,
 												 StripeMetadata *stripeMetadata,
 												 TupleDesc tupleDescriptor,
@@ -883,6 +884,7 @@ BeginChunkGroupRead(StripeBuffers *stripeBuffers, int chunkIndex, TupleDesc tupl
 static void
 EndChunkGroupRead(ChunkGroupReadState *chunkGroupReadState)
 {
+	FreeChunkBufferValueArray(chunkGroupReadState->chunkGroupData);
 	FreeChunkData(chunkGroupReadState->chunkGroupData);
 	pfree(chunkGroupReadState);
 }
@@ -1009,6 +1011,28 @@ FreeChunkData(ChunkData *chunkData)
 	pfree(chunkData->existsArray);
 	pfree(chunkData->valueArray);
 	pfree(chunkData);
+}
+
+
+/* FreeChunkValueArrayBuffer relase valueBufferArray memory. */
+static void 
+FreeChunkBufferValueArray(ChunkData *chunkData)
+{
+	uint32 columnIndex = 0;
+
+	if (chunkData == NULL)
+	{
+		return;
+	}
+
+	for (columnIndex = 0; columnIndex < chunkData->columnCount; columnIndex++)
+	{
+		if (chunkData->valueBufferArray[columnIndex] != NULL)
+		{
+			pfree(chunkData->valueBufferArray[columnIndex]->data);
+			pfree(chunkData->valueBufferArray[columnIndex]);
+		}
+	}
 }
 
 

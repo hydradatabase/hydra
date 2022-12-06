@@ -597,6 +597,7 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		 * constraint violation. In that case, indexAM provides dirty
 		 * snapshot to index_fetch_tuple callback.
 		 */
+		pfree(stripeMetadata);
 		Assert(snapshot->snapshot_type == SNAPSHOT_DIRTY);
 		return false;
 	}
@@ -667,6 +668,7 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		Assert(stripeWriteState == STRIPE_WRITE_FLUSHED);
 	}
 
+	pfree(stripeMetadata);
 	slot->tts_tableOid = RelationGetRelid(columnarRelation);
 	slot->tts_tid = *tid;
 	ExecStoreVirtualTuple(slot);
