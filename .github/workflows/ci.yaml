@@ -235,7 +235,7 @@ jobs:
           ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
   push_spilo:
-    needs: [build_validate_postgres, build_validate_spilo]
+    needs: [build_validate_spilo]
     if: github.repository == 'hydrasdb/hydra-internal' && github.ref == 'refs/heads/main'
     name: Push Spilo
     runs-on: ubuntu-latest
