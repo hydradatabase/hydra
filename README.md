@@ -12,8 +12,11 @@ Eliminate data silos today. Solve hard problems fast.
 * [x] 📎 append-only columnar store - [docs](https://docs.hydras.io/features/columnar)
 * [x] 📊 external tables - [docs](https://docs.hydras.io/features/external_tables)
 * [x] 📅 postgres scheduler - [docs](https://docs.hydras.io/features/scheduler)
-* [ ] 🐎 vectorized execution
-* [ ] ⚙️ updates and deletes for columnar store
+* [x] 🤹‍♀️ query parallelization
+* [x] 🐎 vectorized execution of WHERE clauses
+* [ ] 📝 updates and deletes for columnar store
+* [ ] 🏎️ vectorized execution of aggegate functions
+* [ ] 🚅 use of SIMD in vectorized execution
 * [ ] ↔️ separation of compute and storage
 
 ![Where does Hydra fit](.images/hydra-db.png)
