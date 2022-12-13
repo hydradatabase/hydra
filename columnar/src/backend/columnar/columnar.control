@@ -1,5 +1,4 @@
-# Citus extension
-comment = 'Citus Columnar extension'
+comment = 'Hydra Columnar extension'
 default_version = '11.1-4'
 module_pathname = '$libdir/columnar'
 relocatable = false
