@@ -40,7 +40,7 @@ Managed in the [cloud](https://hydras.io/#early-access).
 
 ## 📄 Documentation
 
-You can find our documentation [here](https://docs.hydras.io/getting-started/readme).
+You can find our documentation [here](https://docs.hydras.io/getting-started/setup-guide).
 
 ## 👩🏾‍🤝‍👨🏻 Community
 
