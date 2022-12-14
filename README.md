@@ -8,10 +8,10 @@ The open source Snowflake alternative. OLAP Postgres.
 
 Eliminate data silos today. Solve hard problems fast.
 
-* [x] 🗃 hosted postgres database - [docs](https://docs.hydras.io/getting-started/hydra-with-postgres)
-* [x] 📎 append-only columnar store - [docs](https://docs.hydras.io/features/columnar)
-* [x] 📊 external tables - [docs](https://docs.hydras.io/features/external_tables)
-* [x] 📅 postgres scheduler - [docs](https://docs.hydras.io/features/scheduler)
+* [x] 🗃 hosted postgres database - [docs](https://docs.hydras.io/getting-started)
+* [x] 📎 append-only columnar store - [docs](https://docs.hydras.io/concepts/what-is-columnar)
+* [x] 📊 external tables - [docs](https://docs.hydras.io/concepts/using-hydra-external-tables)
+* [x] 📅 postgres scheduler - [docs](https://docs.hydras.io/cloud-warehouse-operations/using-hydra-scheduler)
 * [x] 🤹‍♀️ query parallelization
 * [x] 🐎 vectorized execution of WHERE clauses
 * [ ] 📝 updates and deletes for columnar store
