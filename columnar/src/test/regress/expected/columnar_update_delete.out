@@ -2,13 +2,8 @@ CREATE TABLE columnar_update(i int, j int) USING columnar;
 INSERT INTO columnar_update VALUES (1, 10);
 INSERT INTO columnar_update VALUES (2, 20);
 INSERT INTO columnar_update VALUES (3, 30);
--- should fail
 UPDATE columnar_update SET j = j+1 WHERE i = 2;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
--- should fail
 DELETE FROM columnar_update WHERE i = 2;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
--- should succeed because there's no target
 INSERT INTO columnar_update VALUES
   (3, 5),
   (4, 5),
@@ -21,14 +16,22 @@ INSERT INTO columnar_update VALUES
   (5, 5)
   ON CONFLICT (i) DO NOTHING;
 ERROR:  there is no unique or exclusion constraint matching the ON CONFLICT specification
--- tuple locks should fail
 SELECT * FROM columnar_update WHERE i = 2 FOR SHARE;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+ i | j 
+---+---
+(0 rows)
+
 SELECT * FROM columnar_update WHERE i = 2 FOR UPDATE;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
--- CTID scans should fail
+ i | j 
+---+---
+(0 rows)
+
 SELECT * FROM columnar_update WHERE ctid = '(0,2)';
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+ i | j  
+---+----
+ 1 | 10
+(1 row)
+
 DROP TABLE columnar_update;
 CREATE TABLE parent(ts timestamptz, i int, n numeric, s text)
   PARTITION BY RANGE (ts);
@@ -57,38 +60,21 @@ SELECT * FROM parent;
  Mon Mar 23 00:00:00 2020 PDT | 33 | 303 | three thousand and three
 (6 rows)
 
--- update on specific row partition should succeed
 UPDATE p2 SET i = i+1 WHERE ts = '2020-03-15';
 DELETE FROM p2 WHERE ts = '2020-03-21';
--- update on specific columnar partition should fail
 UPDATE p1 SET i = i+1 WHERE ts = '2020-02-15';
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
 DELETE FROM p1 WHERE ts = '2020-02-15';
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
--- partitioned updates that affect only row tables
--- should succeed
 UPDATE parent SET i = i+1 WHERE ts = '2020-03-15';
 DELETE FROM parent WHERE ts = '2020-03-22';
--- partitioned updates that affect columnar tables
--- should fail
 UPDATE parent SET i = i+1 WHERE ts > '2020-02-15';
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
 DELETE FROM parent WHERE ts > '2020-02-15';
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
--- non-partitioned update should fail, even if it
--- only affects a row partition
 UPDATE parent SET i = i+1 WHERE n = 300;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
 DELETE FROM parent WHERE n = 303;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
 SELECT * FROM parent;
-              ts              | i  |  n  |            s             
-------------------------------+----+-----+--------------------------
+              ts              | i  |  n  |      s       
+------------------------------+----+-----+--------------
  Wed Jan 15 00:00:00 2020 PST | 10 | 100 | one thousand
- Sat Feb 15 00:00:00 2020 PST | 20 | 200 | two thousand
- Mon Mar 23 00:00:00 2020 PDT | 33 | 303 | three thousand and three
- Sun Mar 15 00:00:00 2020 PDT | 32 | 300 | three thousand
-(4 rows)
+(1 row)
 
 -- detach partition
 ALTER TABLE parent DETACH PARTITION p0;

@@ -51,6 +51,8 @@ typedef struct ChunkGroupReadState
 	int columnCount;
 	List *projectedColumnList;  /* borrowed reference */
 	ChunkData *chunkGroupData;
+	bytea *rowMask;
+	uint32 chunkStripeRowOffset; 
 } ChunkGroupReadState;
 
 typedef struct StripeReadState
@@ -126,7 +128,9 @@ static StripeReadState * BeginStripeRead(StripeMetadata *stripeMetadata, Relatio
 static void AdvanceStripeRead(ColumnarReadState *readState);
 static bool SnapshotMightSeeUnflushedStripes(Snapshot snapshot);
 static bool ReadStripeNextRow(StripeReadState *stripeReadState, Datum *columnValues,
-							  bool *columnNulls);
+							  bool *columnNulls,
+							  uint64 stripeFirstRowNumber,
+							  Snapshot snapshot);
 static ChunkGroupReadState * BeginChunkGroupRead(StripeBuffers *stripeBuffers, int
 												 chunkIndex,
 												 TupleDesc tupleDesc,
@@ -135,7 +139,8 @@ static ChunkGroupReadState * BeginChunkGroupRead(StripeBuffers *stripeBuffers, i
 static void EndChunkGroupRead(ChunkGroupReadState *chunkGroupReadState);
 static bool ReadChunkGroupNextRow(ChunkGroupReadState *chunkGroupReadState,
 								  Datum *columnValues,
-								  bool *columnNulls);
+								  bool *columnNulls,
+								  int32 *deletedColumnsNumber);
 static void FreeChunkBufferValueArray(ChunkData *chunkData);
 static StripeBuffers * LoadFilteredStripeBuffers(Relation relation,
 												 StripeMetadata *stripeMetadata,
@@ -176,10 +181,16 @@ static Datum ColumnDefaultValue(TupleConstr *tupleConstraints,
 
 /* Vectorization */
 static bool ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
-								 bool *columnNulls, int *newVectorSize);
+								 bool *columnNulls, int *newVectorSize,
+								 uint64 stripeId,
+								 Snapshot snapshot,
+								 uint64 *rowNumber,
+								 uint64 stripeFirstRowNumber);
 static bool ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *columnValues,
 									 bool *columnNulls, TupleDesc tupleDesc, 
-									 int32 *columnValueOffset, int *chunkReadRows);
+									 int32 *columnValueOffset, int *chunkReadRows,
+									 uint64 *rowNumber,
+									 uint64 stripeFirstRowNumber);
 
 /*
  * ColumnarBeginRead initializes a columnar read operation. This function returns a
@@ -224,6 +235,14 @@ ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 
 	if (!randomAccess)
 	{
+		/*
+		 * Flush any pending in-memory changes to row_mask metadata
+		 * for next scan.
+		 */
+		RowMaskFlushWriteStateForRelfilenode(readState->relation->rd_node.relNode,
+											 GetCurrentSubTransactionId());
+
+
 		/*
 		 * When doing random access (i.e.: index scan), we don't need to flush
 		 * pending writes until we need to read them.
@@ -357,7 +376,9 @@ ColumnarReadNextRow(ColumnarReadState *readState, Datum *columnValues, bool *col
 														 readState->snapshot);
 		}
 
-		if (!ReadStripeNextRow(readState->stripeReadState, columnValues, columnNulls))
+		if (!ReadStripeNextRow(readState->stripeReadState, columnValues, columnNulls,
+							   readState->currentStripeMetadata->firstRowNumber,
+							   readState->snapshot))
 		{
 			AdvanceStripeRead(readState);
 			continue;
@@ -366,7 +387,8 @@ ColumnarReadNextRow(ColumnarReadState *readState, Datum *columnValues, bool *col
 		if (rowNumber)
 		{
 			*rowNumber = readState->currentStripeMetadata->firstRowNumber +
-						 readState->stripeReadState->currentRow - 1;
+						 readState->stripeReadState->chunkGroupReadState->chunkStripeRowOffset +
+						 readState->stripeReadState->chunkGroupReadState->currentRow  - 1;
 		}
 
 		return true;
@@ -564,7 +586,9 @@ ReadChunkGroupRowByRowOffset(ChunkGroupReadState *chunkGroupReadState,
 	/* set the exact row number to be read from given chunk roup */
 	chunkGroupReadState->currentRow = stripeRowOffset %
 									  stripeMetadata->chunkGroupRowCount;
-	if (!ReadChunkGroupNextRow(chunkGroupReadState, columnValues, columnNulls))
+	int dummyDeletedColumnNumber = 0;
+	if (!ReadChunkGroupNextRow(chunkGroupReadState, columnValues, columnNulls, 
+							   &dummyDeletedColumnNumber))
 	{
 		/* not expected but be on the safe side */
 		ereport(ERROR, (errmsg("could not find the row in stripe")));
@@ -806,7 +830,9 @@ SnapshotMightSeeUnflushedStripes(Snapshot snapshot)
  */
 static bool
 ReadStripeNextRow(StripeReadState *stripeReadState, Datum *columnValues,
-				  bool *columnNulls)
+				  bool *columnNulls,
+				  uint64 stripeFirstRowNumber,
+				  Snapshot snapshot)
 {
 	if (stripeReadState->currentRow >= stripeReadState->rowCount)
 	{
@@ -828,19 +854,48 @@ ReadStripeNextRow(StripeReadState *stripeReadState, Datum *columnValues,
 				projectedColumnList,
 				stripeReadState->
 				stripeReadContext);
+			
+			if (columnar_enable_dml)
+			{
+				uint64 chunkFirstRowNumber = 
+					stripeFirstRowNumber + 
+					stripeReadState->chunkGroupReadState->chunkStripeRowOffset;
+
+				stripeReadState->chunkGroupReadState->rowMask = 
+					ReadChunkRowMask(stripeReadState->relation->rd_node,
+									 snapshot,
+									 stripeReadState->stripeReadContext,
+									 chunkFirstRowNumber,
+									 stripeReadState->chunkGroupReadState->rowCount);
+			}
+			else
+			{
+				stripeReadState->chunkGroupReadState->rowMask = NULL;
+			}
 		}
 
+		int32 deletedColumnsNumber = 0;
 		if (!ReadChunkGroupNextRow(stripeReadState->chunkGroupReadState, columnValues,
-								   columnNulls))
+								   columnNulls, &deletedColumnsNumber))
 		{
 			/* if this chunk group is exhausted, fetch the next one and loop */
+
+			stripeReadState->currentRow += deletedColumnsNumber;
+
+			bool isStripeExhausted = stripeReadState->currentRow >= stripeReadState->rowCount;
+
 			EndChunkGroupRead(stripeReadState->chunkGroupReadState);
 			stripeReadState->chunkGroupReadState = NULL;
+
+			if (isStripeExhausted)
+				return false;
+
 			stripeReadState->chunkGroupIndex++;
+				
 			continue;
 		}
 
-		stripeReadState->currentRow++;
+		stripeReadState->currentRow += 1 + deletedColumnsNumber;
 		return true;
 	}
 
@@ -858,6 +913,8 @@ BeginChunkGroupRead(StripeBuffers *stripeBuffers, int chunkIndex, TupleDesc tupl
 {
 	uint32 chunkGroupRowCount =
 		stripeBuffers->selectedChunkGroupRowCounts[chunkIndex];
+	uint32 chunkGroupRowOffset =
+		stripeBuffers->selectedChunkGroupRowOffset[chunkIndex];
 
 	MemoryContext oldContext = MemoryContextSwitchTo(cxt);
 
@@ -865,6 +922,7 @@ BeginChunkGroupRead(StripeBuffers *stripeBuffers, int chunkIndex, TupleDesc tupl
 
 	chunkGroupReadState->currentRow = 0;
 	chunkGroupReadState->rowCount = chunkGroupRowCount;
+	chunkGroupReadState->chunkStripeRowOffset = chunkGroupRowOffset;
 	chunkGroupReadState->columnCount = tupleDesc->natts;
 	chunkGroupReadState->projectedColumnList = projectedColumnList;
 
@@ -886,6 +944,9 @@ EndChunkGroupRead(ChunkGroupReadState *chunkGroupReadState)
 {
 	FreeChunkBufferValueArray(chunkGroupReadState->chunkGroupData);
 	FreeChunkData(chunkGroupReadState->chunkGroupData);
+	if (chunkGroupReadState->rowMask)
+		pfree(chunkGroupReadState->rowMask);
+	chunkGroupReadState->rowMask = NULL;
 	pfree(chunkGroupReadState);
 }
 
@@ -900,37 +961,50 @@ EndChunkGroupRead(ChunkGroupReadState *chunkGroupReadState)
  */
 static bool
 ReadChunkGroupNextRow(ChunkGroupReadState *chunkGroupReadState, Datum *columnValues,
-					  bool *columnNulls)
+					  bool *columnNulls, int32 *deletedColumnsNumber)
 {
-	if (chunkGroupReadState->currentRow >= chunkGroupReadState->rowCount)
-	{
-		Assert(chunkGroupReadState->currentRow == chunkGroupReadState->rowCount);
-		return false;
-	}
-
 	/*
 	 * Initialize to all-NULL. Only non-NULL projected attributes will be set.
 	 */
 	memset(columnNulls, true, sizeof(bool) * chunkGroupReadState->columnCount);
 
-	int attno;
-	foreach_int(attno, chunkGroupReadState->projectedColumnList)
+	while (chunkGroupReadState->currentRow < chunkGroupReadState->rowCount)
 	{
-		const ChunkData *chunkGroupData = chunkGroupReadState->chunkGroupData;
-		const int rowIndex = chunkGroupReadState->currentRow;
-
-		/* attno is 1-indexed; existsArray is 0-indexed */
-		const uint32 columnIndex = attno - 1;
-
-		if (chunkGroupData->existsArray[columnIndex][rowIndex])
+		if (chunkGroupReadState->rowMask != NULL)
 		{
-			columnValues[columnIndex] = chunkGroupData->valueArray[columnIndex][rowIndex];
-			columnNulls[columnIndex] = false;
+			int8 checkColumnMask = 1 << (chunkGroupReadState->currentRow % 8);
+			int8 checkLookupMask = VARDATA(chunkGroupReadState->rowMask)[chunkGroupReadState->currentRow / 8 ];
+
+			if (checkLookupMask & checkColumnMask)
+			{
+				chunkGroupReadState->currentRow++;
+				*deletedColumnsNumber += 1;
+				continue;
+			}
 		}
+
+		int attno;
+		foreach_int(attno, chunkGroupReadState->projectedColumnList)
+		{
+			const ChunkData *chunkGroupData = chunkGroupReadState->chunkGroupData;
+			const int rowIndex = chunkGroupReadState->currentRow;
+
+			/* attno is 1-indexed; existsArray is 0-indexed */
+			const uint32 columnIndex = attno - 1;
+
+			if (chunkGroupData->existsArray[columnIndex][rowIndex])
+			{
+				columnValues[columnIndex] = chunkGroupData->valueArray[columnIndex][rowIndex];
+				columnNulls[columnIndex] = false;
+			}
+		}
+
+		chunkGroupReadState->currentRow++;
+		return true;
 	}
 
-	chunkGroupReadState->currentRow++;
-	return true;
+	return false;
+
 }
 
 
@@ -1110,6 +1184,9 @@ LoadFilteredStripeBuffers(Relation relation, StripeMetadata *stripeMetadata,
 	stripeBuffers->columnBuffersArray = columnBuffersArray;
 	stripeBuffers->selectedChunkGroupRowCounts =
 		selectedChunkSkipList->chunkGroupRowCounts;
+	stripeBuffers->selectedChunkGroupRowOffset =
+		selectedChunkSkipList->chunkGroupRowOffset;
+	
 
 	return stripeBuffers;
 }
@@ -1492,12 +1569,17 @@ SelectedChunkSkipList(StripeSkipList *stripeSkipList, bool *projectedColumnMask,
 
 	selectedChunkIndex = 0;
 	uint32 *chunkGroupRowCounts = palloc0(selectedChunkCount * sizeof(uint32));
+	uint32 *chunkGroupRowOffset = palloc0(selectedChunkCount * sizeof(uint32));
+
 	for (chunkIndex = 0; chunkIndex < stripeSkipList->chunkCount; chunkIndex++)
 	{
 		if (selectedChunkMask[chunkIndex])
 		{
-			chunkGroupRowCounts[selectedChunkIndex++] =
+			chunkGroupRowCounts[selectedChunkIndex] =
 				stripeSkipList->chunkGroupRowCounts[chunkIndex];
+			chunkGroupRowOffset[selectedChunkIndex] =
+				stripeSkipList->chunkGroupRowOffset[chunkIndex];
+			selectedChunkIndex++;
 		}
 	}
 
@@ -1506,6 +1588,7 @@ SelectedChunkSkipList(StripeSkipList *stripeSkipList, bool *projectedColumnMask,
 	selectedChunkSkipList->chunkCount = selectedChunkCount;
 	selectedChunkSkipList->columnCount = stripeSkipList->columnCount;
 	selectedChunkSkipList->chunkGroupRowCounts = chunkGroupRowCounts;
+	selectedChunkSkipList->chunkGroupRowOffset = chunkGroupRowOffset;
 
 	return selectedChunkSkipList;
 }
@@ -1753,7 +1836,7 @@ ColumnDefaultValue(TupleConstr *tupleConstraints, Form_pg_attribute attributeFor
 
 bool
 ColumnarReadNextVector(ColumnarReadState *readState,  Datum *columnValues,
-					   bool *columnNulls, int *newVectorSize)
+					   bool *columnNulls, uint64 *rowNumber, int *newVectorSize)
 {
 	while (true)
 	{
@@ -1774,7 +1857,12 @@ ColumnarReadNextVector(ColumnarReadState *readState,  Datum *columnValues,
 														 readState->snapshot);
 		}
 
-		if (!ReadStripeNextVector(readState->stripeReadState, columnValues, columnNulls, newVectorSize))
+		if (!ReadStripeNextVector(readState->stripeReadState, columnValues, columnNulls, 
+								  newVectorSize,
+								  readState->currentStripeMetadata->id,
+								  readState->snapshot,
+								  rowNumber,
+								  readState->currentStripeMetadata->firstRowNumber))
 		{
 			AdvanceStripeRead(readState);
 			
@@ -1794,7 +1882,11 @@ ColumnarReadNextVector(ColumnarReadState *readState,  Datum *columnValues,
 
 static bool
 ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
-					 bool *columnNulls, int *newVectorSize)
+					 bool *columnNulls, int *newVectorSize,
+					 uint64 stripeId,
+					 Snapshot snapshot,
+					 uint64 *rowNumber,
+					 uint64 stripeFirstRowNumber)
 {
 	if (stripeReadState->currentRow >= stripeReadState->rowCount)
 	{
@@ -1807,6 +1899,8 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 
 	while (true)
 	{
+		uint64 chunkFirstRowNumber = 0;
+
 		if (stripeReadState->chunkGroupReadState == NULL)
 		{
 			stripeReadState->chunkGroupReadState = BeginChunkGroupRead(
@@ -1819,13 +1913,38 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 				projectedColumnList,
 				stripeReadState->
 				stripeReadContext);
+
+			chunkFirstRowNumber = stripeFirstRowNumber +
+								  stripeReadState->chunkGroupReadState->chunkStripeRowOffset;
+
+			if (columnar_enable_dml)
+			{
+				stripeReadState->chunkGroupReadState->rowMask =
+					ReadChunkRowMask(stripeReadState->relation->rd_node,
+									 snapshot,
+									 stripeReadState->stripeReadContext,
+									 chunkFirstRowNumber,
+									 stripeReadState->chunkGroupReadState->rowCount);
+
+			}
+			else
+			{
+				stripeReadState->chunkGroupReadState->rowMask = NULL;
+			}
+		}
+		else
+		{
+			chunkFirstRowNumber = stripeFirstRowNumber +
+						stripeReadState->chunkGroupReadState->chunkStripeRowOffset;
 		}
 
 		if (!ReadChunkGroupNextVector(stripeReadState->chunkGroupReadState,
 									  columnValues, columnNulls, 
 									  stripeReadState->tupleDescriptor,
 									  columnValueOffset, 
-									  newVectorSize))
+									  newVectorSize,
+									  rowNumber,
+									  chunkFirstRowNumber))
 		{
 			/* if this chunk group is exhausted, fetch the next one and loop */
 			EndChunkGroupRead(stripeReadState->chunkGroupReadState);
@@ -1848,7 +1967,9 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 static bool
 ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *columnValues,
 						 bool *columnNulls, TupleDesc tupleDesc, 
-						 int32 *columnValueOffset, int *chunkReadRows)
+						 int32 *columnValueOffset, int *chunkReadRows,
+						 uint64 *rowNumber,
+						 uint64 stripeFirstRowNumber)
 {
 	if (chunkGroupReadState->currentRow >= chunkGroupReadState->rowCount)
 	{
@@ -1870,6 +1991,20 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 		
 		if (*chunkReadRows >= COLUMNAR_VECTOR_COLUMN_SIZE)
 			break;
+
+		if (chunkGroupReadState->rowMask != NULL)
+		{
+			int8 checkColumnMask = 1 << (chunkGroupReadState->currentRow % 8);
+			int8 checkLookupMask = VARDATA(chunkGroupReadState->rowMask)[chunkGroupReadState->currentRow / 8];
+
+			if (checkLookupMask & checkColumnMask)
+			{
+				(*chunkReadRows)++;
+				chunkGroupReadState->currentRow++;
+				rowNumber[i] = stripeFirstRowNumber + chunkGroupReadState->currentRow - 1;
+				continue;
+			}
+		}
 
 		int attno;
 		foreach_int(attno, chunkGroupReadState->projectedColumnList)
@@ -1901,6 +2036,7 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 
 		(*chunkReadRows)++;
 		chunkGroupReadState->currentRow++;
+		rowNumber[i] = stripeFirstRowNumber + chunkGroupReadState->currentRow - 1;
 	}
 
 	return true;

@@ -1851,14 +1851,22 @@ ColumnarAttrNeeded(ScanState *ss, List *customList)
 	{
 		Var *var = lfirst(lc);
 
-		if (var->varattno < 0)
+		/* 
+		 * We support following special variables with update / delete.
+		 */
+		if (var->varattno == SelfItemPointerAttributeNumber ||
+			var->varattno == TableOidAttributeNumber)
 		{
-			ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							errmsg(
-								"UPDATE and CTID scans not supported for ColumnarScan")));
+			continue;
+		}
+		else if (var->varattno < SelfItemPointerAttributeNumber)
+		{
+			ereport(ERROR, 
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("MIN / MAX TransactionID or CommandID not supported for ColumnarScan")));
 		}
 
-		if (var->varattno == 0)
+		if (var->varattno == 0 )
 		{
 			elog(DEBUG1, "Need attribute: all");
 

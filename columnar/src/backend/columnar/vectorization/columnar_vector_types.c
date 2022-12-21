@@ -14,10 +14,12 @@
 #include "utils/lsyscache.h"
 #include "nodes/bitmapset.h"
 
+#include "columnar/columnar.h"
 #include "columnar/vectorization/columnar_vector_types.h"
 
 VectorColumn *
-BuildVectorColumn(int16 columnDimension, int16 columnTypeLen, bool columnIsVal)
+BuildVectorColumn(int16 columnDimension, int16 columnTypeLen, 
+				  bool columnIsVal, uint64 *rowNumber)
 {
 	VectorColumn *vectorColumn;
 
@@ -27,6 +29,7 @@ BuildVectorColumn(int16 columnDimension, int16 columnTypeLen, bool columnIsVal)
 	vectorColumn->value = palloc0(columnTypeLen * COLUMNAR_VECTOR_COLUMN_SIZE);
 	vectorColumn->columnTypeLen = columnTypeLen;
 	vectorColumn->columnIsVal = columnIsVal;
+	vectorColumn->rowNumber = rowNumber;
 
 	return vectorColumn;
 }
@@ -64,7 +67,8 @@ CreateVectorTupleTableSlot(TupleDesc tupleDesc)
 
 		vectorColumn = BuildVectorColumn(COLUMNAR_VECTOR_COLUMN_SIZE,
 										 vectorColumnTypeLen,
-										 columnTypeLen == -1);
+										 columnTypeLen == -1,
+										 vectorTTS->rowNumber);
 
 		vectorTTS->tts.tts_values[i] = PointerGetDatum(vectorColumn);
 		vectorTTS->tts.tts_isnull[i] = false;
@@ -88,6 +92,8 @@ extractTupleFromVectorSlot(TupleTableSlot *out, VectorTupleTableSlot *vectorSlot
 		out->tts_values[bmsMember] = fetch_att(rawColumRawData, true, column->columnTypeLen);
 		out->tts_isnull[bmsMember] = column->isnull[index];
 	}
+
+	out->tts_tid = row_number_to_tid(vectorSlot->rowNumber[index]);
 
 	ExecStoreVirtualTuple(out);
 }

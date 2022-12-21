@@ -44,6 +44,7 @@ int columnar_compression_level = 3;
 bool columnar_enable_parallel_execution = true;
 int columnar_min_parallel_processes = 8;
 bool columnar_enable_vectorization = true;
+bool columnar_enable_dml = true;
 
 static const struct config_enum_entry columnar_compression_options[] =
 {
@@ -154,6 +155,17 @@ columnar_init_gucs()
 							 NULL, 
 							 NULL, 
 							 NULL);
+
+	DefineCustomBoolVariable("columnar.enable_dml",
+							gettext_noop("Enables DML"),
+							NULL,
+							&columnar_enable_dml,
+							true,
+							PGC_USERSET,
+							GUC_NO_SHOW_ALL,
+							NULL, 
+							NULL, 
+							NULL);
 }
 
 

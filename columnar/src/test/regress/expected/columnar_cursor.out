@@ -103,7 +103,7 @@ FETCH a_25;
 (1 row)
 
 UPDATE test_cursor SET a = 8000 WHERE CURRENT OF a_25;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+ERROR:  WHERE CURRENT OF is not supported for this table type
 COMMIT;
 -- A case where the WHERE clause doesn't filter out any chunks
 EXPLAIN (analyze on, costs off, timing off, summary off) SELECT * FROM test_cursor WHERE a > 25;
@@ -205,6 +205,6 @@ FETCH a_25;
 (1 row)
 
 UPDATE test_cursor SET a = 8000 WHERE CURRENT OF a_25;
-ERROR:  UPDATE and CTID scans not supported for ColumnarScan
+ERROR:  WHERE CURRENT OF is not supported for this table type
 COMMIT;
 DROP TABLE test_cursor CASCADE;

@@ -104,10 +104,12 @@ static Oid ColumnarOptionsRelationId(void);
 static Oid ColumnarOptionsIndexRegclass(void);
 static Oid ColumnarChunkRelationId(void);
 static Oid ColumnarChunkGroupRelationId(void);
+static Oid ColumnarRowMaskRelationId(void);
+static Oid ColumnarRowMaskSeqId(void);
 static Oid ColumnarChunkIndexRelationId(void);
 static Oid ColumnarChunkGroupIndexRelationId(void);
+static Oid ColumnarRowMaskIndexRelationId(void);
 static Oid ColumnarNamespaceId(void);
-static uint64 LookupStorageId(RelFileNode relfilenode);
 static uint64 GetHighestUsedRowNumber(uint64 storageId);
 static void DeleteStorageFromColumnarMetadataTable(Oid metadataTableId,
 												   AttrNumber storageIdAtrrNumber,
@@ -128,6 +130,7 @@ static StripeMetadata * StripeMetadataLookupRowNumber(Relation relation, uint64 
 static void CheckStripeMetadataConsistency(StripeMetadata *stripeMetadata);
 
 PG_FUNCTION_INFO_V1(columnar_relation_storageid);
+PG_FUNCTION_INFO_V1(create_table_row_mask);
 
 /* constants for columnar.options */
 #define Natts_columnar_options 5
@@ -191,6 +194,13 @@ typedef FormData_columnar_options *Form_columnar_options;
 #define Anum_columnar_chunk_value_decompressed_size 13
 #define Anum_columnar_chunk_value_count 14
 
+/* constants for columnar.row_mask */
+#define Natts_columnar_row_mask 5
+#define Anum_columnar_row_mask_id 1
+#define Anum_columnar_row_mask_storage_id 2
+#define Anum_columnar_row_mask_start_row_number 3
+#define Anum_columnar_row_mask_end_row_number 4
+#define Anum_columnar_row_mask_mask 5
 
 /*
  * InitColumnarOptions initialized the columnar table options. Meaning it writes the
@@ -537,6 +547,107 @@ SaveChunkGroups(RelFileNode relfilenode, uint64 stripe,
 
 
 /*
+ * SaveEmptyRowMask saves the metadata for inserted rows in columnar.mask_row
+ */
+extern bool 
+SaveEmptyRowMask(uint64 storageId, uint64 stripeStartRowNumber,
+				 List *chunkGroupRowCounts)
+{
+	Oid columnarRowMaskOid = ColumnarRowMaskRelationId();
+	Oid columnarRowMaskSeq = ColumnarRowMaskSeqId();
+	Relation columnarRowMask = table_open(columnarRowMaskOid, RowExclusiveLock);
+	ModifyState *modifyState = StartModifyRelation(columnarRowMask);
+
+	uint64 chunkIterationStartRowNumber = stripeStartRowNumber;
+	uint64 chunkIterationEndRowNumber = stripeStartRowNumber -  1;
+
+	ListCell *lc = NULL;
+
+	bool chunkInserted = true;
+
+	foreach(lc, chunkGroupRowCounts)
+	{
+		if (!chunkInserted)
+			break;
+
+		int64 rowCount = lfirst_int(lc);
+
+		uint16 rowMaskIterations = 
+			(rowCount % COLUMNAR_ROW_MASK_CHUNK_SIZE) ? 
+				(rowCount / COLUMNAR_ROW_MASK_CHUNK_SIZE + 1) :
+				(rowCount / COLUMNAR_ROW_MASK_CHUNK_SIZE);
+
+		for(uint16 n = 0; n < rowMaskIterations; n++)
+		{
+			uint16 maskSize;
+
+			/* Last iteration */
+			if (n == (rowMaskIterations - 1))
+			{
+				uint16 lastIterationRowSize = rowCount % COLUMNAR_ROW_MASK_CHUNK_SIZE ? 
+						rowCount % COLUMNAR_ROW_MASK_CHUNK_SIZE : COLUMNAR_ROW_MASK_CHUNK_SIZE;
+				chunkIterationEndRowNumber += lastIterationRowSize;
+				maskSize = (lastIterationRowSize) % 8 ? 
+								lastIterationRowSize / 8 + 1 :
+								lastIterationRowSize / 8;
+			}
+			else
+			{
+				chunkIterationEndRowNumber += COLUMNAR_ROW_MASK_CHUNK_SIZE;
+				maskSize = COLUMNAR_ROW_MASK_CHUNK_SIZE / 8;
+			}
+
+			bytea *initialLookupRecord = (bytea *) palloc0(maskSize + VARHDRSZ);
+			SET_VARSIZE(initialLookupRecord, maskSize + VARHDRSZ);
+
+			int64 nextSeqId = nextval_internal(columnarRowMaskSeq, false);
+
+			Datum values[Natts_columnar_row_mask] = {
+				Int64GetDatum(nextSeqId),
+				UInt64GetDatum(storageId),
+				Int64GetDatum(chunkIterationStartRowNumber),
+				Int64GetDatum(chunkIterationEndRowNumber),
+				0, /* to be filled below */
+			};
+
+			values[Anum_columnar_row_mask_mask - 1] =
+				PointerGetDatum(initialLookupRecord);
+
+			bool nulls[Natts_columnar_row_mask] = { false };
+
+			/*
+			 * columnar.row_mask has UNIQUE constraint which can throw
+			 * error so we need to catch this and return to function caller
+			 * if saving empty row mask was succesful or not.
+			 */
+			PG_TRY();
+			{
+				InsertTupleAndEnforceConstraints(modifyState, values, nulls);
+			}
+			
+			PG_CATCH();
+			{
+				FlushErrorState();
+				chunkInserted = false;
+				break;
+			}
+
+			PG_END_TRY();
+
+			chunkIterationStartRowNumber += COLUMNAR_ROW_MASK_CHUNK_SIZE;
+		}
+
+		chunkIterationStartRowNumber = chunkIterationEndRowNumber + 1;
+	}
+
+	FinishModifyRelation(modifyState);
+	table_close(columnarRowMask, NoLock);
+
+	return chunkInserted;
+}
+
+
+/*
  * ReadStripeSkipList fetches chunk metadata for a given stripe.
  */
 StripeSkipList *
@@ -544,6 +655,8 @@ ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe, TupleDesc tupleDescri
 				   uint32 chunkCount, Snapshot snapshot)
 {
 	int32 columnIndex = 0;
+	int32 chunkGroupIndex = 0;
+	int32 chunkGroupRowOffsetAcc = 0;
 	HeapTuple heapTuple = NULL;
 	uint32 columnCount = tupleDescriptor->natts;
 	ScanKeyData scanKey[2];
@@ -645,7 +758,220 @@ ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe, TupleDesc tupleDescri
 	chunkList->chunkGroupRowCounts =
 		ReadChunkGroupRowCounts(storageId, stripe, chunkCount, snapshot);
 
+	chunkList->chunkGroupRowOffset = palloc0(chunkCount * sizeof(uint32));
+
+	for (chunkGroupIndex = 0; chunkGroupIndex < chunkCount; chunkGroupIndex++)
+	{
+		chunkList->chunkGroupRowOffset[chunkGroupIndex] = chunkGroupRowOffsetAcc;
+		chunkGroupRowOffsetAcc += chunkList->chunkGroupRowCounts[chunkGroupIndex];
+	}
+
 	return chunkList;
+}
+
+
+/*
+ * ReadChunkRowMask fetches chunk row mask for columnar relation.
+ */
+bytea *
+ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
+				 MemoryContext cxt,
+				 uint64 stripeFirstRowNumber, int rowCount)
+{
+	HeapTuple heapTuple = NULL;
+	ScanKeyData scanKey[3];
+
+	uint64 storageId = LookupStorageId(relfilenode);
+
+	Oid columnarRowMaskOid = ColumnarRowMaskRelationId();
+	Relation columnarRowMask = table_open(columnarRowMaskOid, AccessShareLock);
+	Relation index = index_open(ColumnarRowMaskIndexRelationId(), AccessShareLock);
+
+	MemoryContext oldContext = MemoryContextSwitchTo(cxt);
+
+	uint16 chunkMaskSize = 
+		(rowCount % COLUMNAR_ROW_MASK_CHUNK_SIZE) ?
+			(rowCount / 8 + 1) :
+			(rowCount / 8);
+
+	bytea *chunkRowMaskBytea = (bytea *) palloc0(chunkMaskSize + VARHDRSZ);
+	SET_VARSIZE(chunkRowMaskBytea, chunkMaskSize + VARHDRSZ);
+
+	ScanKeyInit(&scanKey[0], Anum_columnar_row_mask_storage_id,
+				BTEqualStrategyNumber, F_INT8EQ, UInt64GetDatum(storageId));
+	ScanKeyInit(&scanKey[1], Anum_columnar_row_mask_start_row_number,
+				BTGreaterEqualStrategyNumber, F_INT8GE, UInt64GetDatum(stripeFirstRowNumber));
+	ScanKeyInit(&scanKey[2], Anum_columnar_row_mask_end_row_number,
+				BTLessEqualStrategyNumber, F_INT8LE, UInt64GetDatum(stripeFirstRowNumber + rowCount - 1));
+
+	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarRowMask,
+															index,
+															SnapshotSelf, 3, scanKey);
+
+	int pos = 0;
+	while (HeapTupleIsValid(heapTuple = systable_getnext_ordered(scanDescriptor,
+																 ForwardScanDirection)))
+	{
+		Datum datumArray[Natts_columnar_row_mask];
+		bool isNullArray[Natts_columnar_row_mask];
+
+		heap_deform_tuple(heapTuple, RelationGetDescr(columnarRowMask), datumArray, isNullArray);
+		bytea * currentRowMask = DatumGetByteaP(datumArray[Anum_columnar_row_mask_mask - 1]);
+
+		memcpy(VARDATA(chunkRowMaskBytea) + pos,
+			   VARDATA(currentRowMask),
+			   VARSIZE_ANY_EXHDR(currentRowMask));
+
+		pos += VARSIZE_ANY_EXHDR(currentRowMask);
+	}
+
+	MemoryContextSwitchTo(oldContext);
+
+	systable_endscan_ordered(scanDescriptor);
+	index_close(index, AccessShareLock);
+	table_close(columnarRowMask, AccessShareLock);
+
+	return chunkRowMaskBytea;
+}
+
+
+bool
+UpdateRowMask(RelFileNode relfilenode, uint64 storageId,
+			  Snapshot snapshot, uint64 rowNumber)
+{
+	bytea *rowMask = NULL;
+
+	RowMaskWriteStateEntry *rowMaskEntry = 
+		RowMaskFindWriteState(relfilenode.relNode, GetCurrentSubTransactionId(), rowNumber);
+
+	if (rowMaskEntry == NULL)
+	{
+		HeapTuple rowMaskHeapTuple;
+		ScanKeyData scanKey[3];
+
+		Oid columnarRowMaskOid = ColumnarRowMaskRelationId();
+		Relation columnarRowMask = table_open(columnarRowMaskOid, AccessShareLock);
+		TupleDesc tupleDescriptor = RelationGetDescr(columnarRowMask);
+
+		Relation index = index_open(ColumnarRowMaskIndexRelationId(), AccessShareLock);
+
+		ScanKeyInit(&scanKey[0], Anum_columnar_row_mask_storage_id,
+					BTEqualStrategyNumber, F_INT8EQ, UInt64GetDatum(storageId));
+		ScanKeyInit(&scanKey[1], Anum_columnar_row_mask_start_row_number,
+					BTLessEqualStrategyNumber, F_INT8LE, UInt64GetDatum(rowNumber));
+		ScanKeyInit(&scanKey[2], Anum_columnar_row_mask_end_row_number,
+					BTGreaterEqualStrategyNumber, F_INT8GE, UInt64GetDatum(rowNumber));
+
+		SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarRowMask,
+																index,
+																NULL, 3, scanKey);
+
+		rowMaskHeapTuple = systable_getnext_ordered(scanDescriptor, BackwardScanDirection);
+
+		if (HeapTupleIsValid(rowMaskHeapTuple))
+		{
+			bool isnull;
+
+			Pointer mask = DatumGetPointer(
+					fastgetattr(rowMaskHeapTuple, Anum_columnar_row_mask_mask,
+								tupleDescriptor, &isnull));
+		
+			rowMaskEntry = RowMaskInitWriteState(relfilenode.relNode,
+												 storageId,
+												 GetCurrentSubTransactionId(),
+												 DatumGetByteaP(mask));
+			/* 
+			 * Populate row mask cache with values from heap table
+			 */
+			rowMaskEntry->id = DatumGetInt64(
+					fastgetattr(rowMaskHeapTuple, Anum_columnar_row_mask_id, 
+								tupleDescriptor, &isnull));
+
+			rowMaskEntry->storageId = DatumGetInt64(
+					fastgetattr(rowMaskHeapTuple, Anum_columnar_row_mask_storage_id, 
+								tupleDescriptor, &isnull));
+
+			rowMaskEntry->startRowNumber = DatumGetInt64(
+					fastgetattr(rowMaskHeapTuple, Anum_columnar_row_mask_start_row_number, 
+								tupleDescriptor, &isnull));
+
+			rowMaskEntry->endRowNumber = DatumGetInt64(
+					fastgetattr(rowMaskHeapTuple, Anum_columnar_row_mask_end_row_number, 
+								tupleDescriptor, &isnull));
+
+			rowMask = rowMaskEntry->mask;
+		}
+
+		systable_endscan_ordered(scanDescriptor);
+		index_close(index, AccessShareLock);
+		table_close(columnarRowMask, AccessShareLock);
+	}
+	else
+	{
+		rowMask = rowMaskEntry->mask;
+	}
+
+	int16 rowByteMask = rowNumber - rowMaskEntry->startRowNumber;
+
+	/* 
+	 * IF we have been blocked by advisory lock for storage, maybe row
+	 * was delete by some other transaction.
+	 */
+	if (VARDATA(rowMask)[rowByteMask / 8] & (1 << (rowByteMask % 8)))
+		return false;
+
+	VARDATA(rowMask)[rowByteMask / 8] |= 1 << (rowByteMask % 8);
+
+	CommandCounterIncrement();
+
+	return true;
+}
+
+
+void FlushRowMaskCache(RowMaskWriteStateEntry *rowMaskEntry)
+{
+	HeapTuple oldHeapTuple = NULL;
+
+	ScanKeyData scanKey;
+
+	Oid columnarChunkGroupMaskOid = ColumnarRowMaskRelationId();
+	Relation columnarChunkGroupMask =
+		table_open(columnarChunkGroupMaskOid, AccessShareLock);
+	TupleDesc tupleDescriptor = RelationGetDescr(columnarChunkGroupMask);
+
+	Relation index = index_open(ColumnarRowMaskIndexRelationId(), AccessShareLock);
+
+	ScanKeyInit(&scanKey, Anum_columnar_row_mask_id,
+				BTEqualStrategyNumber, F_INT8EQ, Int64GetDatum(rowMaskEntry->id));
+
+	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarChunkGroupMask,
+															index,
+															NULL, 1, &scanKey);
+
+	oldHeapTuple = systable_getnext_ordered(scanDescriptor, BackwardScanDirection);
+
+	index_close(index, AccessShareLock);
+
+	if (HeapTupleIsValid(oldHeapTuple))
+	{
+		bool update[Natts_columnar_row_mask] = { 0 };
+		bool nulls[Natts_columnar_row_mask] = { 0 };
+		Datum values[Natts_columnar_row_mask] = { 0 };
+
+		update[Natts_columnar_row_mask - 1] = true;
+
+		values[Anum_columnar_row_mask_mask - 1] = PointerGetDatum(rowMaskEntry->mask);
+
+		HeapTuple newHeapTuple = heap_modify_tuple(oldHeapTuple, tupleDescriptor,
+												values, nulls, update);
+
+		CatalogTupleUpdate(columnarChunkGroupMask, &oldHeapTuple->t_self, newHeapTuple);
+
+		heap_freetuple(newHeapTuple);
+	}
+
+	systable_endscan_ordered(scanDescriptor);
+	table_close(columnarChunkGroupMask, AccessShareLock);
 }
 
 
@@ -1378,6 +1704,10 @@ DeleteMetadataRows(RelFileNode relfilenode)
 										   Anum_columnar_chunk_storageid,
 										   ColumnarChunkIndexRelationId(),
 										   storageId);
+	DeleteStorageFromColumnarMetadataTable(ColumnarRowMaskRelationId(),
+										   Anum_columnar_row_mask_storage_id,
+										   ColumnarRowMaskIndexRelationId(),
+										   storageId);
 }
 
 
@@ -1694,6 +2024,27 @@ ColumnarChunkGroupRelationId(void)
 
 
 /*
+ * ColumnarRowMaskRelationId returns relation id of columnar.row_mask.
+ */
+static Oid
+ColumnarRowMaskRelationId(void)
+{
+	return get_relname_relid("row_mask", ColumnarNamespaceId());
+}
+
+
+/*
+ * ColumnarRowMaskSeqId returns relation id of columnar.row_mask_seq.
+ */
+static Oid
+ColumnarRowMaskSeqId(void)
+{
+	return get_relname_relid("row_mask_seq", ColumnarNamespaceId());
+}
+
+
+
+/*
  * ColumnarChunkIndexRelationId returns relation id of columnar.chunk_pkey.
  * TODO: should we cache this similar to citus?
  */
@@ -1716,6 +2067,17 @@ ColumnarChunkGroupIndexRelationId(void)
 
 
 /*
+ * ColumnarRowMaskIndexRelationId returns relation id 
+ * of columnar.row_mask_pkey
+ */
+static Oid
+ColumnarRowMaskIndexRelationId(void)
+{
+	return get_relname_relid("row_mask_pkey", ColumnarNamespaceId());
+}
+
+
+/*
  * ColumnarNamespaceId returns namespace id of the schema we store columnar
  * related tables.
  */
@@ -1730,7 +2092,7 @@ ColumnarNamespaceId(void)
  * LookupStorageId reads storage metapage to find the storage ID for the given relfilenode. It returns
  * false if the relation doesn't have a meta page yet.
  */
-static uint64
+uint64
 LookupStorageId(RelFileNode relfilenode)
 {
 	Oid relationId = RelidByRelfilenode(relfilenode.spcNode,
@@ -1777,6 +2139,78 @@ columnar_relation_storageid(PG_FUNCTION_ARGS)
 	PG_RETURN_INT64(storageId);
 }
 
+/*
+ * create_table_row_mask creates empty row mask for table
+ */
+Datum
+create_table_row_mask(PG_FUNCTION_ARGS)
+{
+	Oid relationId = PG_GETARG_OID(0);
+
+	Relation relation = relation_open(relationId, AccessShareLock);
+
+	if (!IsColumnarTableAmTable(relationId))
+	{
+		elog(ERROR, "relation \"%s\" is not a columnar table",
+			 RelationGetRelationName(relation));
+	}
+
+	uint64 storageId = ColumnarStorageGetStorageId(relation, false);
+
+	ScanKeyData scanKey[1];
+	StripeMetadata *stripeMetadata = NULL;
+
+	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
+				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+
+	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
+	
+	Relation index = index_open(ColumnarStripePKeyIndexRelationId(),
+								AccessShareLock);
+
+	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarStripes, index,
+															SnapshotSelf, 1, scanKey);
+
+	HeapTuple heapTuple = NULL;
+
+	bool created = true;
+
+	while (HeapTupleIsValid(heapTuple = systable_getnext_ordered(scanDescriptor,
+																 ForwardScanDirection)))
+	{
+		stripeMetadata = BuildStripeMetadata(columnarStripes, heapTuple);
+
+		List *chunkGroupRowCount = NIL;
+
+		int64 lastChunkRowCount = stripeMetadata->rowCount % stripeMetadata->chunkGroupRowCount ?
+									stripeMetadata->rowCount % stripeMetadata->chunkGroupRowCount :
+									stripeMetadata->chunkGroupRowCount;
+
+		for (int i = 0; i < stripeMetadata->chunkCount - 1; i++)
+		{
+			chunkGroupRowCount = 
+				lappend_int(chunkGroupRowCount, stripeMetadata->chunkGroupRowCount);
+		}
+
+		chunkGroupRowCount = 
+				lappend_int(chunkGroupRowCount, lastChunkRowCount);
+
+		if(!SaveEmptyRowMask(storageId, stripeMetadata->firstRowNumber, chunkGroupRowCount))
+		{
+			elog(WARNING, "relation \"%s\" already has columnar.row_mask populated.",
+				 RelationGetRelationName(relation));
+			created = false;
+			break;
+		}
+	}
+
+	systable_endscan_ordered(scanDescriptor);
+	index_close(index, AccessShareLock);
+	table_close(columnarStripes, AccessShareLock);
+	relation_close(relation, AccessShareLock);
+
+	PG_RETURN_BOOL(created);
+}
 
 /*
  * ColumnarStorageUpdateIfNeeded - upgrade columnar storage to the current version by

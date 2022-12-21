@@ -26,6 +26,7 @@
 
 #include "columnar/columnar_compression.h"
 #include "columnar/columnar_metadata.h"
+#include "columnar/columnar_write_state_row_mask.h"
 
 #define COLUMNAR_MODULE_NAME "citus_columnar"
 
@@ -53,6 +54,9 @@
 #define COLUMNAR_POSTSCRIPT_SIZE_LENGTH 1
 #define COLUMNAR_POSTSCRIPT_SIZE_MAX 256
 #define COLUMNAR_BYTES_PER_PAGE (BLCKSZ - SizeOfPageHeaderData)
+
+/* Columnar row mask byte array size */
+#define COLUMNAR_ROW_MASK_CHUNK_SIZE 10000
 
 /*
  * ColumnarOptions holds the option values to be used when reading or writing
@@ -107,6 +111,7 @@ typedef struct StripeSkipList
 {
 	ColumnChunkSkipNode **chunkSkipNodeArray;
 	uint32 *chunkGroupRowCounts;
+	uint32 *chunkGroupRowOffset;
 	uint32 columnCount;
 	uint32 chunkCount;
 } StripeSkipList;
@@ -170,6 +175,7 @@ typedef struct StripeBuffers
 	ColumnBuffers **columnBuffersArray;
 
 	uint32 *selectedChunkGroupRowCounts;
+	uint32 *selectedChunkGroupRowOffset;
 } StripeBuffers;
 
 
@@ -216,6 +222,10 @@ typedef struct ColumnarReadState ColumnarReadState;
 struct ColumnarWriteState;
 typedef struct ColumnarWriteState ColumnarWriteState;
 
+/* RowMaskWriteStateEntry represents write state entry of columnar.row_mask row */
+struct RowMaskWriteStateEntry;
+typedef struct RowMaskWriteStateEntry RowMaskWriteStateEntry;
+
 /* GUCs */
 extern int columnar_compression;
 extern int columnar_stripe_row_limit;
@@ -224,6 +234,7 @@ extern int columnar_compression_level;
 extern bool columnar_enable_parallel_execution;
 extern int columnar_min_parallel_processes;
 extern bool columnar_enable_vectorization;
+extern bool columnar_enable_dml;
 
 
 /* called when the user changes options on the given relation */
@@ -264,7 +275,8 @@ extern void ColumnarResetRead(ColumnarReadState *readState);
 extern bool ColumnarReadNextRow(ColumnarReadState *state, Datum *columnValues,
 								bool *columnNulls, uint64 *rowNumber);
 extern bool ColumnarReadNextVector(ColumnarReadState *readState, Datum *columnValues,
-								   bool *columnNulls, int *newVectorSize);
+								   bool *columnNulls, uint64 *rowNumber,
+								   int *newVectorSize);
 extern int64 ColumnarReadChunkGroupsFiltered(ColumnarReadState *state);
 extern void ColumnarRescan(ColumnarReadState *readState, List *scanQual);
 
@@ -284,6 +296,8 @@ extern ChunkData * CreateEmptyChunkData(uint32 columnCount, bool *columnMask,
 extern void FreeChunkData(ChunkData *chunkData);
 extern uint64 ColumnarTableRowCount(Relation relation);
 extern const char * CompressionTypeStr(CompressionType type);
+extern ItemPointerData row_number_to_tid(uint64 rowNumber);
+extern uint64 LookupStorageId(RelFileNode relfilenode);
 
 /* columnar_metadata_tables.c */
 extern void InitColumnarOptions(Oid regclass);
@@ -326,22 +340,68 @@ extern uint64 StripeGetHighestRowNumber(StripeMetadata *stripeMetadata);
 extern StripeMetadata * FindStripeWithHighestRowNumber(Relation relation,
 													   Snapshot snapshot);
 extern Datum columnar_relation_storageid(PG_FUNCTION_ARGS);
+extern bool SaveEmptyRowMask(uint64 storageId, uint64 stripeStartRowNumber,
+							 List *chunkGroupRowCounts);
+extern bool UpdateRowMask(RelFileNode relfilenode, uint64 storageId,
+						  Snapshot snapshot, uint64 rowNumber);
+extern void FlushRowMaskCache(RowMaskWriteStateEntry *rowMaskEntry);
+extern bytea * ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
+								MemoryContext ctx,
+								uint64 stripeFirstRowNumber, int rowCount);
+extern Datum create_table_row_mask(PG_FUNCTION_ARGS);
 
+/* write_state_interface.c */
+extern void FlushWriteStateForAllRels(SubTransactionId currentSubXid,
+									  SubTransactionId parentSubXid);
+extern void DiscardWriteStateForAllRels(SubTransactionId currentSubXid,
+										SubTransactionId parentSubXid);
+extern void MarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid);
+extern void NonTransactionDropWriteState(Oid relfilenode);
+extern bool PendingWritesInUpperTransactions(Oid relfilenode,
+											 SubTransactionId currentSubXid);
 
 /* write_state_management.c */
 extern ColumnarWriteState * columnar_init_write_state(Relation relation, TupleDesc
 													  tupdesc,
 													  SubTransactionId currentSubXid);
+extern void ColumnarPopWriteStateForAllRels(SubTransactionId currentSubXid,
+											SubTransactionId parentSubXid,
+											bool commit);
+extern void ColumnarMarkRelfilenodeDroppedColumnar(Oid relfilenode,
+												   SubTransactionId currentSubXid);
+extern void ColumnarNonTransactionDropWriteState(Oid relfilenode);
+extern bool ColumnarPendingWritesInUpperTransactions(Oid relfilenode,
+													 SubTransactionId currentSubXid);
 extern void FlushWriteStateForRelfilenode(Oid relfilenode, SubTransactionId
 										  currentSubXid);
-extern void FlushWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId
-									  parentSubXid);
-extern void DiscardWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId
-										parentSubXid);
-extern void MarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid);
-extern void NonTransactionDropWriteState(Oid relfilenode);
-extern bool PendingWritesInUpperTransactions(Oid relfilenode,
-											 SubTransactionId currentSubXid);
-extern MemoryContext GetWriteContextForDebug(void);
+extern MemoryContext GetColumnarWriteContextForDebug(void);
+
+/* write_state_row_mask.c */
+extern RowMaskWriteStateEntry * RowMaskInitWriteState(Oid relfilenode,
+													  uint64 storageId,
+													  SubTransactionId currentSubXid,
+							 						  bytea *rowMask);
+extern void RowMaskFlushWriteStateForRelfilenode(Oid relfilenode, 
+												 SubTransactionId currentSubXid);
+extern RowMaskWriteStateEntry * RowMaskFindWriteState(Oid relfilenode,
+					  								  SubTransactionId currentSubXid,
+													  uint64 rowId);
+extern void  RowMaskPopWriteStateForAllRels(SubTransactionId currentSubXid,
+											SubTransactionId parentSubXid,
+											bool commit);
+extern void RowMaskMarkRelfilenodeDropped(Oid relfilenode,
+										  SubTransactionId currentSubXid);
+extern void RowMaskNonTransactionDrop(Oid relfilenode);
+extern bool RowMaskPendingWritesInUpperTransactions(Oid relfilenode,
+													SubTransactionId currentSubXid);
+extern MemoryContext GetRowMaskWriteStateContextForDebug(void);
+
+/* columanar_read_state_cache.c */
+extern ColumnarReadState ** InitColumnarReadStateCache(Relation relation,
+													  SubTransactionId currentSubXid);
+extern ColumnarReadState ** FindReadStateCache(Relation relation,
+											   SubTransactionId currentSubXid);
+extern void CleanupReadStateCache(SubTransactionId currentSubXid);
+extern MemoryContext GetColumnarReadStateCache(void);
 
 #endif /* COLUMNAR_H */

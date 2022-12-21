@@ -30,6 +30,8 @@ typedef struct VectorTupleTableSlot
 	uint32 dimension;
 	/* Skip array to represent filtered tuples */
 	bool skip[COLUMNAR_VECTOR_COLUMN_SIZE];
+	/* Row Number */
+	uint64 rowNumber[COLUMNAR_VECTOR_COLUMN_SIZE];
 } VectorTupleTableSlot;
 
 extern TupleTableSlot * CreateVectorTupleTableSlot(TupleDesc tupleDesc);
@@ -41,11 +43,13 @@ typedef struct VectorColumn
 	bool 	columnIsVal;
 	Datum	*value;
 	bool	isnull[COLUMNAR_VECTOR_COLUMN_SIZE];
+	uint64	*rowNumber;
 } VectorColumn;
 
 extern VectorColumn * BuildVectorColumn(int16 columnDimension,
 										int16 columnTypeLen,
-										bool columnIsVal);
+										bool columnIsVal,
+										uint64 *rowNumber);
 extern void extractTupleFromVectorSlot(TupleTableSlot *out, 
 									   VectorTupleTableSlot *vectorSlot, 
 									   int32 index,

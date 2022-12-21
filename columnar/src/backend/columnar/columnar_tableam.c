@@ -142,7 +142,6 @@ static void TruncateColumnar(Relation rel, int elevel);
 static HeapTuple ColumnarSlotCopyHeapTuple(TupleTableSlot *slot);
 static void ColumnarCheckLogicalReplication(Relation rel);
 static Datum * detoast_values(TupleDesc tupleDesc, Datum *orig_values, bool *isnull);
-static ItemPointerData row_number_to_tid(uint64 rowNumber);
 static uint64 tid_to_row_number(ItemPointerData tid);
 static void ErrorIfInvalidRowNumber(uint64 rowNumber);
 static void ColumnarReportTotalVirtualBlocks(Relation relation, Snapshot snapshot,
@@ -370,6 +369,7 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 		bool nextRowFound = ColumnarReadNextVector(scan->cs_readState, 
 												   vectorTTS->tts.tts_values,
 												   vectorTTS->tts.tts_isnull,
+												   vectorTTS->rowNumber,
 												   &newVectorSize);
 
 		if (!nextRowFound)
@@ -403,7 +403,7 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 /*
  * row_number_to_tid maps given rowNumber to ItemPointerData.
  */
-static ItemPointerData
+ItemPointerData
 row_number_to_tid(uint64 rowNumber)
 {
 	ErrorIfInvalidRowNumber(rowNumber);
@@ -683,7 +683,41 @@ columnar_fetch_row_version(Relation relation,
 						   Snapshot snapshot,
 						   TupleTableSlot *slot)
 {
-	elog(ERROR, "columnar_fetch_row_version not implemented");
+	uint64 rowNumber = tid_to_row_number(*tid);
+	ColumnarReadState **readState = 
+		FindReadStateCache(relation, GetCurrentSubTransactionId());
+
+	if (readState == NULL)
+	{
+		readState = InitColumnarReadStateCache(relation, GetCurrentSubTransactionId());
+
+		int natts = relation->rd_att->natts;
+		Bitmapset *attr_needed = bms_add_range(NULL, 0, natts - 1);
+
+		List *scanQual = NIL;
+
+		bool randomAccess = false;
+
+		*readState = init_columnar_read_state(relation,
+											  slot->tts_tupleDescriptor,
+											  attr_needed, scanQual,
+											  GetColumnarReadStateCache(),
+											  snapshot, randomAccess,
+											  NULL);
+	}
+
+	MemoryContext oldContext = MemoryContextSwitchTo(GetColumnarReadStateCache());
+	ColumnarReadRowByRowNumber(*readState, rowNumber,
+							   slot->tts_values, slot->tts_isnull);
+	MemoryContextSwitchTo(oldContext);
+
+	slot->tts_tableOid = RelationGetRelid(relation);
+	slot->tts_tid = *tid;
+
+	if (TTS_EMPTY(slot))
+		ExecStoreVirtualTuple(slot);
+
+	return true;
 }
 
 
@@ -864,7 +898,18 @@ columnar_tuple_delete(Relation relation, ItemPointer tid, CommandId cid,
 					  Snapshot snapshot, Snapshot crosscheck, bool wait,
 					  TM_FailureData *tmfd, bool changingPart)
 {
-	elog(ERROR, "columnar_tuple_delete not implemented");
+	uint64 rowNumber = tid_to_row_number(*tid);
+
+	uint64 storageId = LookupStorageId(relation->rd_node);
+
+	/* Set lock for relation until transaction ends */
+	DirectFunctionCall1(pg_advisory_xact_lock_int8,
+						Int64GetDatum((int64) storageId));
+
+	if (UpdateRowMask(relation->rd_node, storageId,  snapshot, rowNumber))
+		return TM_Ok;
+
+	return TM_Deleted;
 }
 
 
@@ -874,7 +919,20 @@ columnar_tuple_update(Relation relation, ItemPointer otid, TupleTableSlot *slot,
 					  bool wait, TM_FailureData *tmfd,
 					  LockTupleMode *lockmode, bool *update_indexes)
 {
-	elog(ERROR, "columnar_tuple_update not implemented");
+	uint64 rowNumber = tid_to_row_number(*otid);
+
+	uint64 storageId = LookupStorageId(relation->rd_node);
+
+	/* Set lock for relation until transaction ends */
+	DirectFunctionCall1(pg_advisory_xact_lock_int8,
+						Int64GetDatum((int64) storageId));
+
+	if (!UpdateRowMask(relation->rd_node, storageId, snapshot, rowNumber))
+		return TM_Deleted;
+
+	columnar_tuple_insert(relation, slot, cid, 0, NULL);
+
+	return TM_Ok;
 }
 
 
@@ -1912,6 +1970,7 @@ ColumnarXactCallback(XactEvent event, void *arg)
 		case XACT_EVENT_PARALLEL_ABORT:
 		{
 			DiscardWriteStateForAllRels(GetCurrentSubTransactionId(), 0);
+			CleanupReadStateCache(GetCurrentSubTransactionId());
 			break;
 		}
 
@@ -1920,6 +1979,7 @@ ColumnarXactCallback(XactEvent event, void *arg)
 		case XACT_EVENT_PRE_PREPARE:
 		{
 			FlushWriteStateForAllRels(GetCurrentSubTransactionId(), 0);
+			CleanupReadStateCache(GetCurrentSubTransactionId());
 			break;
 		}
 	}
@@ -1942,12 +2002,14 @@ ColumnarSubXactCallback(SubXactEvent event, SubTransactionId mySubid,
 		case SUBXACT_EVENT_ABORT_SUB:
 		{
 			DiscardWriteStateForAllRels(mySubid, parentSubid);
+			CleanupReadStateCache(mySubid);
 			break;
 		}
 
 		case SUBXACT_EVENT_PRE_COMMIT_SUB:
 		{
 			FlushWriteStateForAllRels(mySubid, parentSubid);
+			CleanupReadStateCache(mySubid);
 			break;
 		}
 	}

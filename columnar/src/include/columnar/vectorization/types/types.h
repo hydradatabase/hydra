@@ -33,7 +33,7 @@ Datum v##FNAME##OPSTR(PG_FUNCTION_ARGS) 									\
 		vectorColumn = (VectorColumn*) left->arg;							\
 		RTYPE constValue = right->arg;										\
 																			\
-		res = BuildVectorColumn(vectorColumn->dimension, 1, true);			\
+		res = BuildVectorColumn(vectorColumn->dimension, 1, true, NULL);	\
 																			\
 		LTYPE *vectorValue = (LTYPE *) vectorColumn->value;					\
 		bool *vectorNull = (bool *) vectorColumn->isnull;					\
@@ -54,7 +54,7 @@ Datum v##FNAME##OPSTR(PG_FUNCTION_ARGS) 									\
 		vectorColumn = (VectorColumn*) right->arg;							\
 		LTYPE constValue = left->arg;										\
 																			\
-		res = BuildVectorColumn(vectorColumn->dimension, 1, true);			\
+		res = BuildVectorColumn(vectorColumn->dimension, 1, true, NULL);	\
 																			\
 		RTYPE *vectorValue = (RTYPE *) vectorColumn->value;					\
 		bool *vectorNull = (bool *) vectorColumn->isnull;					\

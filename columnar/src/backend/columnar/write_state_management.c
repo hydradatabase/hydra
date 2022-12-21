@@ -70,7 +70,6 @@ typedef struct SubXidWriteState
 {
 	SubTransactionId subXid;
 	ColumnarWriteState *writeState;
-
 	struct SubXidWriteState *next;
 } SubXidWriteState;
 
@@ -229,9 +228,10 @@ FlushWriteStateForRelfilenode(Oid relfilenode, SubTransactionId currentSubXid)
  * tables, and either propagates the dropped flag to parent subtransaction or
  * rolls back abort.
  */
-static void
-PopWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId parentSubXid,
-						bool commit)
+void
+ColumnarPopWriteStateForAllRels(SubTransactionId currentSubXid,
+								SubTransactionId parentSubXid,
+								bool commit)
 {
 	HASH_SEQ_STATUS status;
 	WriteStateMapEntry *entry;
@@ -291,30 +291,10 @@ PopWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId parentS
 
 
 /*
- * Called when current subtransaction is committed.
- */
-void
-FlushWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId parentSubXid)
-{
-	PopWriteStateForAllRels(currentSubXid, parentSubXid, true);
-}
-
-
-/*
- * Called when current subtransaction is aborted.
- */
-void
-DiscardWriteStateForAllRels(SubTransactionId currentSubXid, SubTransactionId parentSubXid)
-{
-	PopWriteStateForAllRels(currentSubXid, parentSubXid, false);
-}
-
-
-/*
  * Called when the given relfilenode is dropped.
  */
 void
-MarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid)
+ColumnarMarkRelfilenodeDroppedColumnar(Oid relfilenode, SubTransactionId currentSubXid)
 {
 	if (WriteStateMap == NULL)
 	{
@@ -337,7 +317,7 @@ MarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid)
  * Called when the given relfilenode is dropped in non-transactional TRUNCATE.
  */
 void
-NonTransactionDropWriteState(Oid relfilenode)
+ColumnarNonTransactionDropWriteState(Oid relfilenode)
 {
 	if (WriteStateMap)
 	{
@@ -350,7 +330,7 @@ NonTransactionDropWriteState(Oid relfilenode)
  * Returns true if there are any pending writes in upper transactions.
  */
 bool
-PendingWritesInUpperTransactions(Oid relfilenode, SubTransactionId currentSubXid)
+ColumnarPendingWritesInUpperTransactions(Oid relfilenode, SubTransactionId currentSubXid)
 {
 	if (WriteStateMap == NULL)
 	{
@@ -384,7 +364,7 @@ PendingWritesInUpperTransactions(Oid relfilenode, SubTransactionId currentSubXid
  * purposes.
  */
 extern MemoryContext
-GetWriteContextForDebug(void)
+GetColumnarWriteContextForDebug(void)
 {
 	return WriteStateContext;
 }
