@@ -232,11 +232,11 @@ jobs:
           postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
           ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
-  # push_spilo:
-  #   needs: [build_validate_spilo]
-  #   if: github.repository == 'hydrasdb/hydra-internal' && github.ref == 'refs/heads/main'
-  #   uses: hydraDB/hydra-internal/.github/workflows/deploy.yml@main
-  #   with:
-  #     production: true
-  #   secrets: inherit
-  #
+  push_spilo:
+    needs: [build_validate_spilo]
+    if: github.repository == 'hydrasdb/hydra-internal' && github.ref == 'refs/heads/main'
+    uses: hydrasDB/hydra-internal/.github/workflows/build_spilo.yaml@main
+    with:
+      production: true
+    secrets: inherit
+

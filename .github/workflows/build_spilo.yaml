@@ -50,5 +50,5 @@ jobs:
         set: |
           *.cache-from=type=gha
           *.platform=linux/amd64
-          spilo.tags=${{ env.SPILO_REPO }}:${{ input.production && github.sha || format('dev-{0}-{1}', github.ref, github.sha) }}
-          ${{ input.production && format('spilo.tags={0}:latest', env.SPILO_REPO) || '' }}
+          spilo.tags=${{ env.SPILO_REPO }}:${{ inputs.production && github.sha || format('dev-{0}-{1}', github.ref, github.sha) }}
+          ${{ inputs.production && format('spilo.tags={0}:latest', env.SPILO_REPO) || '' }}
