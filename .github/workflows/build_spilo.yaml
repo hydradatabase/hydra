@@ -7,12 +7,19 @@ on:
         required: true
         type: boolean
         default: false
+      spilo_repo:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       production:
         required: true
         type: boolean
         default: false
+      spilo_repo:
+        required: true
+        type: string
+        default: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
 
 jobs:
   push_spilo:
@@ -50,5 +57,5 @@ jobs:
         set: |
           *.cache-from=type=gha
           *.platform=linux/amd64
-          spilo.tags=${{ env.SPILO_REPO }}:${{ inputs.production && github.sha || format('dev-{0}-{1}', github.ref, github.sha) }}
-          ${{ inputs.production && format('spilo.tags={0}:latest', env.SPILO_REPO) || '' }}
+          spilo.tags=${{ inputs.spilo_repo }}:${{ inputs.production && github.sha || format('dev-{0}-{1}', github.ref, github.sha) }}
+          ${{ inputs.production && format('spilo.tags={0}:latest', inputs.spilo_repo) || '' }}

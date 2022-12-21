@@ -238,5 +238,6 @@ jobs:
     uses: hydrasDB/hydra-internal/.github/workflows/build_spilo.yaml@main
     with:
       production: true
+      spilo_repo: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo # env vars can't be used here
     secrets: inherit
 
