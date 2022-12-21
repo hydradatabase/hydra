@@ -111,7 +111,6 @@ jobs:
         pull: true
         targets: postgres
         set: |
-          *.platform=linux/amd64,linux/arm64/v8
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
 
@@ -228,47 +227,16 @@ jobs:
         push: true
         targets: postgres
         set: |
-          *.platform=linux/amd64,linux/arm64/v8
           *.cache-from=type=gha
           postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}
           postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
           ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
-  push_spilo:
-    needs: [build_validate_spilo]
-    if: github.repository == 'hydrasdb/hydra-internal' && github.ref == 'refs/heads/main'
-    name: Push Spilo
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-      with:
-        version: latest
-        platforms: linux/amd64
-        driver-opts: network=host
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-        aws-region: us-east-1
-        mask-aws-account-id: no
-    - name: Login to Amazon ECR
-      id: spilo-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-      with:
-        registries: "011789831835"
-    - name: Bake and push spilo
-      uses: docker/bake-action@v2.3.0
-      with:
-        push: true
-        targets: spilo
-        set: |
-          *.cache-from=type=gha
-          *.platform=linux/amd64
-          spilo.tags=${{ env.SPILO_REPO }}:${{ github.sha }}
-          spilo.tags=${{ env.SPILO_REPO }}:latest
+  # push_spilo:
+  #   needs: [build_validate_spilo]
+  #   if: github.repository == 'hydrasdb/hydra-internal' && github.ref == 'refs/heads/main'
+  #   uses: hydraDB/hydra-internal/.github/workflows/deploy.yml@main
+  #   with:
+  #     production: true
+  #   secrets: inherit
+  #
