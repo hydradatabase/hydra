@@ -247,20 +247,6 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'timescaledb';
 			},
 		},
 		shared.Case{
-			Name: "ensure 20 worker processes",
-			SQL:  `SHOW max_worker_processes;`,
-			Validate: func(t *testing.T, row pgx.Row) {
-				var workerProcesses string
-				if err := row.Scan(&workerProcesses); err != nil {
-					t.Fatal(err)
-				}
-
-				if want, got := "20", workerProcesses; want != got {
-					t.Errorf("max_worker_processes not set to 20, set to %s", got)
-				}
-			},
-		},
-		shared.Case{
 			Name: "cron should use worker processes",
 			SQL:  `SHOW cron.use_background_workers;`,
 			Validate: func(t *testing.T, row pgx.Row) {

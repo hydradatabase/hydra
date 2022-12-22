@@ -225,7 +225,6 @@ bootstrap:
         autovacuum_max_workers: 5
         autovacuum_vacuum_scale_factor: 0.05
         autovacuum_analyze_scale_factor: 0.02
-        max_worker_processes: 20
   {{#CLONE_WITH_WALE}}
   method: clone_with_wale
   clone_with_wale:
@@ -289,8 +288,6 @@ postgresql:
   data_dir: {{PGDATA}}
   parameters:
     archive_command: {{{postgresql.parameters.archive_command}}}
-    shared_buffers: {{postgresql.parameters.shared_buffers}}
-    work_mem: {{postgresql.parameters.work_mem}}
     logging_collector: 'on'
     log_destination: csvlog
     log_directory: ../pg_log
@@ -669,14 +666,8 @@ def get_placeholders(provider):
         os_memory_mb = sys.maxsize
     os_memory_mb = min(os_memory_mb, os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / 1048576)
 
-    # Depending on environment we take 1/4 or 1/5 of the memory, expressed in full MB's
-    sb_ratio = 5 if USE_KUBERNETES else 4
-    placeholders['postgresql']['parameters']['shared_buffers'] = '{}MB'.format(int(os_memory_mb/sb_ratio))
     # # 1 connection per 30 MB, at least 100, at most 1000
     placeholders['postgresql']['parameters']['max_connections'] = min(max(100, int(os_memory_mb/30)), 1000)
-
-    # work_mem: 1 MB per GB of RAM, up to 64MB, min 16MB
-    placeholders['postgresql']['parameters']['work_mem'] = '{}MB'.format(min(64, max(16, os_memory_mb/1000)))
 
     placeholders['instance_data'] = get_instance_metadata(provider)
     placeholders.setdefault('RESTAPI_CONNECT_ADDRESS', placeholders['instance_data']['ip'])
