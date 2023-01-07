@@ -66,15 +66,18 @@ Please see [DEVELOPERS.md](DEVELOPERS.md) for information on contributing to Hyd
 ## 📑 License and Acknowledgments
 Hydra is only possible by building on the shoulders of giants.
 
-The code in this repo is licensed under the [Apache 2.0 license](LICENSE). Pre-built images are
-subject to additional licenses as follows:
+The code in this repo is licensed under:
+* [AGPL 3.0](https://github.com/HydrasDB/hydra/tree/main/columnar/LICENSE) for [Hydra Columnar](https://github.com/HydrasDB/hydra/tree/main/columnar)
+* All other code is [Apache 2.0](LICENSE)
 
-* [Hydra columnar engine](https://github.com/HydrasDB/hydra/tree/main/columnar) - AGPL 3.0
-* [Spilo](https://github.com/zalando/spilo) - Apache 2.0
-* The underlying Spilo image contains a large number of open source projects, including:
-  * Postgres - [the Postgres license](https://www.postgresql.org/about/licence/)
-  * [WAL-G](https://github.com/wal-g/wal-g) - Apache 2.0
-  * [Ubuntu's docker image](https://hub.docker.com/_/ubuntu/) - various copyleft licenses (MIT, GPL, Apache, etc)
+The docker image is built on the [Postgres docker image](https://hub.docker.com/_/postgres/), which contains a large number of open source projects, including:
+* Postgres - [the Postgres license](https://www.postgresql.org/about/licence/)
+* Debian or Alpine Linux image, depending on the image used
+* Hydra includes the following additional software in the image:
+  * multicorn - BSD license
+  * mysql_fdw - MIT-style license
+  * parquet_s3_fdw - MIT-style license
+  * pgsql-http - MIT license
 
 As for any pre-built image usage, it is the image user's responsibility to ensure that any use of this
 image complies with any relevant licenses for all software contained within.
