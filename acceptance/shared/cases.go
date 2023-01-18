@@ -448,6 +448,12 @@ VALUES ('75372aac-d74a-4e5a-8bf3-43cdaf9011de', 2, 3, 100.1, 'hydra');
 	}
 	AfterUpgradeCases = []Case{
 		{
+			Name: "force upgrade columnar ext",
+			SQL: `
+ALTER EXTENSION columnar UPDATE;
+			`,
+		},
+		{
 			Name: "create another columnar table",
 			SQL: `
 CREATE TABLE columnar_table2
