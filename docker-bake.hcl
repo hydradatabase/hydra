@@ -1,5 +1,5 @@
 variable "POSTGRES_REPO" {
-  default = "ghcr.io/hydrasdb/hydra"
+  default = "ghcr.io/hydradatabase/hydra"
 }
 
 variable "SPILO_REPO" {

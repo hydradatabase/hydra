@@ -45,7 +45,7 @@ RUN set -eux; \
 ENV PATH="/usr/lib/postgresql/${POSTGRES_BASE_VERSION}/bin:$PATH"
 
 RUN set -eux; \
-  git clone https://github.com/HydrasDB/parquet_s3_fdw --single-branch; \
+  git clone https://github.com/hydradatabase/parquet_s3_fdw --single-branch; \
   cd parquet_s3_fdw; \
   git checkout ${PARQUET_S3_FDW_COMMIT}; \
   DESTDIR=/pg_ext make USE_PGXS=1; \

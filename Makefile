@@ -57,8 +57,8 @@ acceptance_test: postgres_acceptance_test spilo_acceptance_test
 # Builds local images then runs the acceptance tests
 acceptance_build_test: postgres_acceptance_build_test spilo_acceptance_build_test
 
-POSTGRES_IMAGE ?= ghcr.io/hydrasdb/hydra:latest
-POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydrasdb/hydra:$(POSTGRES_BASE_VERSION)
+POSTGRES_IMAGE ?= ghcr.io/hydradatabase/hydra:latest
+POSTGRES_UPGRADE_FROM_IMAGE ?= ghcr.io/hydradatabase/hydra:$(POSTGRES_BASE_VERSION)
 
 .PHONY: postgres_acceptance_test
 # Runs the postgres acceptance tests

@@ -1,7 +1,7 @@
 services:
   hydra:
     container_name: hydra
-    image: ghcr.io/hydrasdb/hydra:latest
+    image: ghcr.io/hydradatabase/hydra:latest
     ports:
       - ${POSTGRES_PORT}:5432
     environment:

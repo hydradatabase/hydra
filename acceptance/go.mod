@@ -1,4 +1,4 @@
-module github.com/HydrasDB/hydra/acceptance
+module github.com/hydradatabase/hydra/acceptance
 
 go 1.19
 

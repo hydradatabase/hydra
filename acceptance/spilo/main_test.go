@@ -15,7 +15,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/HydrasDB/hydra/acceptance/shared"
+	"github.com/hydradatabase/hydra/acceptance/shared"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joeshaw/envdecode"
