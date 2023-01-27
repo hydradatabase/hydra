@@ -21,6 +21,7 @@
 #include "storage/bufpage.h"
 #include "storage/lockdefs.h"
 #include "storage/relfilenode.h"
+#include "storage/s_lock.h"
 #include "utils/relcache.h"
 #include "utils/snapmgr.h"
 
@@ -203,7 +204,9 @@ typedef enum StripeWriteStateEnum
 /* Parallel Custom Scan shared data */
 typedef struct ParallelColumnarScanData
 {
+	slock_t mutex;
 	pg_atomic_uint64 nextStripeId;	/* Fetch next stripe id to be read and increment */
+	char snapshotData[FLEXIBLE_ARRAY_MEMBER];
 } ParallelColumnarScanData;
 typedef struct ParallelColumnarScanData *ParallelColumnarScan;
 
@@ -334,7 +337,8 @@ extern StripeMetadata * FindStripeWithMatchingFirstRowNumber(Relation relation,
 															 Snapshot snapshot);
 extern StripeMetadata *  FindNextStripeForParallelWorker(Relation relation,
 														 Snapshot snapshot,
-														 uint32 nextStripeId);
+														 uint64 nextStripeId,
+														 uint64 * nextHigherStripeId);
 extern StripeWriteStateEnum StripeWriteState(StripeMetadata *stripeMetadata);
 extern uint64 StripeGetHighestRowNumber(StripeMetadata *stripeMetadata);
 extern StripeMetadata * FindStripeWithHighestRowNumber(Relation relation,
@@ -351,6 +355,9 @@ extern bytea * ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
 extern Datum create_table_row_mask(PG_FUNCTION_ARGS);
 
 /* write_state_interface.c */
+extern void FlushWriteStateWithNewSnapshot(Oid relfilenode,
+										   Snapshot * snapshot,
+										   bool * snapShotRegisteredByUs);
 extern void FlushWriteStateForAllRels(SubTransactionId currentSubXid,
 									  SubTransactionId parentSubXid);
 extern void DiscardWriteStateForAllRels(SubTransactionId currentSubXid,

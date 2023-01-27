@@ -236,19 +236,25 @@ ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 	if (!randomAccess)
 	{
 		/*
-		 * Flush any pending in-memory changes to row_mask metadata
-		 * for next scan.
+		 * If have parallel columnar scan we don't flush states.
 		 */
-		RowMaskFlushWriteStateForRelfilenode(readState->relation->rd_node.relNode,
-											 GetCurrentSubTransactionId());
+		if (readState->parallelColumnarScan == NULL)
+		{
+			/*
+			* Flush any pending in-memory changes to row_mask metadata
+			* for next scan.
+			*/
+			RowMaskFlushWriteStateForRelfilenode(readState->relation->rd_node.relNode,
+												 GetCurrentSubTransactionId());
 
 
-		/*
-		 * When doing random access (i.e.: index scan), we don't need to flush
-		 * pending writes until we need to read them.
-		 * columnar_index_fetch_tuple would do so when needed.
-		 */
-		ColumnarReadFlushPendingWrites(readState);
+			/*
+			* When doing random access (i.e.: index scan), we don't need to flush
+			* pending writes until we need to read them.
+			* columnar_index_fetch_tuple would do so when needed.
+			*/
+			ColumnarReadFlushPendingWrites(readState);
+		}
 
 		/*
 		 * AdvanceStripeRead sets currentStripeMetadata for the first stripe
@@ -290,49 +296,9 @@ ColumnarReadFlushPendingWrites(ColumnarReadState *readState)
 	Assert(!readState->snapshotRegisteredByUs);
 
 	Oid relfilenode = readState->relation->rd_node.relNode;
-	FlushWriteStateForRelfilenode(relfilenode, GetCurrentSubTransactionId());
 
-	if (readState->snapshot == InvalidSnapshot || !IsMVCCSnapshot(readState->snapshot))
-	{
-		return;
-	}
-
-	/*
-	 * If we flushed any pending writes, then we should guarantee that
-	 * those writes are visible to us too. For this reason, if given
-	 * snapshot is an MVCC snapshot, then we set its curcid to current
-	 * command id.
-	 *
-	 * For simplicity, we do that even if we didn't flush any writes
-	 * since we don't see any problem with that.
-	 *
-	 * XXX: We should either not update cid if we are executing a FETCH
-	 * (from cursor) command, or we should have a better way to deal with
-	 * pending writes, see the discussion in
-	 * https://github.com/citusdata/citus/issues/5231.
-	 */
-	PushCopiedSnapshot(readState->snapshot);
-
-	/* now our snapshot is the active one */
-	UpdateActiveSnapshotCommandId();
-	Snapshot newSnapshot = GetActiveSnapshot();
-	RegisterSnapshot(newSnapshot);
-
-	/*
-	 * To be able to use UpdateActiveSnapshotCommandId, we pushed the
-	 * copied snapshot to the stack. However, we don't need to keep it
-	 * there since we will anyway rely on ColumnarReadState->snapshot
-	 * during read operation.
-	 *
-	 * Note that since we registered the snapshot already, we guarantee
-	 * that PopActiveSnapshot won't free it.
-	 */
-	PopActiveSnapshot();
-
-	readState->snapshot = newSnapshot;
-
-	/* not forget to unregister it when finishing read operation */
-	readState->snapshotRegisteredByUs = true;
+	FlushWriteStateWithNewSnapshot(relfilenode, &readState->snapshot,
+								   &readState->snapshotRegisteredByUs);
 }
 
 
@@ -753,13 +719,30 @@ AdvanceStripeRead(ColumnarReadState *readState)
 				readState->stripeReadState->chunkGroupsFiltered;
 		}
 
+		SpinLockAcquire(&readState->parallelColumnarScan->mutex);
+
 		/* Fetch atomic next stripe id to be read by this scan. */
-		uint32 nextStripeId = 
+		uint64 nextStripeId = 
 			pg_atomic_fetch_add_u64(&readState->parallelColumnarScan->nextStripeId, 1);
 
+		uint64 nextHigherStripeId = nextStripeId;
+
 		readState->currentStripeMetadata = FindNextStripeForParallelWorker(readState->relation,
-																	 	   readState->snapshot,
-																		   nextStripeId);
+																		   readState->snapshot,
+																		   nextStripeId,
+																		   &nextHigherStripeId);
+
+		/* 
+		 * There exists higher stripe id than this one so adjust and 
+		 * add +1 for next workers.
+		 */
+		if (nextHigherStripeId != nextStripeId)
+		{
+			pg_atomic_write_u64(&readState->parallelColumnarScan->nextStripeId,
+								nextHigherStripeId + 1);
+		}
+
+		SpinLockRelease(&readState->parallelColumnarScan->mutex);
 	}
 
 	if (readState->currentStripeMetadata &&

@@ -173,7 +173,6 @@ BEGIN
     EXECUTE FORMAT('ALTER TABLE %I RENAME TO %I;'::text, temp_tbl_name, tbl_name);
 
     -- Since we inserted rows before they are not flushed so trigger flushing
-    -- by running columnar scan
 
     EXECUTE FORMAT('SELECT COUNT(1) FROM %I LIMIT 1;'::text, tbl_name);
 

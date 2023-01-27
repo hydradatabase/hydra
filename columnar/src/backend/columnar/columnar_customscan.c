@@ -21,6 +21,7 @@
 
 #include "access/amapi.h"
 #include "access/skey.h"
+#include "access/xact.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_statistic.h"
 #include "commands/defrem.h"
@@ -77,6 +78,10 @@ typedef struct ColumnarScanState
 		List *vectorizedQualList;
 		List *constructedVectorizedQualList;
 	} vectorization;
+
+	/* Scan snapshot*/
+	Snapshot snapshot;
+	bool snapshotRegisteredByUs;
 } ColumnarScanState;
 
 typedef bool (*PathPredicate)(Path *path);
@@ -1820,6 +1825,23 @@ ColumnarScan_BeginCustomScan(CustomScanState *cscanstate, EState *estate, int ef
 	columnarScanState->attrNeeded = 
 		ColumnarAttrNeeded(&cscanstate->ss, columnarScanState->vectorization.vectorizedQualList);
 
+	/*
+	 * If we have pending changes that need to be flushed (row_mask after update/delete)
+	 * or new stripe we need to to them here because sequential columnar scan 
+	 * can have parallel execution and updated are not allowed in parallel mode.
+	 */
+	columnarScanState->snapshot = estate->es_snapshot;
+	columnarScanState->snapshotRegisteredByUs = false;
+	Oid relationOid = cscanstate->ss.ss_currentRelation->rd_node.relNode;
+
+	if(!IsInParallelMode())
+	{
+		RowMaskFlushWriteStateForRelfilenode(relationOid, GetCurrentSubTransactionId());
+
+		FlushWriteStateWithNewSnapshot(relationOid, &columnarScanState->snapshot,
+									   &columnarScanState->snapshotRegisteredByUs);
+	}
+
 	/* scan slot is already initialized */
 }
 
@@ -2207,7 +2229,7 @@ ColumnarScanNext(ColumnarScanState *columnarScanState)
 		 * executing a scan that was planned to be parallel.
 		 */
 		scandesc = columnar_beginscan_extended(node->ss.ss_currentRelation,
-											   estate->es_snapshot,
+											   columnarScanState->snapshot,
 											   0, NULL, NULL, flags,
 											   columnarScanState->attrNeeded,
 											   columnarScanState->qual,
@@ -2274,10 +2296,8 @@ ColumnarScan_ExecCustomScan(CustomScanState *node)
 static void
 ColumnarScan_EndCustomScan(CustomScanState *node)
 {
-	/*
-	 * get information from node
-	 */
 	TableScanDesc scanDesc = node->ss.ss_currentScanDesc;
+	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
 
 	/*
 	 * Cleanup BMS of selected scan attributes
@@ -2304,6 +2324,12 @@ ColumnarScan_EndCustomScan(CustomScanState *node)
 	if (scanDesc != NULL)
 	{
 		table_endscan(scanDesc);
+	}
+
+	/* Unregister snapshot */
+	if (columnarScanState->snapshotRegisteredByUs)
+	{
+		UnregisterSnapshot(columnarScanState->snapshot);
 	}
 }
 
@@ -2381,7 +2407,15 @@ static Size
 Columnar_EstimateDSMCustomScan(CustomScanState *node,
 							   ParallelContext *pcxt)
 {
-	return sizeof(ParallelColumnarScanData);
+	Size nbytes;
+
+	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
+
+	nbytes = offsetof(ParallelColumnarScanData, snapshotData);
+	nbytes = add_size(nbytes, EstimateSnapshotSpace(columnarScanState->snapshot));
+	nbytes = MAXALIGN(nbytes);
+
+	return nbytes;
 }
 
 
@@ -2393,6 +2427,15 @@ Columnar_InitializeDSMCustomScan(CustomScanState *node,
 	ParallelColumnarScan pscan = (ParallelColumnarScan) coordinate;
 	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
 	
+	/* 
+	 * Serialize scan snapshot for workers so they see changes
+	 * if we have flushed stripe / row_mask during this scan.
+	 */
+	SerializeSnapshot(columnarScanState->snapshot, pscan->snapshotData);
+
+	/* Initialize parallel scan mutex */
+	SpinLockInit(&pscan->mutex);
+
 	/* Stripe numbers are starting from index 1 */
 	pg_atomic_init_u64(&pscan->nextStripeId, 1);
 
@@ -2429,6 +2472,7 @@ Columnar_InitializeWorkerCustomScan(CustomScanState *node,
 	ColumnarScanState *columnarScanState = (ColumnarScanState *) node;
 	ParallelColumnarScan pscan = (ParallelColumnarScan) coordinate;
 	columnarScanState->parallelColumnarScan = pscan;
+	columnarScanState->snapshot = RestoreSnapshot(pscan->snapshotData);
 }
 
 

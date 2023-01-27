@@ -1040,7 +1040,8 @@ FindStripeWithMatchingFirstRowNumber(Relation relation, uint64 rowNumber,
 StripeMetadata * 
 FindNextStripeForParallelWorker(Relation relation,
 								Snapshot snapshot,
-								uint32 nextStripeId)
+								uint64 nextStripeId,
+								uint64 * nextHigherStripeId)
 {
 	StripeMetadata *foundStripeMetadata = NULL;
 
@@ -1066,8 +1067,15 @@ FindNextStripeForParallelWorker(Relation relation,
 		if (HeapTupleIsValid(heapTuple))
 		{
 			foundStripeMetadata = BuildStripeMetadata(columnarStripes, heapTuple);
+
 			if (foundStripeMetadata->id == nextStripeId)
 				break;
+
+			if (foundStripeMetadata->id > nextStripeId)
+			{
+				*nextHigherStripeId = foundStripeMetadata->id;
+				break;
+			}
 		}
 		else
 		{

@@ -1,5 +1,7 @@
 -- columnar--11.1-4--11.1-5.sql
 
+#include "udfs/alter_table_set_access_method/11.1-5.sql"
+
 SET search_path TO columnar;
 
 CREATE SEQUENCE row_mask_seq START WITH 1 INCREMENT BY 1; 

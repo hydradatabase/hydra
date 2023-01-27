@@ -75,3 +75,31 @@ DROP TABLE p0;
 
 DROP TABLE parent;
 
+-- delete / update in transaction
+
+CREATE TABLE columnar_transaction_update(i INT, j INT) using columnar;
+
+INSERT INTO columnar_transaction_update VALUES (1, 10);
+INSERT INTO columnar_transaction_update VALUES (2, 20);
+INSERT INTO columnar_transaction_update VALUES (3, 30);
+
+INSERT INTO columnar_transaction_update SELECT g, g * 10 FROM generate_series(4, 100) g;
+INSERT INTO columnar_transaction_update SELECT g, g * 10 FROM generate_series(101, 1000) g;
+INSERT INTO columnar_transaction_update SELECT g, g * 10 FROM generate_series(1001, 20000) g;
+
+SELECT COUNT(*) from columnar_transaction_update;
+
+START TRANSACTION;
+
+DELETE FROM columnar_transaction_update where i % 2 = 0;
+SELECT COUNT(*) from columnar_transaction_update;
+
+UPDATE columnar_transaction_update SET j = -1 WHERE i % 3 = 0;
+SELECT COUNT(*) from columnar_transaction_update WHERE j = -1;
+
+COMMIT;
+
+SELECT COUNT(*) from columnar_transaction_update;
+SELECT COUNT(*) from columnar_transaction_update WHERE j = -1;
+
+DROP TABLE columnar_transaction_update;
