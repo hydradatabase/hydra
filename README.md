@@ -1,17 +1,17 @@
 ![Hydra - the open source data warehouse](.images/header.svg)
 
-[Request Access](https://hydras.io/#early-access) - [Documentation](https://docs.hydras.io/getting-started/readme) - [Demo](https://www.youtube.com/watch?v=DD1oD1LWNOo) - [Website](https://hydras.io/)
+[Get a 14-day Free Trial](https://hydra.so/) - [Documentation](https://docs.hydra.so/getting-started/readme) - [Demo](https://www.youtube.com/watch?v=DD1oD1LWNOo) - [Website](https://hydra.so/)
 
 The open source Snowflake alternative. OLAP Postgres.
 
-[Hydra](https://hydras.io/) is an open source data warehouse built on Postgres. It’s easy to use and designed for OLAP and HTAP workloads. Hydra serves analytical reporting with parallelized query execution and vectorization on columnar storage. Operational work and high-throughput transactions write to standard Postgres heap tables. All Postgres extensions, tools, and connectors work with Hydra.
+[Hydra](https://hydra.so/) is an open source data warehouse built on Postgres. It’s easy to use and designed for OLAP and HTAP workloads. Hydra serves analytical reporting with parallelized query execution and vectorization on columnar storage. Operational work and high-throughput transactions write to standard Postgres heap tables. All Postgres extensions, tools, and connectors work with Hydra.
 
 Eliminate data silos today. Solve hard problems fast.
 
-* [x] 🗃 hosted postgres database - [docs](https://docs.hydras.io/getting-started)
-* [x] 📎 append-only columnar store - [docs](https://docs.hydras.io/concepts/what-is-columnar)
-* [x] 📊 external tables - [docs](https://docs.hydras.io/concepts/using-hydra-external-tables)
-* [x] 📅 postgres scheduler - [docs](https://docs.hydras.io/cloud-warehouse-operations/using-hydra-scheduler)
+* [x] 🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
+* [x] 📎 append-only columnar store - [docs](https://docs.hydra.so/concepts/what-is-columnar)
+* [x] 📊 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
+* [x] 📅 postgres scheduler - [docs](https://docs.hydra.so/cloud-warehouse-operations/using-hydra-scheduler)
 * [x] 🤹‍♀️ query parallelization
 * [x] 🐎 vectorized execution of WHERE clauses
 * [ ] 📝 updates and deletes for columnar store
@@ -36,11 +36,11 @@ psql postgres://postgres:hydra@127.0.0.1:5432
 
 ### Or
 
-Managed in the [cloud](https://hydras.io/#early-access).
+Managed in the [cloud](https://hydra.so/).
 
 ## 📄 Documentation
 
-You can find our documentation [here](https://docs.hydras.io/getting-started/setup-guide).
+You can find our documentation [here](https://docs.hydra.so/getting-started/setup-guide).
 
 ## 👩🏾‍🤝‍👨🏻 Community
 
