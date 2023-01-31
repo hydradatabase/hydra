@@ -292,6 +292,8 @@ extern void ColumnarReadRowByRowNumberOrError(ColumnarReadState *readState,
 extern bool ColumnarReadRowByRowNumber(ColumnarReadState *readState,
 									   uint64 rowNumber, Datum *columnValues,
 									   bool *columnNulls);
+extern bool ColumnaSetStripeReadState(ColumnarReadState *readState,
+									  StripeMetadata *startStripeMetadata);
 
 /* Function declarations for common functions */
 extern FmgrInfo * GetFunctionInfoOrNull(Oid typeId, Oid accessMethodId,
@@ -313,6 +315,7 @@ extern bool IsColumnarTableAmTable(Oid relationId);
 
 /* columnar_metadata_tables.c */
 extern void DeleteMetadataRows(RelFileNode relfilenode);
+extern void DeleteMetadataRowsForStripeId(RelFileNode relfilenode, uint64 stripeId);
 extern uint64 ColumnarMetadataNewStorageId(void);
 extern uint64 GetHighestUsedAddress(RelFileNode relfilenode);
 extern EmptyStripeReservation * ReserveEmptyStripe(Relation rel, uint64 columnCount,
