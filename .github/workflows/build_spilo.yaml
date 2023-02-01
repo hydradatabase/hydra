@@ -55,10 +55,6 @@ jobs:
         push: true
         targets: spilo
         set: |
-          # FIXME: Got "No space left for device": https://github.com/hydradatabase/hydra-internal/actions/runs/4056431074/jobs/6989478868#step:7:56395
-          # Turn it on after figuring it out
-          # *.cache-from=type=gha
-          # *.cache-to=type=gha,mode=max
           *.platform=linux/amd64,linux/arm64
           spilo.tags=${{ inputs.spilo_repo }}:${{ inputs.production && github.sha || format('dev-{0}', github.sha) }}
           ${{ inputs.production && format('spilo.tags={0}:latest', inputs.spilo_repo) || '' }}
