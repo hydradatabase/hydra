@@ -52,6 +52,7 @@ typedef struct ChunkGroupReadState
 	List *projectedColumnList;  /* borrowed reference */
 	ChunkData *chunkGroupData;
 	bytea *rowMask;
+	bool rowMaskCached; /* If rowMask metadata is cached and borrowed */
 	uint32 chunkStripeRowOffset; 
 } ChunkGroupReadState;
 
@@ -109,12 +110,12 @@ static MemoryContext CreateStripeReadMemoryContext(void);
 static bool ColumnarReadIsCurrentStripe(ColumnarReadState *readState,
 										uint64 rowNumber);
 static StripeMetadata * ColumnarReadGetCurrentStripe(ColumnarReadState *readState);
-static void ReadStripeRowByRowNumber(ColumnarReadState *readState,
+static bool ReadStripeRowByRowNumber(ColumnarReadState *readState,
 									 uint64 rowNumber, Datum *columnValues,
 									 bool *columnNulls);
 static bool StripeReadIsCurrentChunkGroup(StripeReadState *stripeReadState,
 										  int chunkGroupIndex);
-static void ReadChunkGroupRowByRowOffset(ChunkGroupReadState *chunkGroupReadState,
+static bool ReadChunkGroupRowByRowOffset(ChunkGroupReadState *chunkGroupReadState,
 										 StripeMetadata *stripeMetadata,
 										 uint64 stripeRowOffset, Datum *columnValues,
 										 bool *columnNulls);
@@ -438,9 +439,7 @@ ColumnarReadRowByRowNumber(ColumnarReadState *readState,
 		readState->currentStripeMetadata = stripeMetadata;
 	}
 
-	ReadStripeRowByRowNumber(readState, rowNumber, columnValues, columnNulls);
-
-	return true;
+	return ReadStripeRowByRowNumber(readState, rowNumber, columnValues, columnNulls);
 }
 
 
@@ -483,7 +482,7 @@ ColumnarReadGetCurrentStripe(ColumnarReadState *readState)
  * stripeReadState into columnValues and columnNulls.
  * Errors out if no such row exists in the stripe being read.
  */
-static void
+static bool
 ReadStripeRowByRowNumber(ColumnarReadState *readState,
 						 uint64 rowNumber, Datum *columnValues,
 						 bool *columnNulls)
@@ -514,11 +513,43 @@ ReadStripeRowByRowNumber(ColumnarReadState *readState,
 			stripeReadState->tupleDescriptor,
 			stripeReadState->projectedColumnList,
 			stripeReadState->stripeReadContext);
+
+		uint64 chunkFirstRowNumber = 
+			stripeMetadata->firstRowNumber +
+			stripeReadState->chunkGroupReadState->chunkStripeRowOffset;
+
+		if (columnar_enable_dml)
+		{
+
+			RowMaskWriteStateEntry *rowMaskEntry = 
+				RowMaskFindWriteState(stripeReadState->relation->rd_node.relNode,
+									  GetCurrentSubTransactionId(), rowNumber);
+
+			if (rowMaskEntry != NULL)
+			{
+				stripeReadState->chunkGroupReadState->rowMask = rowMaskEntry->mask;
+				stripeReadState->chunkGroupReadState->rowMaskCached = true;
+			}
+			else
+			{
+				stripeReadState->chunkGroupReadState->rowMask =
+					ReadChunkRowMask(stripeReadState->relation->rd_node,
+										readState->snapshot,
+										stripeReadState->stripeReadContext,
+										chunkFirstRowNumber,
+										stripeReadState->chunkGroupReadState->rowCount);
+				stripeReadState->chunkGroupReadState->rowMaskCached = false;
+			}
+		}
+		else
+		{
+			stripeReadState->chunkGroupReadState->rowMask = NULL;
+		}
 	}
 
-	ReadChunkGroupRowByRowOffset(stripeReadState->chunkGroupReadState,
-								 stripeMetadata, stripeRowOffset,
-								 columnValues, columnNulls);
+	return ReadChunkGroupRowByRowOffset(stripeReadState->chunkGroupReadState,
+										stripeMetadata, stripeRowOffset,
+										columnValues, columnNulls);
 }
 
 
@@ -543,7 +574,7 @@ StripeReadIsCurrentChunkGroup(StripeReadState *stripeReadState, int chunkGroupIn
  * chunkGroupReadState into columnValues and columnNulls.
  * Errors out if no such row exists in the chunk group being read.
  */
-static void
+static bool
 ReadChunkGroupRowByRowOffset(ChunkGroupReadState *chunkGroupReadState,
 							 StripeMetadata *stripeMetadata,
 							 uint64 stripeRowOffset, Datum *columnValues,
@@ -552,13 +583,10 @@ ReadChunkGroupRowByRowOffset(ChunkGroupReadState *chunkGroupReadState,
 	/* set the exact row number to be read from given chunk roup */
 	chunkGroupReadState->currentRow = stripeRowOffset %
 									  stripeMetadata->chunkGroupRowCount;
-	int dummyDeletedColumnNumber = 0;
-	if (!ReadChunkGroupNextRow(chunkGroupReadState, columnValues, columnNulls, 
-							   &dummyDeletedColumnNumber))
-	{
-		/* not expected but be on the safe side */
-		ereport(ERROR, (errmsg("could not find the row in stripe")));
-	}
+	int isDeleted = 0;
+	ReadChunkGroupNextRow(chunkGroupReadState, columnValues, columnNulls,
+						  &isDeleted);
+	return !isDeleted;
 }
 
 
@@ -850,6 +878,7 @@ ReadStripeNextRow(StripeReadState *stripeReadState, Datum *columnValues,
 									 stripeReadState->stripeReadContext,
 									 chunkFirstRowNumber,
 									 stripeReadState->chunkGroupReadState->rowCount);
+				stripeReadState->chunkGroupReadState->rowMaskCached = false;
 			}
 			else
 			{
@@ -927,7 +956,7 @@ EndChunkGroupRead(ChunkGroupReadState *chunkGroupReadState)
 {
 	FreeChunkBufferValueArray(chunkGroupReadState->chunkGroupData);
 	FreeChunkData(chunkGroupReadState->chunkGroupData);
-	if (chunkGroupReadState->rowMask)
+	if (chunkGroupReadState->rowMask != NULL && !chunkGroupReadState->rowMaskCached)
 		pfree(chunkGroupReadState->rowMask);
 	chunkGroupReadState->rowMask = NULL;
 	pfree(chunkGroupReadState);

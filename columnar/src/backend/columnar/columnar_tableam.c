@@ -932,6 +932,8 @@ columnar_tuple_update(Relation relation, ItemPointer otid, TupleTableSlot *slot,
 
 	columnar_tuple_insert(relation, slot, cid, 0, NULL);
 
+	*update_indexes = true;
+
 	return TM_Ok;
 }
 

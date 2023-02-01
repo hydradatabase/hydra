@@ -172,8 +172,8 @@ InitRowMaskEntry(uint64 storageId, bytea *mask)
 	RowMaskWriteStateEntry *rowMask = palloc0(sizeof(RowMaskWriteStateEntry));
 
 	rowMask->storageId = storageId;
-	rowMask->mask = (bytea *)palloc0(VARSIZE(mask));
-	memcpy(rowMask->mask, mask, VARSIZE(mask));
+	rowMask->mask = (bytea *)palloc0(VARSIZE(mask) + VARHDRSZ);
+	memcpy(rowMask->mask, mask, VARSIZE(mask) + VARHDRSZ);
 	// rest of structure members needs be populated where RowMaskState was created
 
 	return rowMask;
