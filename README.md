@@ -14,7 +14,8 @@ Eliminate data silos today. Solve hard problems fast.
 * [x] 📅 postgres scheduler - [docs](https://docs.hydra.so/cloud-warehouse-operations/using-hydra-scheduler)
 * [x] 🤹‍♀️ query parallelization
 * [x] 🐎 vectorized execution of WHERE clauses
-* [ ] 📝 updates and deletes for columnar store
+* [x] 📝 updates and deletes for columnar store
+* [ ] 🧹 vacuum stripe optimizations and space reclamation
 * [ ] 🏎️ vectorized execution of aggegate functions
 * [ ] 🚅 use of SIMD in vectorized execution
 * [ ] ↔️ separation of compute and storage
