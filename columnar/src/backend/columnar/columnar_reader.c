@@ -1995,6 +1995,7 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 	memset(columnNulls, true, sizeof(bool) * chunkGroupReadState->columnCount);
 
 	int i;
+	int rowNumberIndex = 0;
 
 	for (i = 0; i < chunkGroupReadState->rowCount; i ++)
 	{
@@ -2013,7 +2014,6 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 			{
 				(*chunkReadRows)++;
 				chunkGroupReadState->currentRow++;
-				rowNumber[i] = stripeFirstRowNumber + chunkGroupReadState->currentRow - 1;
 				continue;
 			}
 		}
@@ -2048,7 +2048,7 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 
 		(*chunkReadRows)++;
 		chunkGroupReadState->currentRow++;
-		rowNumber[i] = stripeFirstRowNumber + chunkGroupReadState->currentRow - 1;
+		rowNumber[rowNumberIndex++] = stripeFirstRowNumber + chunkGroupReadState->currentRow - 1;
 	}
 
 	return true;

@@ -972,6 +972,8 @@ void FlushRowMaskCache(RowMaskWriteStateEntry *rowMaskEntry)
 
 	systable_endscan_ordered(scanDescriptor);
 	table_close(columnarChunkGroupMask, AccessShareLock);
+
+	CommandCounterIncrement();
 }
 
 
