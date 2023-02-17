@@ -25,12 +25,6 @@ RUN set -eux; \
 	; \
     rm -rf /var/lib/apt/lists/*
 
-# columnar ext
-COPY --from=columnar_13 /pg_ext /
-COPY --from=columnar_14 /pg_ext /
-COPY files/spilo/postgres-appliance/scripts /scripts/
-COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
-
 # mysql ext
 COPY --from=mysql_13 /pg_ext /
 COPY --from=mysql_14 /pg_ext /
@@ -53,6 +47,14 @@ RUN set -eux; \
     rm -f /tmp/install
 COPY --from=s3_14 /lib/* /s3_lib/
 RUN cp -r /s3_lib/* /usr/lib/$(uname -m)-linux-gnu/
+
+# columnar ext
+COPY --from=columnar_13 /pg_ext /
+COPY --from=columnar_14 /pg_ext /
+
+# configuration
+COPY files/spilo/postgres-appliance/scripts /scripts/
+COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
 
 ARG POSTGRES_BASE_VERSION
 # Default envs

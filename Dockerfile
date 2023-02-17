@@ -21,9 +21,6 @@ RUN set -eux; \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
-# columnar ext
-COPY --from=columnar /pg_ext /
-
 # mysql ext
 COPY --from=mysql /pg_ext /
 
@@ -42,5 +39,8 @@ RUN set -eux; \
     rm -f /tmp/install
 COPY --from=s3 /lib/* /s3_lib/
 RUN cp -r /s3_lib/* /usr/lib/$(uname -m)-linux-gnu/
+
+# columnar ext
+COPY --from=columnar /pg_ext /
 
 COPY files/postgres/docker-entrypoint-initdb.d /docker-entrypoint-initdb.d/
