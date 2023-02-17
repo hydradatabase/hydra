@@ -29,6 +29,7 @@ RUN set -eux; \
 COPY --from=columnar_13 /pg_ext /
 COPY --from=columnar_14 /pg_ext /
 COPY files/spilo/postgres-appliance/scripts /scripts/
+COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
 
 # mysql ext
 COPY --from=mysql_13 /pg_ext /
