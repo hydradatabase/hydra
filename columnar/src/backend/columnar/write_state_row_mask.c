@@ -187,6 +187,8 @@ RowMaskFlushPendingWriteState(List *rowMaskWriteStateList)
 	{
 		RowMaskWriteStateEntry *rowMaskCache = (RowMaskWriteStateEntry *)lfirst(lc);
 		FlushRowMaskCache(rowMaskCache);
+		UpdateChunkGroupDeletedRows(rowMaskCache->storageId, rowMaskCache->stripeId,
+									rowMaskCache->chunkId, rowMaskCache->deletedRows);
 		pfree(rowMaskCache->mask);
 	}
 }

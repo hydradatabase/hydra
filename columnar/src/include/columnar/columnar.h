@@ -113,6 +113,7 @@ typedef struct StripeSkipList
 	ColumnChunkSkipNode **chunkSkipNodeArray;
 	uint32 *chunkGroupRowCounts;
 	uint32 *chunkGroupRowOffset;
+	uint32 *chunkGroupDeletedRows;
 	uint32 columnCount;
 	uint32 chunkCount;
 } StripeSkipList;
@@ -177,6 +178,7 @@ typedef struct StripeBuffers
 
 	uint32 *selectedChunkGroupRowCounts;
 	uint32 *selectedChunkGroupRowOffset;
+	uint32 *selectedChunkGroupDeletedRows;
 } StripeBuffers;
 
 
@@ -324,6 +326,8 @@ extern void SaveStripeSkipList(RelFileNode relfilenode, uint64 stripe,
 							   TupleDesc tupleDescriptor);
 extern void SaveChunkGroups(RelFileNode relfilenode, uint64 stripe,
 							List *chunkGroupRowCounts);
+extern void UpdateChunkGroupDeletedRows(uint64 storageId, uint64 stripe,
+										uint32 chunkGroupId, uint32 deletedRowNumber);
 extern StripeSkipList * ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe,
 										   TupleDesc tupleDescriptor,
 										   uint32 chunkCount,
@@ -344,8 +348,8 @@ extern uint64 StripeGetHighestRowNumber(StripeMetadata *stripeMetadata);
 extern StripeMetadata * FindStripeWithHighestRowNumber(Relation relation,
 													   Snapshot snapshot);
 extern Datum columnar_relation_storageid(PG_FUNCTION_ARGS);
-extern bool SaveEmptyRowMask(uint64 storageId, uint64 stripeStartRowNumber,
-							 List *chunkGroupRowCounts);
+extern bool SaveEmptyRowMask(uint64 storageId, uint64 stripeId,
+							 uint64 stripeStartRowNumber, List *chunkGroupRowCounts);
 extern bool UpdateRowMask(RelFileNode relfilenode, uint64 storageId,
 						  Snapshot snapshot, uint64 rowNumber);
 extern void FlushRowMaskCache(RowMaskWriteStateEntry *rowMaskEntry);

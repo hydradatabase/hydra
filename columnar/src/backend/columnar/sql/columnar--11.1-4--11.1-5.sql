@@ -9,14 +9,22 @@ CREATE SEQUENCE row_mask_seq START WITH 1 INCREMENT BY 1;
 CREATE TABLE row_mask (
 	id BIGINT NOT NULL,
 	storage_id BIGINT NOT NULL,
+	stripe_id BIGINT NOT NULL,
+	chunk_id INT NOT NULL,
 	start_row_number BIGINT NOT NULL,
 	end_row_number BIGINT NOT NULL,
+	deleted_rows INT NOT NULL,
 	mask BYTEA,
 	PRIMARY KEY (id, storage_id, start_row_number, end_row_number)
 ) WITH (user_catalog_table = true);
 
+ALTER TABLE columnar.chunk_group ADD COLUMN deleted_rows BIGINT NOT NULL DEFAULT 0;
+
 ALTER TABLE columnar.row_mask ADD CONSTRAINT row_mask_stripe_unique
-UNIQUE (storage_id, start_row_number);
+UNIQUE (storage_id, stripe_id, start_row_number);
+
+ALTER TABLE columnar.row_mask ADD CONSTRAINT row_mask_chunk_unique
+UNIQUE (storage_id, stripe_id, chunk_id, start_row_number);
 
 REVOKE SELECT ON columnar.row_mask FROM PUBLIC;
 

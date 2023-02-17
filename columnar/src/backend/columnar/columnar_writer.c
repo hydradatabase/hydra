@@ -493,6 +493,7 @@ FlushStripe(ColumnarWriteState *writeState)
 					   stripeMetadata->id,
 					   stripeSkipList, tupleDescriptor);
 	SaveEmptyRowMask(LookupStorageId(writeState->relfilenode),
+					 stripeMetadata->id,
 					 stripeMetadata->firstRowNumber,
 					 writeState->chunkGroupRowCounts);
 

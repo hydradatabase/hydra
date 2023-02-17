@@ -54,6 +54,7 @@ typedef struct ChunkGroupReadState
 	bytea *rowMask;
 	bool rowMaskCached; /* If rowMask metadata is cached and borrowed */
 	uint32 chunkStripeRowOffset; 
+	uint32 chunkGroupDeletedRows;
 } ChunkGroupReadState;
 
 typedef struct StripeReadState
@@ -520,7 +521,6 @@ ReadStripeRowByRowNumber(ColumnarReadState *readState,
 
 		if (columnar_enable_dml)
 		{
-
 			RowMaskWriteStateEntry *rowMaskEntry = 
 				RowMaskFindWriteState(stripeReadState->relation->rd_node.relNode,
 									  GetCurrentSubTransactionId(), rowNumber);
@@ -530,7 +530,7 @@ ReadStripeRowByRowNumber(ColumnarReadState *readState,
 				stripeReadState->chunkGroupReadState->rowMask = rowMaskEntry->mask;
 				stripeReadState->chunkGroupReadState->rowMaskCached = true;
 			}
-			else
+			else if (stripeReadState->chunkGroupReadState->chunkGroupDeletedRows > 0)
 			{
 				stripeReadState->chunkGroupReadState->rowMask =
 					ReadChunkRowMask(stripeReadState->relation->rd_node,
@@ -866,7 +866,8 @@ ReadStripeNextRow(StripeReadState *stripeReadState, Datum *columnValues,
 				stripeReadState->
 				stripeReadContext);
 			
-			if (columnar_enable_dml)
+			if (columnar_enable_dml &&
+				stripeReadState->chunkGroupReadState->chunkGroupDeletedRows != 0)
 			{
 				uint64 chunkFirstRowNumber = 
 					stripeFirstRowNumber + 
@@ -927,6 +928,8 @@ BeginChunkGroupRead(StripeBuffers *stripeBuffers, int chunkIndex, TupleDesc tupl
 		stripeBuffers->selectedChunkGroupRowCounts[chunkIndex];
 	uint32 chunkGroupRowOffset =
 		stripeBuffers->selectedChunkGroupRowOffset[chunkIndex];
+	uint32 chunkGroupDeletedRows =
+		stripeBuffers->selectedChunkGroupDeletedRows[chunkIndex];
 
 	MemoryContext oldContext = MemoryContextSwitchTo(cxt);
 
@@ -935,6 +938,7 @@ BeginChunkGroupRead(StripeBuffers *stripeBuffers, int chunkIndex, TupleDesc tupl
 	chunkGroupReadState->currentRow = 0;
 	chunkGroupReadState->rowCount = chunkGroupRowCount;
 	chunkGroupReadState->chunkStripeRowOffset = chunkGroupRowOffset;
+	chunkGroupReadState->chunkGroupDeletedRows = chunkGroupDeletedRows;
 	chunkGroupReadState->columnCount = tupleDesc->natts;
 	chunkGroupReadState->projectedColumnList = projectedColumnList;
 
@@ -1198,6 +1202,8 @@ LoadFilteredStripeBuffers(Relation relation, StripeMetadata *stripeMetadata,
 		selectedChunkSkipList->chunkGroupRowCounts;
 	stripeBuffers->selectedChunkGroupRowOffset =
 		selectedChunkSkipList->chunkGroupRowOffset;
+	stripeBuffers->selectedChunkGroupDeletedRows =
+		selectedChunkSkipList->chunkGroupDeletedRows;
 	
 
 	return stripeBuffers;
@@ -1582,6 +1588,7 @@ SelectedChunkSkipList(StripeSkipList *stripeSkipList, bool *projectedColumnMask,
 	selectedChunkIndex = 0;
 	uint32 *chunkGroupRowCounts = palloc0(selectedChunkCount * sizeof(uint32));
 	uint32 *chunkGroupRowOffset = palloc0(selectedChunkCount * sizeof(uint32));
+	uint32 *chunkGroupDeletedRows = palloc(selectedChunkCount * sizeof(uint32));
 
 	for (chunkIndex = 0; chunkIndex < stripeSkipList->chunkCount; chunkIndex++)
 	{
@@ -1591,6 +1598,8 @@ SelectedChunkSkipList(StripeSkipList *stripeSkipList, bool *projectedColumnMask,
 				stripeSkipList->chunkGroupRowCounts[chunkIndex];
 			chunkGroupRowOffset[selectedChunkIndex] =
 				stripeSkipList->chunkGroupRowOffset[chunkIndex];
+			chunkGroupDeletedRows[selectedChunkIndex] =
+				stripeSkipList->chunkGroupDeletedRows[chunkIndex];
 			selectedChunkIndex++;
 		}
 	}
@@ -1601,6 +1610,7 @@ SelectedChunkSkipList(StripeSkipList *stripeSkipList, bool *projectedColumnMask,
 	selectedChunkSkipList->columnCount = stripeSkipList->columnCount;
 	selectedChunkSkipList->chunkGroupRowCounts = chunkGroupRowCounts;
 	selectedChunkSkipList->chunkGroupRowOffset = chunkGroupRowOffset;
+	selectedChunkSkipList->chunkGroupDeletedRows = chunkGroupDeletedRows;
 
 	return selectedChunkSkipList;
 }
@@ -1929,7 +1939,8 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 			chunkFirstRowNumber = stripeFirstRowNumber +
 								  stripeReadState->chunkGroupReadState->chunkStripeRowOffset;
 
-			if (columnar_enable_dml)
+			if (columnar_enable_dml &&
+				stripeReadState->chunkGroupReadState->chunkGroupDeletedRows != 0)
 			{
 				stripeReadState->chunkGroupReadState->rowMask =
 					ReadChunkRowMask(stripeReadState->relation->rd_node,
