@@ -217,7 +217,7 @@ jobs:
   push_spilo:
     needs: [build_validate_spilo]
     if: github.repository == 'hydradatabase/hydra-internal' && github.ref == 'refs/heads/main'
-    uses: hydradatabase/hydra-internal/.github/workflows/build_spilo.yaml@main
+    uses: ./.github/workflows/build_spilo.yaml
     with:
       production: true
       spilo_repo: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo # env vars can't be used here
