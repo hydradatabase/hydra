@@ -815,6 +815,8 @@ columnar_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
 
 	MemoryContextSwitchTo(oldContext);
 	MemoryContextReset(ColumnarWritePerTupleContext(writeState));
+
+	pgstat_count_heap_insert(relation, 1);
 }
 
 
@@ -866,6 +868,8 @@ columnar_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 	}
 
 	MemoryContextSwitchTo(oldContext);
+
+	pgstat_count_heap_insert(relation, ntuples);
 }
 
 
@@ -882,10 +886,12 @@ columnar_tuple_delete(Relation relation, ItemPointer tid, CommandId cid,
 	DirectFunctionCall1(pg_advisory_xact_lock_int8,
 						Int64GetDatum((int64) storageId));
 
-	if (UpdateRowMask(relation->rd_node, storageId,  snapshot, rowNumber))
-		return TM_Ok;
+	if (!UpdateRowMask(relation->rd_node, storageId,  snapshot, rowNumber))
+		return TM_Deleted;
 
-	return TM_Deleted;
+	pgstat_count_heap_delete(relation);
+
+	return TM_Ok;
 }
 
 
@@ -909,6 +915,8 @@ columnar_tuple_update(Relation relation, ItemPointer otid, TupleTableSlot *slot,
 	columnar_tuple_insert(relation, slot, cid, 0, NULL);
 
 	*update_indexes = true;
+
+	pgstat_count_heap_update(relation, false);
 
 	return TM_Ok;
 }
