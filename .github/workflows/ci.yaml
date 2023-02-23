@@ -20,6 +20,7 @@ jobs:
       with:
         go-version-file: acceptance/go.mod
         cache-dependency-path: acceptance/go.sum
+        check-latest: true
         cache: true
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3

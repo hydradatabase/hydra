@@ -43,7 +43,7 @@ func CreatePGPool(t *testing.T, ctx context.Context, username, password string, 
 	}
 
 	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrPgPoolConnect, err)
+		return nil, fmt.Errorf("%w: %w", ErrPgPoolConnect, err)
 	}
 
 	t.Cleanup(func() {
