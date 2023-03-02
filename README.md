@@ -1,6 +1,6 @@
-![Hydra - the open source data warehouse](.images/header.svg)
+![Hydra - the open source data warehouse](.images/header.png)
 
-[Get a 14-day Free Trial](https://hydra.so/) - [Documentation](https://docs.hydra.so/getting-started/readme) - [Demo](https://www.youtube.com/watch?v=DD1oD1LWNOo) - [Website](https://hydra.so/)
+[Get a 14-day Free Trial](https://hydra.so/) - [Documentation](https://docs.hydra.so/) - [Demo](https://www.youtube.com/watch?v=DD1oD1LWNOo) - [Website](https://hydra.so/)
 
 The open source Snowflake alternative. OLAP Postgres.
 
