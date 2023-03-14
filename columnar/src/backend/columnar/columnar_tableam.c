@@ -970,7 +970,11 @@ columnar_relation_set_new_filenode(Relation rel,
 
 	*freezeXid = RecentXmin;
 	*minmulti = GetOldestMultiXactId();
+#if PG_VERSION_NUM >= PG_VERSION_15
+	SMgrRelation srel = RelationCreateStorage(*newrnode, persistence, true);
+#else
 	SMgrRelation srel = RelationCreateStorage(*newrnode, persistence);
+#endif
 
 	ColumnarStorageInit(srel, ColumnarMetadataNewStorageId());
 	InitColumnarOptions(rel->rd_id);
@@ -1001,7 +1005,12 @@ columnar_relation_nontransactional_truncate(Relation rel)
 	RelationTruncate(rel, 0);
 
 	uint64 storageId = ColumnarMetadataNewStorageId();
-	RelationOpenSmgr(rel);
+
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	ColumnarStorageInit(rel->rd_smgr, storageId);
 }
 
@@ -1381,7 +1390,11 @@ LogRelationStats(Relation rel, int elevel)
 		totalStripeLength += stripe->dataLength;
 	}
 
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	uint64 relPages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	RelationCloseSmgr(rel);
 
@@ -1483,8 +1496,18 @@ TruncateColumnar(Relation rel, int elevel)
 	 * stituation where we need to truncate storage at the end.
 	 */
 	if (!stripesTruncated)
-	{
+	uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
+									ColumnarFirstLogicalOffset);
 
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
+	BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+
+	if (!ColumnarStorageTruncate(rel, newDataReservation))
+	{
 		/*
 		* Due to the AccessExclusive lock there's no danger that
 		* new stripes be added beyond highestPhysicalAddress while
@@ -1511,6 +1534,8 @@ TruncateColumnar(Relation rel, int elevel)
 				old_rel_pages, new_rel_pages),
 			errdetail_internal("%s", pg_rusage_show(&ru0))));
 	}
+
+	BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 	/*
 	 * We can release the exclusive lock as soon as we have truncated.
@@ -2033,8 +2058,10 @@ columnar_relation_size(Relation rel, ForkNumber forkNumber)
 {
 	uint64 nblocks = 0;
 
-	/* Open it at the smgr level if not already done */
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
 
 	/* InvalidForkNumber indicates returning the size for all forks */
 	if (forkNumber == InvalidForkNumber)
@@ -2065,7 +2092,11 @@ columnar_estimate_rel_size(Relation rel, int32 *attr_widths,
 						   BlockNumber *pages, double *tuples,
 						   double *allvisfrac)
 {
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	*pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	*tuples = ColumnarTableRowCount(rel);
 
@@ -2538,18 +2569,31 @@ detoast_values(TupleDesc tupleDesc, Datum *orig_values, bool *isnull)
 static void
 ColumnarCheckLogicalReplication(Relation rel)
 {
+	bool pubActionInsert = false;
+
 	if (!is_publishable_relation(rel))
 	{
 		return;
 	}
 
+#if PG_VERSION_NUM >= PG_VERSION_15
+	{
+		PublicationDesc pubdesc;
+
+		RelationBuildPublicationDesc(rel, &pubdesc);
+		pubActionInsert = pubdesc.pubactions.pubinsert;
+	}
+#else
 	if (rel->rd_pubactions == NULL)
 	{
 		GetRelationPublicationActions(rel);
 		Assert(rel->rd_pubactions != NULL);
 	}
 
-	if (rel->rd_pubactions->pubinsert)
+	pubActionInsert = rel->rd_pubactions->pubinsert;
+#endif
+
+	if (pubActionInsert)
 	{
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg(

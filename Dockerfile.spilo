@@ -28,6 +28,7 @@ RUN set -eux; \
 # mysql ext
 COPY --from=mysql_13 /pg_ext /
 COPY --from=mysql_14 /pg_ext /
+COPY --from=mysql_15 /pg_ext /
 
 # http ext
 #COPY --from=http_13 /pg_ext /
@@ -36,11 +37,14 @@ COPY --from=mysql_14 /pg_ext /
 # multicorn ext
 COPY --from=multicorn_13 /pg_ext /
 COPY --from=multicorn_14 /pg_ext /
+COPY --from=multicorn_15 /pg_ext /
 COPY --from=multicorn_14 /python-dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
+COPY --from=multicorn_15 /python-dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
 
 # s3 ext
 COPY --from=s3_13 /pg_ext /
 COPY --from=s3_14 /pg_ext /
+COPY --from=s3_15 /pg_ext /
 COPY third-party/s3/scripts /tmp
 RUN set -eux; \
     /tmp/install-arrow; \
@@ -55,6 +59,7 @@ COPY --from=ivm_14 /pg_ivm /
 # columnar ext
 COPY --from=columnar_13 /pg_ext /
 COPY --from=columnar_14 /pg_ext /
+COPY --from=columnar_15 /pg_ext /
 
 # configuration
 COPY files/spilo/postgres-appliance/scripts /scripts/
