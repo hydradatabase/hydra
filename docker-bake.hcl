@@ -73,16 +73,22 @@ target "spilo" {
     spilo_base = "target:spilo_base"
     columnar_13 = "target:columnar_13"
     columnar_14 = "target:columnar_14"
+    columnar_15 = "target:columnar_15"
     http_13 = "target:http_13"
     http_14 = "target:http_14"
+    http_15 = "target:http_15"
     mysql_13 = "target:mysql_13"
     mysql_14 = "target:mysql_14"
+    mysql_15 = "target:mysql_15"
     multicorn_13 = "target:multicorn_13"
     multicorn_14 = "target:multicorn_14"
+    multicorn_15 = "target:multicorn_15"
     s3_13 = "target:s3_spilo_13"
     s3_14 = "target:s3_spilo_14"
+    s3_15 = "target:s3_spilo_15"
     ivm_13 = "target:ivm_13"
     ivm_14 = "target:ivm_14"
+    ivm_15 = "target:ivm_15"
   }
 
   args = {
@@ -146,6 +152,17 @@ target "http_14" {
   cache-from = ["type=local,src=tmp/bake_cache/http_14"]
 }
 
+target "http_15" {
+  inherits = ["http"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/http_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/http_15"]
+}
+
 target "s3" {
   inherits = ["shared"]
   context = "third-party/s3"
@@ -171,6 +188,21 @@ target "s3_13" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/s3_13"]
   cache-from = ["type=local,src=tmp/bake_cache/s3_13"]
+}
+
+target "s3_15" {
+  inherits = ["s3"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:15"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/s3_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/s3_15"]
 }
 
 target "s3_14" {
@@ -218,6 +250,21 @@ target "s3_spilo_14" {
   cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_14"]
 }
 
+target "s3_spilo_15" {
+  inherits = ["s3"]
+
+  contexts = {
+    postgres_base = "target:spilo_base"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/s3_spilo_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_15"]
+}
+
 target "mysql" {
   inherits = ["shared"]
   context = "third-party/mysql"
@@ -256,6 +303,21 @@ target "mysql_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/mysql_14"]
   cache-from = ["type=local,src=tmp/bake_cache/mysql_14"]
+}
+
+target "mysql_15" {
+  inherits = ["mysql"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:15"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/mysql_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/mysql_15"]
 }
 
 target "multicorn" {
@@ -301,6 +363,21 @@ target "multicorn_14" {
   cache-from = ["type=local,src=tmp/bake_cache/multicorn_14"]
 }
 
+target "multicorn_15" {
+  inherits = ["multicorn"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:15"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/multicorn_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/multicorn_15"]
+}
+
 target "columnar" {
   inherits = ["shared"]
   context = "columnar"
@@ -327,6 +404,17 @@ target "columnar_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/columnar_14"]
   cache-from = ["type=local,src=tmp/bake_cache/columnar_14"]
+}
+
+target "columnar_15" {
+  inherits = ["columnar"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/columnar_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/columnar_15"]
 }
 
 target "ivm" {
@@ -367,4 +455,19 @@ target "ivm_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/ivm_14"]
   cache-from = ["type=local,src=tmp/bake_cache/ivm_14"]
+}
+
+target "ivm_15" {
+  inherits = ["ivm"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:15"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/ivm_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/ivm_15"]
 }
