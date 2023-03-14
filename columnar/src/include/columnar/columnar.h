@@ -374,6 +374,7 @@ extern bool PendingWritesInUpperTransactions(Oid relfilenode,
 /* write_state_management.c */
 extern ColumnarWriteState * columnar_init_write_state(Relation relation, TupleDesc
 													  tupdesc,
+														Oid tupSlotRelationId,
 													  SubTransactionId currentSubXid);
 extern void ColumnarPopWriteStateForAllRels(SubTransactionId currentSubXid,
 											SubTransactionId parentSubXid,
