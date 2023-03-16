@@ -16,7 +16,7 @@ Eliminate data silos today. Solve hard problems fast.
 * [x] 🐎 vectorized execution of WHERE clauses
 * [x] 📝 updates and deletes for columnar store
 * [ ] 🧹 vacuum stripe optimizations and space reclamation
-* [ ] 🏎️ vectorized execution of aggegate functions
+* [ ] 🏎️ vectorized execution of aggregate functions
 * [ ] 🚅 use of SIMD in vectorized execution
 * [ ] ↔️ separation of compute and storage
 
