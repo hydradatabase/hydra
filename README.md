@@ -9,12 +9,12 @@ The open source Snowflake alternative. OLAP Postgres.
 Eliminate data silos today. Solve hard problems fast.
 
 * [x] 🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
-* [x] 📎 append-only columnar store - [docs](https://docs.hydra.so/concepts/what-is-columnar)
+* [x] 📎 columnar store - [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
 * [x] 📊 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
 * [x] 📅 postgres scheduler - [docs](https://docs.hydra.so/cloud-warehouse-operations/using-hydra-scheduler)
 * [x] 🤹‍♀️ query parallelization
 * [x] 🐎 vectorized execution of WHERE clauses
-* [x] 📝 updates and deletes for columnar store
+* [x] 📝 updates and deletes for columnar store - [docs](https://docs.hydra.so/concepts/updates-and-deletes)
 * [ ] 🧹 vacuum stripe optimizations and space reclamation
 * [ ] 🏎️ vectorized execution of aggregate functions
 * [ ] 🚅 use of SIMD in vectorized execution
