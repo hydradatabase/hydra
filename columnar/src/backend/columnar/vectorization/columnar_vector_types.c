@@ -65,9 +65,16 @@ CreateVectorTupleTableSlot(TupleDesc tupleDesc)
 		int16 vectorColumnTypeLen = 
 			columnTypeLen == -1 ?  sizeof(Datum) : get_typlen(columnTypeOid);
 
+		/* 
+		 * We consider that type is passed by val also for cases where we have 
+		 * typlen == -1. This is because we use pointer to VARLEN type and don't
+		 * construct our own object.
+		*/
+		bool vectorColumnIsVal = vectorColumnTypeLen <= sizeof(Datum);
+
 		vectorColumn = BuildVectorColumn(COLUMNAR_VECTOR_COLUMN_SIZE,
 										 vectorColumnTypeLen,
-										 columnTypeLen == -1,
+										 vectorColumnIsVal,
 										 vectorTTS->rowNumber);
 
 		vectorTTS->tts.tts_values[i] = PointerGetDatum(vectorColumn);
@@ -89,7 +96,7 @@ extractTupleFromVectorSlot(TupleTableSlot *out, VectorTupleTableSlot *vectorSlot
 
 		int8 *rawColumRawData = (int8*) column->value + column->columnTypeLen * index;
 
-		out->tts_values[bmsMember] = fetch_att(rawColumRawData, true, column->columnTypeLen);
+		out->tts_values[bmsMember] = fetch_att(rawColumRawData, column->columnIsVal, column->columnTypeLen);
 		out->tts_isnull[bmsMember] = column->isnull[index];
 	}
 

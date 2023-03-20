@@ -278,3 +278,35 @@ SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
 (1 row)
 
 DROP TABLE t;
+--
+-- [columnar] WHERE on INTEGER column not working when SELECT includes certain custom types
+--
+CREATE TABLE t(a INT, b point, c TEXT) USING columnar;
+INSERT INTO t SELECT g, point(1, g), 'abc_' || g FROM generate_series(0,100) AS g;
+EXPLAIN (analyze off, costs off, timing off, summary off)
+SELECT * FROM t WHERE a >= 90;
+                QUERY PLAN                 
+-------------------------------------------
+ Custom Scan (ColumnarScan) on t
+   Columnar Projected Columns: a, b, c
+   Columnar Chunk Group Filters: (a >= 90)
+   Columnar Vectorized Filter: (a >= 90)
+(4 rows)
+
+SELECT * FROM t WHERE a >= 90;
+  a  |    b    |    c    
+-----+---------+---------
+  90 | (1,90)  | abc_90
+  91 | (1,91)  | abc_91
+  92 | (1,92)  | abc_92
+  93 | (1,93)  | abc_93
+  94 | (1,94)  | abc_94
+  95 | (1,95)  | abc_95
+  96 | (1,96)  | abc_96
+  97 | (1,97)  | abc_97
+  98 | (1,98)  | abc_98
+  99 | (1,99)  | abc_99
+ 100 | (1,100) | abc_100
+(11 rows)
+
+DROP TABLE t;

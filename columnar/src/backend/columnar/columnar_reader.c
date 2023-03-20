@@ -2045,12 +2045,25 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 				int8 *writeColumnRowPosition = 
 					(int8 *) vectorColumn->value + columnValueOffset[columnIndex];
 
-				store_att_byval(writeColumnRowPosition, 
-								chunkGroupData->valueArray[columnIndex][rowIndex], 
-								vectorColumn->columnTypeLen);
-							
-				vectorColumn->isnull[vectorColumn->dimension] = false;
 
+				/* 
+				 * For data types which have len less or equal 8 we can
+				 * use `store_att_byval` function.
+				 */
+				if (vectorColumn->columnTypeLen <= 8)
+				{
+					store_att_byval(writeColumnRowPosition,
+									chunkGroupData->valueArray[columnIndex][rowIndex],
+									vectorColumn->columnTypeLen);
+				}
+				else
+				{
+					memcpy(writeColumnRowPosition,
+						   (int8 *)(chunkGroupData->valueArray[columnIndex][rowIndex]),
+						   vectorColumn->columnTypeLen);
+				}
+
+				vectorColumn->isnull[vectorColumn->dimension] = false;
 			}
 
 			vectorColumn->dimension++;
