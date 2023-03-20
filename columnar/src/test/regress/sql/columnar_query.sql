@@ -144,3 +144,19 @@ SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
 SELECT * FROM t WHERE a = 1 ORDER BY b LIMIT 1;
 
 DROP TABLE t;
+
+
+--
+-- [columnar] WHERE on INTEGER column not working when SELECT includes certain custom types
+--
+
+CREATE TABLE t(a INT, b point, c TEXT) USING columnar;
+
+INSERT INTO t SELECT g, point(1, g), 'abc_' || g FROM generate_series(0,100) AS g;
+
+EXPLAIN (analyze off, costs off, timing off, summary off)
+SELECT * FROM t WHERE a >= 90;
+
+SELECT * FROM t WHERE a >= 90;
+
+DROP TABLE t;
