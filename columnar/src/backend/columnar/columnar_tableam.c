@@ -139,6 +139,7 @@ static bool ConditionalLockRelationWithTimeout(Relation rel, LOCKMODE lockMode,
 static List * NeededColumnsList(TupleDesc tupdesc, Bitmapset *attr_needed);
 static void LogRelationStats(Relation rel, int elevel);
 static void TruncateColumnar(Relation rel, int elevel);
+static bool TruncateAndCombineColumnarStripes(Relation rel, int elevel);
 static HeapTuple ColumnarSlotCopyHeapTuple(TupleTableSlot *slot);
 static void ColumnarCheckLogicalReplication(Relation rel);
 static Datum * detoast_values(TupleDesc tupleDesc, Datum *orig_values, bool *isnull);
@@ -814,6 +815,8 @@ columnar_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
 
 	MemoryContextSwitchTo(oldContext);
 	MemoryContextReset(ColumnarWritePerTupleContext(writeState));
+
+	pgstat_count_heap_insert(relation, 1);
 }
 
 
@@ -865,6 +868,8 @@ columnar_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 	}
 
 	MemoryContextSwitchTo(oldContext);
+
+	pgstat_count_heap_insert(relation, ntuples);
 }
 
 
@@ -881,10 +886,12 @@ columnar_tuple_delete(Relation relation, ItemPointer tid, CommandId cid,
 	DirectFunctionCall1(pg_advisory_xact_lock_int8,
 						Int64GetDatum((int64) storageId));
 
-	if (UpdateRowMask(relation->rd_node, storageId,  snapshot, rowNumber))
-		return TM_Ok;
+	if (!UpdateRowMask(relation->rd_node, storageId,  snapshot, rowNumber))
+		return TM_Deleted;
 
-	return TM_Deleted;
+	pgstat_count_heap_delete(relation);
+
+	return TM_Ok;
 }
 
 
@@ -908,6 +915,8 @@ columnar_tuple_update(Relation relation, ItemPointer otid, TupleTableSlot *slot,
 	columnar_tuple_insert(relation, slot, cid, 0, NULL);
 
 	*update_indexes = true;
+
+	pgstat_count_heap_update(relation, false);
 
 	return TM_Ok;
 }
@@ -1109,6 +1118,149 @@ NeededColumnsList(TupleDesc tupdesc, Bitmapset *attr_needed)
 	return columnList;
 }
 
+/*
+ * TruncateAndCombineColumnarStripes will combine last n stripes so they can fit
+ * maximum number of rows per stripe. Stripes that are going to be combined are deleted
+ * and new stripe will be written at the end of untouched last stripe. We also include
+ * information about deleted rows for this implementation.
+ */
+static bool
+TruncateAndCombineColumnarStripes(Relation rel, int elevel)
+{
+	uint64 totalRowNumberCount = 0;
+	uint32 startingStripeListPosition = 0;
+
+	TupleDesc tupleDesc = RelationGetDescr(rel);
+
+	if (tupleDesc->natts == 0)
+	{
+		ereport(elevel,
+				(errmsg("\"%s\": stopping vacuum due to zero column table",
+						RelationGetRelationName(rel))));
+		return false;
+	}
+
+	/* Get current columnar options */
+	ColumnarOptions columnarOptions = { 0 };
+	ReadColumnarOptions(rel->rd_id, &columnarOptions);
+
+	/* Get all stripes in reverse order */
+	List *stripeMetadataList = StripesForRelfilenode(rel->rd_node, BackwardScanDirection);
+	
+	/* Empty table nothing to do */
+	if (stripeMetadataList == NIL)
+	{
+		ereport(elevel,
+				(errmsg("\"%s\": stopping vacuum due to empty table",
+						RelationGetRelationName(rel))));
+		return false;
+	}
+
+	ListCell *lc = NULL;
+
+	uint32 lastStripeDeletedRows = 0;
+
+	foreach(lc, stripeMetadataList)
+	{
+		StripeMetadata * stripeMetadata = lfirst(lc);
+
+		lastStripeDeletedRows = DeletedRowsForStripe(rel->rd_node,
+													 stripeMetadata->chunkCount,
+													 stripeMetadata->id);
+
+		
+		uint64 stripeRowCount = stripeMetadata->rowCount - lastStripeDeletedRows;
+
+		if ((totalRowNumberCount + stripeRowCount > columnarOptions.stripeRowCount))
+		{
+			break;
+		}
+
+		totalRowNumberCount += stripeRowCount;
+		startingStripeListPosition++;
+	}
+
+	/* 
+	 * There is only one stripe that is candidate. Maybe we should vacuum
+	 * it if condition is met.
+	 */
+	if (startingStripeListPosition == 1)
+	{
+		/* Maybe we should vacuum only one stripe if count of
+		 * deleted rows is higher than 20 percent.
+		 */
+		float percentageOfDeleteRows = 
+			(float)lastStripeDeletedRows / (float)(totalRowNumberCount + lastStripeDeletedRows);
+
+		bool shouldVacuumOnlyStripe = percentageOfDeleteRows > 0.2f;
+
+		if (!shouldVacuumOnlyStripe)
+		{
+			return false;
+		}
+	}
+
+	ColumnarWriteState *writeState = ColumnarBeginWrite(rel->rd_node,
+														columnarOptions,
+														tupleDesc);
+
+	/* we need all columns */
+	int natts = rel->rd_att->natts;
+	Bitmapset *attr_needed = bms_add_range(NULL, 0, natts - 1);
+
+	/* no quals for table rewrite */
+	List *scanQual = NIL;
+
+	/* use SnapshotAny when re-writing table as heapAM does */
+	Snapshot snapshot = SnapshotAny;
+
+	MemoryContext scanContext = CreateColumnarScanMemoryContext();
+	bool randomAccess = true;
+	ColumnarReadState *readState = init_columnar_read_state(rel, tupleDesc,
+															attr_needed, scanQual,
+															scanContext, snapshot,
+															randomAccess,
+															NULL);
+
+	ColumnaSetStripeReadState(readState,
+							  list_nth(stripeMetadataList, startingStripeListPosition - 1));
+	
+	Datum *values = palloc0(tupleDesc->natts * sizeof(Datum));
+	bool *nulls = palloc0(tupleDesc->natts * sizeof(bool));
+
+	/* we don't need to know rowNumber here */
+	while (ColumnarReadNextRow(readState, values, nulls, NULL))
+	{
+		ColumnarWriteRow(writeState, values, nulls);
+	}
+	
+	uint64 newDataReservation;
+
+	if (list_length(stripeMetadataList) > startingStripeListPosition)
+	{
+		StripeMetadata *mtd = list_nth(stripeMetadataList, startingStripeListPosition);
+		newDataReservation = mtd->fileOffset + mtd->dataLength - 1;
+	}
+	else
+	{
+		StripeMetadata *mtd = list_nth(stripeMetadataList, startingStripeListPosition - 1);
+		newDataReservation = mtd->fileOffset;
+	}
+
+	ColumnarStorageTruncate(rel, newDataReservation);
+
+	for (int i = 0; i < startingStripeListPosition; i++)
+	{
+		StripeMetadata *metadata = list_nth(stripeMetadataList, i);
+		DeleteMetadataRowsForStripeId(rel->rd_node, metadata->id);
+	}
+
+	ColumnarEndWrite(writeState);
+	ColumnarEndRead(readState);
+
+	return true;
+}
+
 
 /*
  * columnar_vacuum_rel implements VACUUM without FULL option.
@@ -1161,7 +1313,7 @@ LogRelationStats(Relation rel, int elevel)
 	uint64 droppedChunksWithData = 0;
 	uint64 totalDecompressedLength = 0;
 
-	List *stripeList = StripesForRelfilenode(relfilenode);
+	List *stripeList = StripesForRelfilenode(relfilenode, ForwardScanDirection);
 	int stripeCount = list_length(stripeList);
 
 	foreach(stripeMetadataCell, stripeList)
@@ -1299,25 +1451,41 @@ TruncateColumnar(Relation rel, int elevel)
 		return;
 	}
 
+	bool stripesTruncated = TruncateAndCombineColumnarStripes(rel, elevel);
+
 	/*
-	 * Due to the AccessExclusive lock there's no danger that
-	 * new stripes be added beyond highestPhysicalAddress while
-	 * we're truncating.
+	 * If we didn't truncate and combine tail stripes we could have
+	 * stituation where we need to truncate storage at the end.
 	 */
-	uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
-									ColumnarFirstLogicalOffset);
-
-	RelationOpenSmgr(rel);
-	BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
-
-	if (!ColumnarStorageTruncate(rel, newDataReservation))
+	if (!stripesTruncated)
 	{
-		UnlockRelation(rel, AccessExclusiveLock);
-		return;
-	}
 
-	RelationOpenSmgr(rel);
-	BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+		/*
+		* Due to the AccessExclusive lock there's no danger that
+		* new stripes be added beyond highestPhysicalAddress while
+		* we're truncating.
+		*/
+		uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
+										ColumnarFirstLogicalOffset);
+
+		RelationOpenSmgr(rel);
+		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+
+		if (!ColumnarStorageTruncate(rel, newDataReservation))
+		{
+			UnlockRelation(rel, AccessExclusiveLock);
+			return;
+		}
+
+		RelationOpenSmgr(rel);
+		BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+
+		ereport(elevel,
+		(errmsg("\"%s\": truncated %u to %u pages",
+				RelationGetRelationName(rel),
+				old_rel_pages, new_rel_pages),
+			errdetail_internal("%s", pg_rusage_show(&ru0))));
+	}
 
 	/*
 	 * We can release the exclusive lock as soon as we have truncated.
@@ -1327,12 +1495,6 @@ TruncateColumnar(Relation rel, int elevel)
 	 * they acquire lock on the relation.
 	 */
 	UnlockRelation(rel, AccessExclusiveLock);
-
-	ereport(elevel,
-			(errmsg("\"%s\": truncated %u to %u pages",
-					RelationGetRelationName(rel),
-					old_rel_pages, new_rel_pages),
-			 errdetail_internal("%s", pg_rusage_show(&ru0))));
 }
 
 

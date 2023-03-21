@@ -443,6 +443,59 @@ ColumnarReadRowByRowNumber(ColumnarReadState *readState,
 	return ReadStripeRowByRowNumber(readState, rowNumber, columnValues, columnNulls);
 }
 
+/*
+ * ColumnaSetStripeReadState 
+ */
+bool
+ColumnaSetStripeReadState(ColumnarReadState *readState,
+						  StripeMetadata *startStripeMetadata)
+{
+	if (!ColumnarReadIsCurrentStripe(readState, startStripeMetadata->firstRowNumber))
+	{
+		Relation columnarRelation = readState->relation;
+		Snapshot snapshot = readState->snapshot;
+		StripeMetadata *stripeMetadata = 
+			FindStripeByRowNumber(columnarRelation,
+								  startStripeMetadata->firstRowNumber, snapshot);
+		if (stripeMetadata == NULL)
+		{
+			/* no such row exists */
+			return false;
+		}
+
+		if (StripeWriteState(stripeMetadata) != STRIPE_WRITE_FLUSHED)
+		{
+			/*
+			 * Callers are expected to skip stripes that are not flushed to
+			 * disk yet or should wait for the writer xact to commit or abort,
+			 * but let's be on the safe side.
+			 */
+			ereport(ERROR, (errmsg(UNEXPECTED_STRIPE_READ_ERR_MSG,
+								   RelationGetRelationName(columnarRelation),
+								   stripeMetadata->id)));
+		}
+
+		/* do the cleanup before reading a new stripe */
+		ColumnarResetRead(readState);
+
+		TupleDesc relationTupleDesc = RelationGetDescr(columnarRelation);
+		List *whereClauseList = NIL;
+		List *whereClauseVars = NIL;
+		MemoryContext stripeReadContext = readState->stripeReadContext;
+		readState->stripeReadState = BeginStripeRead(stripeMetadata,
+													 columnarRelation,
+													 relationTupleDesc,
+													 readState->projectedColumnList,
+													 whereClauseList,
+													 whereClauseVars,
+													 stripeReadContext,
+													 snapshot);
+
+		readState->currentStripeMetadata = stripeMetadata;
+	}
+
+	return true;
+}
 
 /*
  * ColumnarReadIsCurrentStripe returns true if stripe being read contains
@@ -1132,7 +1185,7 @@ ColumnarTableRowCount(Relation relation)
 {
 	ListCell *stripeMetadataCell = NULL;
 	uint64 totalRowCount = 0;
-	List *stripeList = StripesForRelfilenode(relation->rd_node);
+	List *stripeList = StripesForRelfilenode(relation->rd_node, ForwardScanDirection);
 
 	foreach(stripeMetadataCell, stripeList)
 	{
