@@ -1537,6 +1537,33 @@ TruncateColumnar(Relation rel, int elevel)
 
 	BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
+		/*
+		* Due to the AccessExclusive lock there's no danger that
+		* new stripes be added beyond highestPhysicalAddress while
+		* we're truncating.
+		*/
+		uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
+										ColumnarFirstLogicalOffset);
+
+		RelationOpenSmgr(rel);
+		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+
+		if (!ColumnarStorageTruncate(rel, newDataReservation))
+		{
+			UnlockRelation(rel, AccessExclusiveLock);
+			return;
+		}
+
+		RelationOpenSmgr(rel);
+		BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+
+		ereport(elevel,
+		(errmsg("\"%s\": truncated %u to %u pages",
+				RelationGetRelationName(rel),
+				old_rel_pages, new_rel_pages),
+			errdetail_internal("%s", pg_rusage_show(&ru0))));
+	}
+
 	/*
 	 * We can release the exclusive lock as soon as we have truncated.
 	 * Other backends can't safely access the relation until they have
