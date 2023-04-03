@@ -8,7 +8,7 @@ The open source Snowflake alternative. OLAP Postgres.
 
 Eliminate data silos today. Solve hard problems fast.
 
-* [x] 🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
+* [x] 🗃 free, cloud managed database - [docs](https://docs.hydra.so/getting-started)
 * [x] 📎 columnar store - [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
 * [x] 📊 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
 * [x] 📅 postgres scheduler - [docs](https://docs.hydra.so/cloud-warehouse-operations/using-hydra-scheduler)
