@@ -68,12 +68,12 @@ body:
       placeholder: "# Insert here"
     validations:
       required: true
- 
-#    - type: textarea
-#      attributes:
-#       label: Additional context
-#       description:  >
-#         Add any other context about the problem here.
-#       placeholder: "# Insert here"
-#     validations:
-#       required: false
+      
+  - type: textarea
+    attributes:
+      label: Additional context
+      description:  >
+        Add any other context about the problem here.
+      placeholder: "# Insert here"
+    validations:
+      required: false
