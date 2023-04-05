@@ -1,4 +1,4 @@
-![Hydra - the open source data warehouse](.images/header.png)
+![Hydra - the open source data warehouse](.images/Hydra-OrangeonTransparent.svg)
 
 [Free Hydra Cloud trial](https://hydra.so/) - [Documentation](https://docs.hydra.so/) - [Website](https://hydra.so/) - [Community Discord](https://discord.com/invite/SQrwnAxtDw)
 
