@@ -70,7 +70,7 @@ body:
       required: true
  
    - type: textarea
-    attributes:
+     attributes:
       label: Additional context
       description:  >
         Add any other context about the problem here.
