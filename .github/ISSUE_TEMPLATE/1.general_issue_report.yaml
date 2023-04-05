@@ -1,4 +1,4 @@
-name: ISsue Report
+name: Issue Report
 description: File an issue report
 title: "[Issue]: "
 labels: ["issue", "triage"]
