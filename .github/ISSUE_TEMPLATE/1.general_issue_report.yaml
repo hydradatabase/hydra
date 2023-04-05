@@ -46,7 +46,7 @@ body:
       label: Reproduction
       description:  >
         Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
-      placeholder: "# Insert here"
+      placeholder: "# Insert steps to reproduct the issue here"
     validations:
       required: false
       
@@ -54,7 +54,7 @@ body:
     attributes:
       label: Issue message
       description:  >
-        Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
+        Provide the full exception tracebacks. 
       placeholder: "# Copy complete stack trace and error message here, including log output if applicable."
     validations:
       required: false
