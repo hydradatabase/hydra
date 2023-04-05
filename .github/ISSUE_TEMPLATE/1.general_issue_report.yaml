@@ -6,8 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this issue report! Please ensure you've read our [documentation](https://docs.hydra.so/). If you're unsure as to whether or not you're experiencing an issue, please reach out on our [Discord](https://discord.com/invite/SQrwnAxtDw) to gain a better understanding
-        of what you're facing.
+        Thanks for taking the time to fill out this issue report! Please ensure you've read our [documentation](https://docs.hydra.so/). If you're unsure as to whether or not you're experiencing an issue, please reach out on our [Discord](https://discord.com/invite/SQrwnAxtDw) to gain a better understanding of what you're facing.
 
   - type: checkboxes
     id: checks
