@@ -34,46 +34,46 @@ body:
     validations:
       required: false
       
-  - type: textarea
-    attributes:
-      label: Issue summary
-      description: A clear and concise description of what the issue is.
-      placeholder: "# Tell us what you see!"
-    validations:
-      required: true      
+#   - type: textarea
+#     attributes:
+#       label: Issue summary
+#       description: A clear and concise description of what the issue is.
+#       placeholder: "# Tell us what you see!"
+#     validations:
+#       required: true      
       
-  - type: textarea
-    attributes:
-      label: Reproduction
-      description:  >
-        Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
-      placeholder: "# Insert here"
-    validations:
-      required: false
+#   - type: textarea
+#     attributes:
+#       label: Reproduction
+#       description:  >
+#         Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
+#       placeholder: "# Insert here"
+#     validations:
+#       required: false
       
-  - type: textarea
-    attributes:
-      label: Issue message
-      description:  >
-        Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
-      placeholder: "# Insert here"
-    validations:
-      required: false
+#   - type: textarea
+#     attributes:
+#       label: Issue message
+#       description:  >
+#         Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
+#       placeholder: "# Insert here"
+#     validations:
+#       required: false
       
-  - type: textarea
-    attributes:
-      label: Version
-      description:  >
-        Run `SELECT VERSION()` to retreive your Hydra version. 
-      placeholder: "# Insert here"
-    validations:
-      required: true
+#   - type: textarea
+#     attributes:
+#       label: Version
+#       description:  >
+#         Run `SELECT VERSION()` to retreive your Hydra version. 
+#       placeholder: "# Insert here"
+#     validations:
+#       required: true
  
-   - type: textarea
-     attributes:
-      label: Additional context
-      description:  >
-        Add any other context about the problem here.
-      placeholder: "# Insert here"
-    validations:
-      required: false
+#    - type: textarea
+#      attributes:
+#       label: Additional context
+#       description:  >
+#         Add any other context about the problem here.
+#       placeholder: "# Insert here"
+#     validations:
+#       required: false
