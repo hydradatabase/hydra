@@ -2,13 +2,29 @@ name: Issue Report
 description: File an issue report
 title: "[Issue]: "
 labels: ["issue", "triage"]
-assignees:
-  - octocat
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report!
+        Thanks for taking the time to fill out this bug report! Please ensure you've read our [documentation](https://docs.hydra.so/).
+        If you're unsure as to whether or not you're experiencing an issue, please reach out on our [Discord](https://discord.com/invite/SQrwnAxtDw) to gain a better understanding
+        of what you're facing.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: First check
+      description: Please confirm and check all the following options.
+      options:
+        - label: I added a descriptive title to this issue.
+          required: true
+        - label: I used the GitHub search to find a similar issue and didn't find it.
+          required: true
+        - label: I searched the Hydra documentation for this issue.
+          required: true
+        - label: I checked that this issue is related to Hydra and not one of its dependencies.
+          required: true
+
   - type: input
     id: contact
     attributes:
@@ -17,46 +33,47 @@ body:
       placeholder: ex. email@example.com
     validations:
       required: false
+      
   - type: textarea
-    id: what-happened
     attributes:
-      label: What happened?
-      description: Also tell us, what did you expect to happen?
-      placeholder: Tell us what you see!
-      value: "A bug happened!"
+      label: Issue summary
+      description: A clear and concise description of what the issue is.
+      placeholder: "# Tell us what you see!"
     validations:
-      required: true
-  - type: dropdown
-    id: version
+      required: true      
+      
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description:  >
+        Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
+      placeholder: "# Insert here"
+    validations:
+      required: false
+      
+  - type: textarea
+    attributes:
+      label: Issue message
+      description:  >
+        Provide your [minimal, complete, and verifiable](https://stackoverflow.com/help/mcve) example here. 
+      placeholder: "# Insert here"
+    validations:
+      required: false
+      
+  - type: textarea
     attributes:
       label: Version
-      description: What version of our software are you running?
-      options:
-        - 1.0.2 (Default)
-        - 1.0.3 (Edge)
+      description:  >
+        Run `SELECT VERSION()` to retreive your Hydra version. 
+      placeholder: "# Insert here"
     validations:
       required: true
-  - type: dropdown
-    id: browsers
+ 
+   - type: textarea
     attributes:
-      label: What browsers are you seeing the problem on?
-      multiple: true
-      options:
-        - Firefox
-        - Chrome
-        - Safari
-        - Microsoft Edge
-  - type: textarea
-    id: logs
-    attributes:
-      label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: shell
-  - type: checkboxes
-    id: terms
-    attributes:
-      label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://example.com)
-      options:
-        - label: I agree to follow this project's Code of Conduct
-          required: true
+      label: Additional context
+      description:  >
+        Add any other context about the problem here.
+      placeholder: "# Insert here"
+    validations:
+      required: false
