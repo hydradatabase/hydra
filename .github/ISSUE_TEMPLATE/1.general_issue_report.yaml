@@ -1,7 +1,7 @@
 name: Issue Report
 description: File an issue report
 title: "[Issue]: "
-labels: ["issue", "triage"]
+labels: ["bug", "status:triage"]
 body:
   - type: markdown
     attributes:
