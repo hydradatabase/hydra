@@ -1,28 +1,31 @@
 ![Hydra - the open source data warehouse](.images/hydraGH.svg)
+<div align="center">
+<em>The Modern EDW - Everyone Data Warehouse</em>
 
-[Free Hydra Cloud trial](https://hydra.so/) - [Documentation](https://docs.hydra.so/) - [Website](https://hydra.so/) - [Community Discord](https://discord.com/invite/SQrwnAxtDw)
+[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/hydradatabase.svg?style=social&label=Follow%20%40hydradatabase)](https://twitter.com/hydradatabase)
+[![GitHub Repo stars](https://img.shields.io/github/stars/hydradatabase/hydra?style=social)](https://github.com/hydradatabase/hydra)
 
-The open source Snowflake alternative. OLAP Postgres.
+<h3>
+    <a href="https://dashboard.hydra.so/signup">Free Cloud Trial</a> |
+    <a href="https://docs.hydra.so">Docs</a> |
+    <a href="https://discord.com/invite/SQrwnAxtDw">Discord</a> |
+    <a href="https://hydra.so/">Website</a> 
+</h3>
 
-[Hydra](https://hydra.so/) is an open source data warehouse built on Postgres. It’s easy to use and designed for OLAP and HTAP workloads. Hydra serves analytical reporting with parallelized query execution and vectorization on columnar storage. Operational work and high-throughput transactions write to standard Postgres heap tables. All Postgres extensions, tools, and connectors work with Hydra.
+</div>
 
-Eliminate data silos today. Solve hard problems fast.
+Hydra is a modern, open source replacement for enterprise data warehouses. It’s fast and feature-rich so devs can build better analytics, quicker.
 
-* [x] 🗃 free, cloud managed database - [docs](https://docs.hydra.so/getting-started)
-* [x] 📎 columnar store - [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
-* [x] 📊 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
-* [x] 📅 postgres scheduler - [docs](https://docs.hydra.so/cloud-warehouse-operations/using-hydra-scheduler)
-* [x] 🤹‍♀️ query parallelization
-* [x] 🐎 vectorized execution of WHERE clauses
-* [x] 📝 updates and deletes for columnar store - [docs](https://docs.hydra.so/concepts/updates-and-deletes)
-* [ ] 🧹 vacuum stripe optimizations and space reclamation
-* [ ] 🏎️ vectorized execution of aggregate functions
-* [ ] 🚅 use of SIMD in vectorized execution
-* [ ] ↔️ separation of compute and storage
+Hydra implements an open source columnar engine to Postgres, driving 23X query performance and scalability over basic Postgres. When comparing to traditional warehouses, Hydra delivers 6000X more throughput and faster lookups.
 
-![Where does Hydra fit](.images/hydra-db.png)
+## Contents
+- Quick Start
+- Features
+- Community and Status
+- License
 
-## ⏩ Quick Start
+## 🚀 Quick Start
+### Run Hydra locally
 
 The Hydra [Docker image](https://github.com/hydradatabase/hydra/pkgs/container/hydra) is a drop-in replacement for [postgres Docker image](https://hub.docker.com/_/postgres).
 
@@ -35,50 +38,60 @@ docker compose up
 psql postgres://postgres:hydra@127.0.0.1:5432
 ```
 
-### Or
+### Use Hydra Cloud
 
-Managed in the [cloud](https://hydra.so/).
+Hydra Cloud is the fastest and most reliable way to run Hydra. It is a cloud-based data warehouse that allows you to consolidate data from various sources into a single, unified system. It provides a user-friendly interface for automated data ingestion and transformation.
 
-## 📄 Documentation
+Hydra Cloud provides a scalable and secure cloud environment where automatic backups, resource scaling, high availability, point-in-time recovery, and more is available instantly with new databases.
 
-You can find our documentation [here](https://docs.hydra.so/getting-started/setup-guide).
+Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, managed database.
 
-## 👩🏾‍🤝‍👨🏻 Community
+## 🎁 Features
+🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
+<br>📎 columnar store with updates and deletes- [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
+<br>🤹‍♀️ query parallelization
+<br>🐎 vectorized execution of WHERE clauses
+<br>📊 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
 
-- [Discord chat](https://discord.com/invite/zKpVxbXnNY) for quick questions
-- [GitHub Discussions](https://github.com/hydradatabase/hydra/discussions) for longer topics
-- [GitHub Issues](https://github.com/hydradatabase/hydra/issues) for bugs and missing features
-- [@hydradatabase](https://twitter.com/hydradatabase) on Twitter
+## 🤝 Community and Status
+[DEVELOPERS.md](https://github.com/hydradatabase/hydra/blob/main/DEVELOPERS.md) for contributing and building the image.
+<br>[Discord](https://discord.com/invite/zKpVxbXnNY) discussion with the Community and Hydra team
+<br>[GitHub Discussions](https://github.com/hydradatabase/hydra/discussions) for longer topics
+<br>[GitHub Issues](https://github.com/hydradatabase/hydra/issues) for bugs and missing features
+<br>[Blog](https://blog.hydra.so/) for latest announcements, tutorials, product updates
+<br>[@hydradatabase](https://twitter.com/hydradatabase) for the tweets, memes, and social posts
+<br>[Docs](https://docs.hydra.so/) for Hydra features and warehouse ops
 
-## ✅ Status
-
-- [x] Early Access: Closed, private testing
-- [ ] Open Alpha: Open for everyone
-- [ ] Open Beta: Hydra can handle most non-enterprise use
-- [ ] Production: Enterprise ready
-
-We are currently in Early Access. Watch [releases](https://github.com/hydradatabase/hydra/releases) of this repo to get notified of updates.
 
 ![follow the repo](.images/follow.gif)
 
-## 🛠 Developing Hydra
-Please see [DEVELOPERS.md](DEVELOPERS.md) for information on contributing to Hydra and building the image.
+- [x]  Private Alpha: Limited to select design partners
+- [x]  Public Beta: Talk with Hydra team to learn more
+- [ ]  Hydra 1.0 Release: Generally Available (GA) and ready for production use
 
-## 📑 License and Acknowledgments
+### Coming Soon
+Watch [releases](https://github.com/hydradatabase/hydra/releases) of this repo to get notified of updates.
+- [ ]  🧹 vacuum stripe optimizations and space reclamation
+- [ ]  🏎️ vectorized execution of aggregate functions
+- [ ]  🚅 use of SIMD in vectorized execution
+- [ ]  ↔️ separation of compute and storage
+
+## 📝 License
 Hydra is only possible by building on the shoulders of giants.
 
 The code in this repo is licensed under:
-* [AGPL 3.0](https://github.com/hydradatabase/hydra/tree/main/columnar/LICENSE) for [Hydra Columnar](https://github.com/hydradatabase/hydra/tree/main/columnar)
-* All other code is [Apache 2.0](LICENSE)
 
-The docker image is built on the [Postgres docker image](https://hub.docker.com/_/postgres/), which contains a large number of open source projects, including:
-* Postgres - [the Postgres license](https://www.postgresql.org/about/licence/)
-* Debian or Alpine Linux image, depending on the image used
-* Hydra includes the following additional software in the image:
-  * multicorn - BSD license
-  * mysql_fdw - MIT-style license
-  * parquet_s3_fdw - MIT-style license
-  * pgsql-http - MIT license
+- [AGPL 3.0](https://github.com/hydradatabase/hydra/tree/main/columnar/LICENSE) for [Hydra Columnar](https://github.com/hydradatabase/hydra/tree/main/columnar)
+- All other code is [Apache 2.0](https://github.com/hydradatabase/hydra/blob/main/LICENSE)
 
-As for any pre-built image usage, it is the image user's responsibility to ensure that any use of this
-image complies with any relevant licenses for all software contained within.
+The docker image is built on the [Postgres docker image](https://hub.docker.com/_/postgres/), which contains a large number of open source projects, including:
+
+- Postgres - [the Postgres license](https://www.postgresql.org/about/licence/)
+- Debian or Alpine Linux image, depending on the image used
+- Hydra includes the following additional software in the image:
+    - multicorn - BSD license
+    - mysql_fdw - MIT-style license
+    - parquet_s3_fdw - MIT-style license
+    - pgsql-http - MIT license
+
+As for any pre-built image usage, it is the image user's responsibility to ensure that any use of this image complies with any relevant licenses for all software contained within.
