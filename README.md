@@ -47,7 +47,7 @@ Hydra Cloud provides a scalable and secure cloud environment where automatic bac
 Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, managed database.
 
 ## 🎁 Features
-<br>🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
+🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
 <br>📎 columnar store with updates and deletes- [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
 <br>🤹‍♀️ query parallelization
 <br>🐎 vectorized execution of WHERE clauses
