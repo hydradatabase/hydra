@@ -68,7 +68,7 @@ Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, 
 
 - [x]  Private Alpha: Limited to select design partners
 - [x]  Public Beta: Talk with Hydra team to learn more
-- [ ]  Hydra 1.0 Release- Generally Available (GA) production use with financially backed SLA
+- [ ]  Hydra 1.0 Release: Generally Available (GA) and ready for production use
 
 ### Coming Soon
 Watch [releases](https://github.com/hydradatabase/hydra/releases) of this repo to get notified of updates.
