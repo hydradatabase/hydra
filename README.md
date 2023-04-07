@@ -62,7 +62,6 @@ Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, 
 <br>[@hydradatabase](https://twitter.com/hydradatabase) for the tweets, memes, and social posts
 <br>[Docs](https://docs.hydra.so/) for Hydra features and warehouse ops
 
-<br>
 
 ![follow the repo](.images/follow.gif)
 
