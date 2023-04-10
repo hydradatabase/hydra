@@ -1,0 +1,12 @@
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please ensure you've read our [documentation](https://docs.hydra.so/). If you're unsure as to whether or not you're experiencing a bug, please reach out on our [Discord](https://discord.com/invite/SQrwnAxtDw) to gain a better understanding of what you're facing.
+  - type: textarea
+    attributes:
+      label: "What's wrong?"
