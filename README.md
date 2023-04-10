@@ -9,7 +9,7 @@
     <a href="https://dashboard.hydra.so/signup">Free Cloud Trial</a> |
     <a href="https://docs.hydra.so">Docs</a> |
     <a href="https://discord.com/invite/SQrwnAxtDw">Discord</a> |
-    <a href="https://hydra.so/">Website</a> 
+    <a href="https://hydra.so/">Website</a>
 </h3>
 
 </div>
@@ -35,7 +35,7 @@ Hydra implements an open source columnar engine to Postgres, driving 23X query p
 This benchmark represents typical workload in the following areas: clickstream and traffic analysis, web analytics, machine-generated data, structured logs, and events data. It covers the typical queries in ad-hoc analytics and real-time dashboards.
 
 ### Hydra vs Postgres
-Results in seconds, smaller is better.
+Results in seconds, smaller is better.<br />
 ![Hydra - the open source data warehouse](.images/ReadmeBenchmarks.png)
 
 ### Hydra vs. Enterprise data warehouses
@@ -77,7 +77,7 @@ Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, 
 
 ![Hydra - the open source data warehouse](.images/Columnar_diagram.png)
 
-Read [documentation](https://docs.hydra.so/concepts/using-hydra-columnar) on using Hydra’s columnar table access method. 
+Read [documentation](https://docs.hydra.so/concepts/using-hydra-columnar) on using Hydra’s columnar table access method.
 
 ## 🤝 Community and Status
 [DEVELOPERS.md](https://github.com/hydradatabase/hydra/blob/main/DEVELOPERS.md) for contributing and building the image.
