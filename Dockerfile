@@ -40,6 +40,9 @@ RUN set -eux; \
 COPY --from=s3 /lib/* /s3_lib/
 RUN cp -r /s3_lib/* /usr/lib/$(uname -m)-linux-gnu/
 
+# ivm ext
+COPY --from=ivm /pg_ivm /
+
 # columnar ext
 COPY --from=columnar /pg_ext /
 

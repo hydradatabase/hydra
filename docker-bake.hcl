@@ -48,6 +48,7 @@ target "postgres" {
     mysql = "target:mysql_${POSTGRES_BASE_VERSION}"
     multicorn = "target:multicorn_${POSTGRES_BASE_VERSION}"
     s3 = "target:s3_${POSTGRES_BASE_VERSION}"
+    ivm = "target:ivm_${POSTGRES_BASE_VERSION}"
   }
 
   args = {
@@ -80,6 +81,8 @@ target "spilo" {
     multicorn_14 = "target:multicorn_14"
     s3_13 = "target:s3_spilo_13"
     s3_14 = "target:s3_spilo_14"
+    ivm_13 = "target:ivm_13"
+    ivm_14 = "target:ivm_14"
   }
 
   args = {
@@ -324,4 +327,44 @@ target "columnar_14" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/columnar_14"]
   cache-from = ["type=local,src=tmp/bake_cache/columnar_14"]
+}
+
+target "ivm" {
+  inherits = ["shared"]
+  context = "third-party/ivm"
+  target = "output"
+
+  args = {
+    PGSQL_IVM_TAG = "v1.5.1"
+  }
+}
+
+target "ivm_13" {
+  inherits = ["ivm"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:13"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/ivm_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/ivm_13"]
+}
+
+target "ivm_14" {
+  inherits = ["ivm"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:14"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/ivm_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/ivm_14"]
 }
