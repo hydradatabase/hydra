@@ -38,7 +38,7 @@ This benchmark represents typical workload in the following areas: clickstream a
 Results in seconds, smaller is better.<br />
 ![Hydra - the open source data warehouse](.images/ReadmeBenchmarks.png)
 
-### Hydra vs. Enterprise data warehouses
+### Hydra vs Enterprise data warehouses
 
 Hydra delivers 1500X more throughput than traditional warehouses to enable realtime analytical workloads. This is accomplished with transactional heap tables.
 
