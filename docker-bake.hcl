@@ -415,6 +415,60 @@ target "columnar_15" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/columnar_15"]
   cache-from = ["type=local,src=tmp/bake_cache/columnar_15"]
+
+target "ivm" {
+  inherits = ["shared"]
+  context = "third-party/ivm"
+  target = "output"
+
+  args = {
+    PGSQL_IVM_TAG = "v1.5.1"
+  }
+}
+
+target "ivm_13" {
+  inherits = ["ivm"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:13"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/ivm_13"]
+  cache-from = ["type=local,src=tmp/bake_cache/ivm_13"]
+}
+
+target "ivm_14" {
+  inherits = ["ivm"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:14"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/ivm_14"]
+  cache-from = ["type=local,src=tmp/bake_cache/ivm_14"]
+}
+
+target "ivm_15" {
+  inherits = ["ivm"]
+
+  contexts = {
+    postgres_base = "docker-image://postgres:15"
+  }
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+
+  cache-to = ["type=local,dest=tmp/bake_cache/ivm_15"]
+  cache-from = ["type=local,src=tmp/bake_cache/ivm_15"]
 }
 
 target "ivm" {
