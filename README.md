@@ -9,20 +9,44 @@
     <a href="https://dashboard.hydra.so/signup">Free Cloud Trial</a> |
     <a href="https://docs.hydra.so">Docs</a> |
     <a href="https://discord.com/invite/SQrwnAxtDw">Discord</a> |
-    <a href="https://hydra.so/">Website</a> 
+    <a href="https://hydra.so/">Website</a>
 </h3>
 
 </div>
 
+## The world’s fastest Postgres for analytics
+
 Hydra is a modern, open source replacement for enterprise data warehouses. It’s fast and feature-rich so devs can build better analytics, quicker.
 
-Hydra implements an open source columnar engine to Postgres, driving 23X query performance and scalability over basic Postgres. When comparing to traditional warehouses, Hydra delivers 6000X more throughput and faster lookups.
+Hydra implements an open source columnar engine to Postgres, driving 23X query performance, better cache hit rates, and scalability over basic Postgres. When comparing to traditional warehouses, Hydra delivers 1500X more throughput to enable realtime analytical workloads.
 
 ## Contents
+- Benchmarks
 - Quick Start
 - Features
 - Community and Status
 - License
+
+## 💪 Benchmarks
+![Hydra - the open source data warehouse](.images/FasterthanPG.png)
+
+[Review Clickbench](https://tinyurl.com/clickbench) for comprehensive results and the list of 42 queries tested.
+
+This benchmark represents typical workload in the following areas: clickstream and traffic analysis, web analytics, machine-generated data, structured logs, and events data. It covers the typical queries in ad-hoc analytics and real-time dashboards.
+
+### Hydra vs Postgres
+Results in seconds, smaller is better.<br />
+![Hydra - the open source data warehouse](.images/ReadmeBenchmarks.png)
+
+### Hydra vs. Enterprise data warehouses
+
+Hydra delivers 1500X more throughput than traditional warehouses to enable realtime analytical workloads. This is accomplished with transactional heap tables.
+
+|  | Hydra | Redshift |
+| --- | --- | --- |
+| TPS | 21988 | 15 |
+
+[View detailed results](https://github.com/hydradatabase/benchmarking/tree/main/pgbench/results)
 
 ## 🚀 Quick Start
 ### Run Hydra locally
@@ -47,11 +71,15 @@ Hydra Cloud provides a scalable and secure cloud environment where automatic bac
 Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, managed database.
 
 ## 🎁 Features
-🗃 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
-<br>📎 columnar store with updates and deletes- [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
-<br>🤹‍♀️ query parallelization
-<br>🐎 vectorized execution of WHERE clauses
-<br>📊 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
+🐘 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
+<br>📊 columnar store with updates and deletes- [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
+<br>🔀 query parallelization
+<br>🔍 vectorized execution of WHERE clauses
+<br>🌐 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
+
+![Hydra - the open source data warehouse](.images/Columnar_diagram.png)
+
+Read [documentation](https://docs.hydra.so/concepts/using-hydra-columnar) on using Hydra’s columnar table access method.
 
 ## 🤝 Community and Status
 [DEVELOPERS.md](https://github.com/hydradatabase/hydra/blob/main/DEVELOPERS.md) for contributing and building the image.
