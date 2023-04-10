@@ -46,6 +46,8 @@ Hydra delivers 1500X more throughput than traditional warehouses to enable realt
 | --- | --- | --- |
 | TPS | 21988 | 15 |
 
+[View detailed results](https://github.com/hydradatabase/benchmarking/tree/main/pgbench/results)
+
 ## 🚀 Quick Start
 ### Run Hydra locally
 
