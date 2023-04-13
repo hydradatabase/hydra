@@ -706,7 +706,9 @@ ColumnarEndRead(ColumnarReadState *readState)
 		pfree(readState->currentStripeMetadata);
 	}
 
-	pfree(readState);
+	if (readState) {
+		pfree(readState);
+	}
 }
 
 

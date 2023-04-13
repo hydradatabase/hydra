@@ -56,5 +56,7 @@ extern uint32 DeletedRowsForStripe(RelFileNode relfilenode,
 								   uint32 chunkCount,
 								   uint64 stripeId);
 extern void ColumnarStorageUpdateIfNeeded(Relation rel, bool isUpgrade);
+extern StripeMetadata * RewriteStripeMetadataRowWithNewValues(Relation rel, uint64 stripeId,
+              uint64 sizeBytes, uint64 fileOffset, uint64 rowCount, uint64 chunkCount);
 
 #endif /* COLUMNAR_METADATA_H */

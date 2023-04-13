@@ -13,6 +13,9 @@ output_files := $(patsubst $(citus_abs_srcdir)/output/%.source,expected/%.out, $
 check-all: check-regression-columnar
 
 check-regression-columnar:
+	echo "======================================================"
+	echo $(pg_regress_check)
+	echo "======================================================"
 	$(pg_regress_check) \
 		--temp-config columnar_regression.conf \
 		--load-extension=columnar \

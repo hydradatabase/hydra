@@ -1,0 +1,345 @@
+CREATE TABLE t1(a int, b int) USING columnar;
+CREATE TABLE t2(a int, b int) USING columnar;
+INSERT INTO t1 SELECT generate_series(1, 1000000, 1) AS a, generate_series(2, 2000000, 2) AS b;
+INSERT INTO t2 SELECT generate_series(1, 2000000, 1) AS a, generate_series(2, 4000000, 2) AS b;
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   100000 |           0 |         10 |     543291
+(7 rows)
+
+SELECT * FROM columnar.stats('t2'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   150000 |           0 |         15 |     815582
+        8 |    5709432 |   150000 |           0 |         15 |     812780
+        9 |    6526232 |   150000 |           0 |         15 |     814376
+       10 |    7343032 |   150000 |           0 |         15 |     814484
+       11 |    8159832 |   150000 |           0 |         15 |     815362
+       12 |    8976632 |   150000 |           0 |         15 |     813439
+       13 |    9793432 |   150000 |           0 |         15 |     814608
+       14 |   10610232 |    50000 |           0 |          5 |     272361
+(14 rows)
+
+SELECT * FROM columnar.vacuum('t1'::regclass);
+ vacuum 
+--------
+      0
+(1 row)
+
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   100000 |           0 |         10 |     543291
+(7 rows)
+
+SELECT * FROM columnar.stats('t2'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   150000 |           0 |         15 |     815582
+        8 |    5709432 |   150000 |           0 |         15 |     812780
+        9 |    6526232 |   150000 |           0 |         15 |     814376
+       10 |    7343032 |   150000 |           0 |         15 |     814484
+       11 |    8159832 |   150000 |           0 |         15 |     815362
+       12 |    8976632 |   150000 |           0 |         15 |     813439
+       13 |    9793432 |   150000 |           0 |         15 |     814608
+       14 |   10610232 |    50000 |           0 |          5 |     272361
+(14 rows)
+
+SELECT * FROM columnar.vacuum('t2'::regclass);
+ vacuum 
+--------
+      0
+(1 row)
+
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   100000 |           0 |         10 |     543291
+(7 rows)
+
+SELECT * FROM columnar.stats('t2'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   150000 |           0 |         15 |     815582
+        8 |    5709432 |   150000 |           0 |         15 |     812780
+        9 |    6526232 |   150000 |           0 |         15 |     814376
+       10 |    7343032 |   150000 |           0 |         15 |     814484
+       11 |    8159832 |   150000 |           0 |         15 |     815362
+       12 |    8976632 |   150000 |           0 |         15 |     813439
+       13 |    9793432 |   150000 |           0 |         15 |     814608
+       14 |   10610232 |    50000 |           0 |          5 |     272361
+(14 rows)
+
+DELETE FROM t1 WHERE a % 2 = 0;
+DELETE FROM t1 WHERE a % 100 = 0;
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |       75000 |         15 |     788928
+        2 |     808632 |   150000 |       75000 |         15 |     815091
+        3 |    1625432 |   150000 |       75000 |         15 |     814184
+        4 |    2442232 |   150000 |       75000 |         15 |     813607
+        5 |    3259032 |   150000 |       75000 |         15 |     813550
+        6 |    4075832 |   150000 |       75000 |         15 |     815135
+        7 |    4892632 |   100000 |       50000 |         10 |     543291
+(7 rows)
+
+SELECT * FROM columnar.stats('t2'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   150000 |           0 |         15 |     815582
+        8 |    5709432 |   150000 |           0 |         15 |     812780
+        9 |    6526232 |   150000 |           0 |         15 |     814376
+       10 |    7343032 |   150000 |           0 |         15 |     814484
+       11 |    8159832 |   150000 |           0 |         15 |     815362
+       12 |    8976632 |   150000 |           0 |         15 |     813439
+       13 |    9793432 |   150000 |           0 |         15 |     814608
+       14 |   10610232 |    50000 |           0 |          5 |     272361
+(14 rows)
+
+SELECT * FROM columnar.vacuum('t1'::regclass);
+ vacuum 
+--------
+     10
+(1 row)
+
+SELECT * FROM columnar.vacuum('t2'::regclass);
+ vacuum 
+--------
+      0
+(1 row)
+
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        7 |      16336 |   100000 |       50000 |         10 |     543291
+        8 |     559627 |   150000 |           0 |         15 |     808748
+        9 |    1368375 |   150000 |           0 |         15 |     822409
+       10 |    2190784 |   150000 |           0 |         15 |     821020
+(4 rows)
+
+SELECT * FROM columnar.stats('t2'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        1 |      16336 |   150000 |           0 |         15 |     788928
+        2 |     808632 |   150000 |           0 |         15 |     815091
+        3 |    1625432 |   150000 |           0 |         15 |     814184
+        4 |    2442232 |   150000 |           0 |         15 |     813607
+        5 |    3259032 |   150000 |           0 |         15 |     813550
+        6 |    4075832 |   150000 |           0 |         15 |     815135
+        7 |    4892632 |   150000 |           0 |         15 |     815582
+        8 |    5709432 |   150000 |           0 |         15 |     812780
+        9 |    6526232 |   150000 |           0 |         15 |     814376
+       10 |    7343032 |   150000 |           0 |         15 |     814484
+       11 |    8159832 |   150000 |           0 |         15 |     815362
+       12 |    8976632 |   150000 |           0 |         15 |     813439
+       13 |    9793432 |   150000 |           0 |         15 |     814608
+       14 |   10610232 |    50000 |           0 |          5 |     272361
+(14 rows)
+
+SELECT COUNT(*) FROM t1;
+ count  
+--------
+ 500000
+(1 row)
+
+SELECT COUNT(*) FROM t2;
+  count  
+---------
+ 2000000
+(1 row)
+
+SELECT SUM(a), SUM(b) FROM t1;
+     sum      |     sum      
+--------------+--------------
+ 250000000000 | 500000000000
+(1 row)
+
+SELECT SUM(a), SUM(b) FROM t2;
+      sum      |      sum      
+---------------+---------------
+ 2000001000000 | 4000002000000
+(1 row)
+
+INSERT INTO t1 SELECT generate_series(1000001, 2000000, 1) AS a, generate_series(2000002, 4000000, 2) AS b;
+-- should show no holes between the previous insert and this insert
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        7 |      16336 |   100000 |       50000 |         10 |     543291
+        8 |     559627 |   150000 |           0 |         15 |     808748
+        9 |    1368375 |   150000 |           0 |         15 |     822409
+       10 |    2190784 |   150000 |           0 |         15 |     821020
+       11 |    7906624 |   150000 |           0 |         15 |     815176
+       12 |    8723424 |   150000 |           0 |         15 |     813187
+       13 |    9540224 |   150000 |           0 |         15 |     814516
+       14 |   10357024 |   150000 |           0 |         15 |     814283
+       15 |   11173824 |   150000 |           0 |         15 |     815497
+       16 |   11990624 |   150000 |           0 |         15 |     813704
+       17 |   12807424 |   100000 |           0 |         10 |     543338
+(11 rows)
+
+DELETE FROM t1 WHERE a BETWEEN 500000 AND 1500000;
+SELECT * FROM columnar.vacuum('t1'::regclass);
+ vacuum 
+--------
+     19
+(1 row)
+
+-- should show no holes
+SELECT * FROM columnar.stats('t1'::regclass);
+ stripeid | fileoffset | rowcount | deletedrows | chunkcount | datalength 
+----------+------------+----------+-------------+------------+------------
+        8 |      16336 |   150000 |           0 |         15 |     808748
+       15 |     825084 |   150000 |           0 |         15 |     815497
+       16 |    1640581 |   150000 |           0 |         15 |     813704
+       17 |    2454285 |   100000 |           0 |         10 |     543338
+       18 |    2997623 |   150000 |           0 |         15 |     819245
+       19 |    1640581 |    50000 |           0 |          5 |     271619
+(6 rows)
+
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t1(a int, b int) USING columnar;
+INSERT INTO t1 SELECT generate_series(1, 1000000, 1) AS a, generate_series(2, 2000000, 2) AS b;
+DELETE FROM t1 WHERE a % 3 = 0;
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      1
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      0
+(1 row)
+
+SELECT * FROM columnar.vacuum('t1'::regclass, 1);
+ vacuum 
+--------
+      0
+(1 row)
+
+DROP TABLE t1;
