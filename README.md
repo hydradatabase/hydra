@@ -3,7 +3,7 @@
 <em>The Modern EDW - Everyone Data Warehouse</em>
 
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/hydradatabase.svg?style=social&label=Follow%20%40hydradatabase)](https://twitter.com/hydradatabase)
-[![GitHub Repo stars](https://img.shields.io/github/stars/hydradatabase/hydra?style=social)]([https://github.com/hydradatabase/hydra](https://github.com/hydradatabase/hydra/stargazers))
+[![GitHub Repo stars](https://img.shields.io/github/stars/hydradatabase/hydra?style=social)](https://github.com/hydradatabase/hydra/stargazers)
 
 <h3>
     <a href="https://dashboard.hydra.so/signup">Free Cloud Trial</a> |
