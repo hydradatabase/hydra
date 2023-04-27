@@ -40,6 +40,7 @@
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "storage/predicate.h"
+#include "storage/proc.h"
 #include "storage/procarray.h"
 #include "storage/smgr.h"
 #include "tcop/utility.h"
@@ -1200,9 +1201,34 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		}
 	}
 
+	/*
+	 * We need to clear current proces (VACUUUM) status flag here. Why?
+	 * Current process has flag `PROC_IN_VACUUM` which is problematic because
+	 * we write here into metadata heap tables. If concurrent process
+	 * read page in which we inserted metadata tuples these tuples will be considered
+	 * DEAD and will be removed (in problematic scenarion). 
+	 * Concurrent process, when assigning RecentXmin will scan all active processes in
+	 * system but will NOT consider this process because of 
+	 * `PROC_IN_VACUUM` flag set. It looks that invalidating status flag here doesn't affect 
+	 * further execution.
+	 */
+
+	LWLockAcquire(ProcArrayLock, LW_EXCLUSIVE);
+#if PG_VERSION_NUM >= PG_VERSION_14
+	MyProc->statusFlags = 0;
+	ProcGlobal->statusFlags[MyProc->pgxactoff] = MyProc->statusFlags;
+#else
+	MyPgXact->vacuumFlags = 0;
+#endif
+	LWLockRelease(ProcArrayLock);
+
+	/* We need to re-assing RecentXmin here */
+	PushActiveSnapshot(GetTransactionSnapshot());
+
 	ColumnarWriteState *writeState = ColumnarBeginWrite(rel->rd_node,
 														columnarOptions,
 														tupleDesc);
+
 
 	/* we need all columns */
 	int natts = rel->rd_att->natts;
@@ -1211,19 +1237,16 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 	/* no quals for table rewrite */
 	List *scanQual = NIL;
 
-	/* use SnapshotAny when re-writing table as heapAM does */
-	Snapshot snapshot = SnapshotAny;
-
 	MemoryContext scanContext = CreateColumnarScanMemoryContext();
 	bool randomAccess = true;
 	ColumnarReadState *readState = init_columnar_read_state(rel, tupleDesc,
 															attr_needed, scanQual,
-															scanContext, snapshot,
+															scanContext, SnapshotAny,
 															randomAccess,
 															NULL);
 
-	ColumnaSetStripeReadState(readState,
-							  list_nth(stripeMetadataList, startingStripeListPosition - 1));
+	ColumnarSetStripeReadState(readState,
+							   list_nth(stripeMetadataList, startingStripeListPosition - 1));
 	
 	Datum *values = palloc0(tupleDesc->natts * sizeof(Datum));
 	bool *nulls = palloc0(tupleDesc->natts * sizeof(bool));
@@ -1249,14 +1272,16 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 
 	ColumnarStorageTruncate(rel, newDataReservation);
 
+	ColumnarEndWrite(writeState);
+	ColumnarEndRead(readState);
+
 	for (int i = 0; i < startingStripeListPosition; i++)
 	{
 		StripeMetadata *metadata = list_nth(stripeMetadataList, i);
 		DeleteMetadataRowsForStripeId(rel->rd_node, metadata->id);
 	}
 
-	ColumnarEndWrite(writeState);
-	ColumnarEndRead(readState);
+	PopActiveSnapshot();
 
 	return true;
 }

@@ -156,35 +156,36 @@ SET columnar.compression TO default;
 SET columnar.stripe_row_limit TO default;
 SET columnar.chunk_group_row_limit TO default;
 
-
 CREATE TABLE t(a INT, b INT) USING columnar;
 
+SELECT columnar_test_helpers.columnar_relation_storageid(pg_class.oid) AS t_oid FROM pg_class WHERE relname='t' \gset
+
 INSERT INTO t SELECT g, g % 10 from generate_series(1,100000) g;
 INSERT INTO t SELECT g, g % 10 from generate_series(1,100000) g;
 
-SELECT COUNT(*) = 2 FROM columnar.stripe;
+SELECT COUNT(*) = 2 FROM columnar.stripe WHERE storage_id = :t_oid;
 
 VACUUM t;
 
   -- No change since we can't combine 2 stripe because row_number is higher
   -- than maximum row number per stripe
 
-SELECT COUNT(*) = 2 FROM columnar.stripe;
+SELECT COUNT(*) = 2 FROM columnar.stripe WHERE storage_id = :t_oid;
 
 DELETE FROM t WHERE a % 2 = 0;
 
-SELECT COUNT(*) = 0 FROM columnar.chunk_group WHERE deleted_rows = 0; 
-SELECT COUNT(*) = 0 FROM columnar.row_mask WHERE deleted_rows = 0; 
+SELECT COUNT(*) = 0 FROM columnar.chunk_group WHERE deleted_rows = 0 AND storage_id = :t_oid; 
+SELECT COUNT(*) = 0 FROM columnar.row_mask WHERE deleted_rows = 0 AND storage_id = :t_oid; 
 
 VACUUM t;
 
   -- Stripes are merged into one stripe because total number of non-deleted rows
   -- is less than maximum stripe row number
 
-SELECT COUNT(*) = 1 FROM columnar.stripe;
+SELECT COUNT(*) = 1 FROM columnar.stripe WHERE storage_id = :t_oid;
 
-SELECT COUNT(*) FROM columnar.chunk_group WHERE deleted_rows = 0; 
-SELECT COUNT(*) FROM columnar.row_mask WHERE deleted_rows = 0; 
+SELECT COUNT(*) FROM columnar.chunk_group WHERE deleted_rows = 0 AND storage_id = :t_oid; 
+SELECT COUNT(*) FROM columnar.row_mask WHERE deleted_rows = 0 AND storage_id = :t_oid; 
 
 DROP TABLE t;
 
@@ -192,33 +193,40 @@ DROP TABLE t;
 
 CREATE TABLE t(a INT, b INT) USING columnar;
 
+SELECT columnar_test_helpers.columnar_relation_storageid(pg_class.oid) AS t_oid FROM pg_class WHERE relname='t' \gset
+
 INSERT INTO t SELECT g, g % 10 from generate_series(1,100000) g;
 
-SELECT COUNT(*) = (SELECT COUNT(*) FROM columnar.row_mask) FROM columnar.chunk_group;
+SELECT COUNT(*) = (SELECT COUNT(*) FROM columnar.row_mask WHERE storage_id = :t_oid) 
+  FROM columnar.chunk_group WHERE storage_id = :t_oid;
 
-SELECT COUNT(*) AS columnar_chunk_group_rows FROM columnar.chunk_group \gset
-SELECT COUNT(*) AS columnar_row_mask_rows FROM columnar.row_mask \gset
+SELECT COUNT(*) AS columnar_chunk_group_rows FROM columnar.chunk_group WHERE storage_id = :t_oid \gset
+SELECT COUNT(*) AS columnar_row_mask_rows FROM columnar.row_mask WHERE storage_id = :t_oid \gset
 
 DELETE FROM t WHERE a % 2 = 0;
 
-SELECT COUNT(*) AS columnar_chunk_group_after_delete_rows FROM columnar.chunk_group WHERE deleted_rows >= 1 \gset
-SELECT COUNT(*) AS columnar_row_mask_after_delete_rows FROM columnar.row_mask WHERE deleted_rows >= 1 \gset
+SELECT COUNT(*) AS columnar_chunk_group_after_delete_rows FROM columnar.chunk_group 
+  WHERE deleted_rows >= 1 AND storage_id = :t_oid \gset
+SELECT COUNT(*) AS columnar_row_mask_after_delete_rows FROM columnar.row_mask 
+  WHERE deleted_rows >= 1 AND storage_id = :t_oid \gset
 
 SELECT :columnar_chunk_group_after_delete_rows = :columnar_chunk_group_rows;
 SELECT :columnar_row_mask_after_delete_rows = :columnar_row_mask_rows;
 
-SELECT SUM(deleted_rows) FROM columnar.row_mask;
-SELECT SUM(deleted_rows) FROM columnar.chunk_group;
+SELECT SUM(deleted_rows) FROM columnar.row_mask WHERE storage_id = :t_oid;
+SELECT SUM(deleted_rows) FROM columnar.chunk_group WHERE storage_id = :t_oid;
 
 VACUUM t;
 
   -- No more deleted_rows after vacuum
 
-SELECT COUNT(*) = 0 FROM columnar.chunk_group WHERE deleted_rows >= 1;
-SELECT COUNT(*) = 0 FROM columnar.row_mask WHERE deleted_rows >= 1;
+SELECT COUNT(*) = 0 FROM columnar.chunk_group WHERE deleted_rows >= 1 AND storage_id = :t_oid;
+SELECT COUNT(*) = 0 FROM columnar.row_mask WHERE deleted_rows >= 1 AND storage_id = :t_oid;
 
-SELECT COUNT(*) = (:columnar_chunk_group_rows / 2) FROM columnar.chunk_group WHERE deleted_rows = 0;
-SELECT COUNT(*) = (:columnar_row_mask_rows / 2) FROM columnar.row_mask WHERE deleted_rows = 0;
+SELECT COUNT(*) = (:columnar_chunk_group_rows / 2) FROM columnar.chunk_group 
+  WHERE deleted_rows = 0 AND storage_id = :t_oid;
+SELECT COUNT(*) = (:columnar_row_mask_rows / 2) FROM columnar.row_mask 
+  WHERE deleted_rows = 0 AND storage_id = :t_oid;
 
 SELECT COUNT(*) AS table_count FROM t \gset
 SELECT COUNT(*) AS table_count_mod_7 FROM t WHERE a % 7 = 0 \gset
@@ -231,7 +239,7 @@ VACUUM t;
 
   -- Vacuuming will not be done because number of deleted rows / total_rows is less than 20%
 
-SELECT COUNT(*) = (:columnar_chunk_group_rows / 2) FROM columnar.chunk_group;
-SELECT COUNT(*) = (:columnar_row_mask_rows / 2) FROM columnar.row_mask ;
+SELECT COUNT(*) = (:columnar_chunk_group_rows / 2) FROM columnar.chunk_group WHERE storage_id = :t_oid;
+SELECT COUNT(*) = (:columnar_row_mask_rows / 2) FROM columnar.row_mask WHERE storage_id = :t_oid;
 
 DROP TABLE t;

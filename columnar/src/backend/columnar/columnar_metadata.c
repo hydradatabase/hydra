@@ -559,7 +559,7 @@ SaveChunkGroups(RelFileNode relfilenode, uint64 stripe,
 	}
 
 	FinishModifyRelation(modifyState);
-	table_close(columnarChunkGroup, NoLock);
+	table_close(columnarChunkGroup, RowExclusiveLock);
 }
 
 
@@ -663,7 +663,7 @@ SaveEmptyRowMask(uint64 storageId, uint64 stripeId,
 	}
 
 	FinishModifyRelation(modifyState);
-	table_close(columnarRowMask, NoLock);
+	table_close(columnarRowMask, RowExclusiveLock);
 
 	return chunkInserted;
 }
@@ -1960,20 +1960,19 @@ DeleteStripeFromColumnarMetadataTable(Oid metadataTableId,
 	ScanKeyData scanKey[2];
 	ScanKeyInit(&scanKey[0], storageIdAtrrNumber, BTEqualStrategyNumber,
 				F_INT8EQ, UInt64GetDatum(storageId));
-	ScanKeyInit(&scanKey[0], stripeIdAttrNumber, BTEqualStrategyNumber,
+	ScanKeyInit(&scanKey[1], stripeIdAttrNumber, BTEqualStrategyNumber,
 				F_INT8EQ, UInt64GetDatum(stripeId));
 
-	Relation metadataTable = try_relation_open(metadataTableId, AccessShareLock);
+	Relation metadataTable = try_relation_open(metadataTableId, RowShareLock);
 	if (metadataTable == NULL)
 	{
 		/* extension has been dropped */
 		return;
 	}
 
-	Relation index = index_open(storageIdIndexId, AccessShareLock);
-
+	Relation index = index_open(storageIdIndexId, RowShareLock);
 	SysScanDesc scanDescriptor = systable_beginscan_ordered(metadataTable, index, NULL,
-															1, scanKey);
+															2, scanKey);
 
 	ModifyState *modifyState = StartModifyRelation(metadataTable);
 
@@ -1988,8 +1987,8 @@ DeleteStripeFromColumnarMetadataTable(Oid metadataTableId,
 
 	FinishModifyRelation(modifyState);
 
-	index_close(index, AccessShareLock);
-	table_close(metadataTable, AccessShareLock);
+	index_close(index, RowShareLock);
+	table_close(metadataTable, RowShareLock);
 }
 
 

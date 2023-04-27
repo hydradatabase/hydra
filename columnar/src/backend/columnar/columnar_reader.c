@@ -444,11 +444,11 @@ ColumnarReadRowByRowNumber(ColumnarReadState *readState,
 }
 
 /*
- * ColumnaSetStripeReadState 
+ * ColumnarSetStripeReadState 
  */
 bool
-ColumnaSetStripeReadState(ColumnarReadState *readState,
-						  StripeMetadata *startStripeMetadata)
+ColumnarSetStripeReadState(ColumnarReadState *readState,
+						   StripeMetadata *startStripeMetadata)
 {
 	if (!ColumnarReadIsCurrentStripe(readState, startStripeMetadata->firstRowNumber))
 	{
