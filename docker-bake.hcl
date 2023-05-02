@@ -171,7 +171,7 @@ target "s3" {
   args = {
     ARROW_TAG = "apache-arrow-10.0.0"
     AWS_SDK_TAG = "1.10.4"
-    PARQUET_S3_FDW_COMMIT = "15dc2c9f0c57dc9f699f6cc645ac82663cea9fe1"
+    PARQUET_S3_FDW_COMMIT = "3798786831635e5b9cce5dbf33826541c3852809"
   }
 }
 
@@ -415,6 +415,7 @@ target "columnar_15" {
 
   cache-to = ["type=local,dest=tmp/bake_cache/columnar_15"]
   cache-from = ["type=local,src=tmp/bake_cache/columnar_15"]
+}
 
 target "ivm" {
   inherits = ["shared"]
@@ -464,7 +465,7 @@ target "ivm_15" {
   }
 
   args = {
-    POSTGRES_BASE_VERSION = 14
+    POSTGRES_BASE_VERSION = 15
   }
 
   cache-to = ["type=local,dest=tmp/bake_cache/ivm_15"]

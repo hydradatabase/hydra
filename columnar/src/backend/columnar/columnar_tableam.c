@@ -1496,46 +1496,7 @@ TruncateColumnar(Relation rel, int elevel)
 	 * stituation where we need to truncate storage at the end.
 	 */
 	if (!stripesTruncated)
-	uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
-									ColumnarFirstLogicalOffset);
-
-	if (unlikely(rel->rd_smgr == NULL))
 	{
-		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
-	}
-
-	BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
-
-	if (!ColumnarStorageTruncate(rel, newDataReservation))
-	{
-		/*
-		* Due to the AccessExclusive lock there's no danger that
-		* new stripes be added beyond highestPhysicalAddress while
-		* we're truncating.
-		*/
-		uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
-										ColumnarFirstLogicalOffset);
-
-		RelationOpenSmgr(rel);
-		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
-
-		if (!ColumnarStorageTruncate(rel, newDataReservation))
-		{
-			UnlockRelation(rel, AccessExclusiveLock);
-			return;
-		}
-
-		RelationOpenSmgr(rel);
-		BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
-
-		ereport(elevel,
-		(errmsg("\"%s\": truncated %u to %u pages",
-				RelationGetRelationName(rel),
-				old_rel_pages, new_rel_pages),
-			errdetail_internal("%s", pg_rusage_show(&ru0))));
-	}
-
-	BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 		/*
 		* Due to the AccessExclusive lock there's no danger that
@@ -1545,8 +1506,10 @@ TruncateColumnar(Relation rel, int elevel)
 		uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
 										ColumnarFirstLogicalOffset);
 
-		RelationOpenSmgr(rel);
-		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+		if (unlikely(rel->rd_smgr == NULL))
+		{
+			smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+		}		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 		if (!ColumnarStorageTruncate(rel, newDataReservation))
 		{
@@ -1554,7 +1517,6 @@ TruncateColumnar(Relation rel, int elevel)
 			return;
 		}
 
-		RelationOpenSmgr(rel);
 		BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 		ereport(elevel,
@@ -1573,7 +1535,6 @@ TruncateColumnar(Relation rel, int elevel)
 	 */
 	UnlockRelation(rel, AccessExclusiveLock);
 }
-
 
 /*
  * ConditionalLockRelationWithTimeout tries to acquire a relation lock until
