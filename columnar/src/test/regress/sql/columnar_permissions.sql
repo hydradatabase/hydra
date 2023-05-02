@@ -2,6 +2,7 @@
 select current_user \gset
 
 create user columnar_user;
+grant all on schema public to columnar_user;
 
 \c - columnar_user
 

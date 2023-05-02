@@ -1,5 +1,6 @@
 select current_user \gset
 create user columnar_user;
+grant all on schema public to columnar_user;
 \c - columnar_user
 create table columnar_permissions(i int) using columnar;
 insert into columnar_permissions values(1);

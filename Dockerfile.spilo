@@ -50,11 +50,13 @@ RUN set -eux; \
     /tmp/install-arrow; \
     rm -f /tmp/install
 COPY --from=s3_14 /lib/* /s3_lib/
+COPY --from=s3_15 /lib/* /s3_lib/
 RUN cp -r /s3_lib/* /usr/lib/$(uname -m)-linux-gnu/
 
 # ivm ext
 COPY --from=ivm_13 /pg_ivm /
 COPY --from=ivm_14 /pg_ivm /
+COPY --from=ivm_15 /pg_ivm /
 
 # columnar ext
 COPY --from=columnar_13 /pg_ext /
