@@ -292,8 +292,8 @@ extern void ColumnarReadRowByRowNumberOrError(ColumnarReadState *readState,
 extern bool ColumnarReadRowByRowNumber(ColumnarReadState *readState,
 									   uint64 rowNumber, Datum *columnValues,
 									   bool *columnNulls);
-extern bool ColumnaSetStripeReadState(ColumnarReadState *readState,
-									  StripeMetadata *startStripeMetadata);
+extern bool ColumnarSetStripeReadState(ColumnarReadState *readState,
+									   StripeMetadata *startStripeMetadata);
 
 /* Function declarations for common functions */
 extern FmgrInfo * GetFunctionInfoOrNull(Oid typeId, Oid accessMethodId,
