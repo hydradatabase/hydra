@@ -1093,7 +1093,7 @@ FindNextStripeForParallelWorker(Relation relation,
 	ScanKeyData scanKey;
 
 	ScanKeyInit(&scanKey, Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
 
 	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
 
@@ -1120,6 +1120,8 @@ FindNextStripeForParallelWorker(Relation relation,
 				*nextHigherStripeId = foundStripeMetadata->id;
 				break;
 			}
+
+			pfree(foundStripeMetadata);
 		}
 		else
 		{
