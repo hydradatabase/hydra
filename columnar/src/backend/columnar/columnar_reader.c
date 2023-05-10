@@ -23,6 +23,7 @@
 #include "access/xact.h"
 #include "catalog/pg_am.h"
 #include "commands/defrem.h"
+#include "storage/smgr.h"
 #include "columnar/utils/listutils.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"

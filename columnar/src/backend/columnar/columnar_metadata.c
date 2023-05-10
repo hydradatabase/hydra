@@ -1094,7 +1094,7 @@ FindNextStripeForParallelWorker(Relation relation,
 	ScanKeyData scanKey;
 
 	ScanKeyInit(&scanKey, Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
 
 	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
 
@@ -1121,6 +1121,8 @@ FindNextStripeForParallelWorker(Relation relation,
 				*nextHigherStripeId = foundStripeMetadata->id;
 				break;
 			}
+
+			pfree(foundStripeMetadata);
 		}
 		else
 		{
@@ -2054,7 +2056,11 @@ DeleteTupleAndEnforceConstraints(ModifyState *state, HeapTuple heapTuple)
 	simple_heap_delete(state->rel, tid);
 
 	/* execute AFTER ROW DELETE Triggers to enforce constraints */
+#if PG_VERSION_NUM >= PG_VERSION_15
+	ExecARDeleteTriggers(estate, resultRelInfo, tid, NULL, NULL, true);
+#else
 	ExecARDeleteTriggers(estate, resultRelInfo, tid, NULL, NULL);
+#endif
 }
 
 
@@ -2474,7 +2480,15 @@ ColumnarStorageUpdateIfNeeded(Relation rel, bool isUpgrade)
 		return;
 	}
 
-	RelationOpenSmgr(rel);
+	/*
+	 * RelationGetSmgr was added in 15, but only backported to 13.10 and 14.07
+	 * leaving other versions requiring something like this.
+	 */
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	if (nblocks < 2)
 	{

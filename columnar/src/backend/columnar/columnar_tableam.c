@@ -978,7 +978,11 @@ columnar_relation_set_new_filenode(Relation rel,
 
 	*freezeXid = RecentXmin;
 	*minmulti = GetOldestMultiXactId();
+#if PG_VERSION_NUM >= PG_VERSION_15
+	SMgrRelation srel = RelationCreateStorage(*newrnode, persistence, true);
+#else
 	SMgrRelation srel = RelationCreateStorage(*newrnode, persistence);
+#endif
 
 	ColumnarStorageInit(srel, ColumnarMetadataNewStorageId());
 	InitColumnarOptions(rel->rd_id);
@@ -1009,7 +1013,12 @@ columnar_relation_nontransactional_truncate(Relation rel)
 	RelationTruncate(rel, 0);
 
 	uint64 storageId = ColumnarMetadataNewStorageId();
-	RelationOpenSmgr(rel);
+
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	ColumnarStorageInit(rel->rd_smgr, storageId);
 }
 
@@ -1389,7 +1398,11 @@ LogRelationStats(Relation rel, int elevel)
 		totalStripeLength += stripe->dataLength;
 	}
 
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	uint64 relPages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	RelationCloseSmgr(rel);
 
@@ -1502,8 +1515,10 @@ TruncateColumnar(Relation rel, int elevel)
 		uint64 newDataReservation = Max(GetHighestUsedAddress(rel->rd_node) + 1,
 										ColumnarFirstLogicalOffset);
 
-		RelationOpenSmgr(rel);
-		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
+		if (unlikely(rel->rd_smgr == NULL))
+		{
+			smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+		}		BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 		if (!ColumnarStorageTruncate(rel, newDataReservation))
 		{
@@ -1511,7 +1526,6 @@ TruncateColumnar(Relation rel, int elevel)
 			return;
 		}
 
-		RelationOpenSmgr(rel);
 		BlockNumber new_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 		ereport(elevel,
@@ -1530,7 +1544,6 @@ TruncateColumnar(Relation rel, int elevel)
 	 */
 	UnlockRelation(rel, AccessExclusiveLock);
 }
-
 
 /*
  * ConditionalLockRelationWithTimeout tries to acquire a relation lock until
@@ -2042,8 +2055,10 @@ columnar_relation_size(Relation rel, ForkNumber forkNumber)
 {
 	uint64 nblocks = 0;
 
-	/* Open it at the smgr level if not already done */
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
 
 	/* InvalidForkNumber indicates returning the size for all forks */
 	if (forkNumber == InvalidForkNumber)
@@ -2074,7 +2089,11 @@ columnar_estimate_rel_size(Relation rel, int32 *attr_widths,
 						   BlockNumber *pages, double *tuples,
 						   double *allvisfrac)
 {
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	*pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	*tuples = ColumnarTableRowCount(rel);
 
@@ -2547,18 +2566,31 @@ detoast_values(TupleDesc tupleDesc, Datum *orig_values, bool *isnull)
 static void
 ColumnarCheckLogicalReplication(Relation rel)
 {
+	bool pubActionInsert = false;
+
 	if (!is_publishable_relation(rel))
 	{
 		return;
 	}
 
+#if PG_VERSION_NUM >= PG_VERSION_15
+	{
+		PublicationDesc pubdesc;
+
+		RelationBuildPublicationDesc(rel, &pubdesc);
+		pubActionInsert = pubdesc.pubactions.pubinsert;
+	}
+#else
 	if (rel->rd_pubactions == NULL)
 	{
 		GetRelationPublicationActions(rel);
 		Assert(rel->rd_pubactions != NULL);
 	}
 
-	if (rel->rd_pubactions->pubinsert)
+	pubActionInsert = rel->rd_pubactions->pubinsert;
+#endif
+
+	if (pubActionInsert)
 	{
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg(

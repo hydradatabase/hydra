@@ -43,10 +43,11 @@
 #include "miscadmin.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
+#include "storage/smgr.h"
 
 #include "columnar/columnar.h"
 #include "columnar/columnar_storage.h"
-
+#include "columnar/columnar_version_compat.h"
 
 /*
  * Content of the first page in main fork, which stores metadata at file
@@ -354,7 +355,11 @@ ColumnarStorageGetReservedOffset(Relation rel, bool force)
 bool
 ColumnarStorageIsCurrent(Relation rel)
 {
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 	if (nblocks < 2)
@@ -439,7 +444,11 @@ ColumnarStorageReserveData(Relation rel, uint64 amount)
 	PhysicalAddr final = LogicalToPhysical(nextReservation - 1);
 
 	/* extend with new pages */
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 
 	while (nblocks <= final.blockno)
@@ -547,7 +556,11 @@ ColumnarStorageTruncate(Relation rel, uint64 newDataReservation)
 			 rel->rd_id, newDataReservation);
 	}
 
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	if (old_rel_pages == 0)
 	{
@@ -627,7 +640,11 @@ ColumnarOverwriteMetapage(Relation relation, ColumnarMetapage columnarMetapage)
 static ColumnarMetapage
 ColumnarMetapageRead(Relation rel, bool force)
 {
-	RelationOpenSmgr(rel);
+	if (unlikely(rel->rd_smgr == NULL))
+	{
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	}
+
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
 	if (nblocks == 0)
 	{
