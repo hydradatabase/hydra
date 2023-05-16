@@ -231,6 +231,18 @@ typedef struct ColumnarWriteState ColumnarWriteState;
 struct RowMaskWriteStateEntry;
 typedef struct RowMaskWriteStateEntry RowMaskWriteStateEntry;
 
+/* Cache statistics for when caching is enabled and used. */
+typedef struct ColumnarCacheStatistics
+{
+	uint64 hits;
+	uint64 misses;
+	uint64 evictions;
+	uint64 writes;
+	uint64 maximumCacheSize;
+	uint64 endingCacheSize;
+	uint64 entries;
+} ColumnarCacheStatistics;
+
 /* GUCs */
 extern int columnar_compression;
 extern int columnar_stripe_row_limit;
@@ -240,6 +252,8 @@ extern bool columnar_enable_parallel_execution;
 extern int columnar_min_parallel_processes;
 extern bool columnar_enable_vectorization;
 extern bool columnar_enable_dml;
+extern bool columnar_enable_page_cache;
+extern int columnar_page_cache_size;
 
 
 /* called when the user changes options on the given relation */
@@ -301,6 +315,7 @@ extern FmgrInfo * GetFunctionInfoOrNull(Oid typeId, Oid accessMethodId,
 extern ChunkData * CreateEmptyChunkData(uint32 columnCount, bool *columnMask,
 										uint32 chunkGroupRowCount);
 extern void FreeChunkData(ChunkData *chunkData);
+extern void FreeChunkBufferValueArray(ChunkData *chunkData);
 extern uint64 ColumnarTableRowCount(Relation relation);
 extern const char * CompressionTypeStr(CompressionType type);
 extern ItemPointerData row_number_to_tid(uint64 rowNumber);
@@ -418,5 +433,13 @@ extern ColumnarReadState ** FindReadStateCache(Relation relation,
 											   SubTransactionId currentSubXid);
 extern void CleanupReadStateCache(SubTransactionId currentSubXid);
 extern MemoryContext GetColumnarReadStateCache(void);
+
+/* columnar_cache.c */
+extern void ColumnarAddCacheEntry(uint64, uint64, uint64, uint32, void *);
+extern void *ColumnarRetrieveCache(uint64, uint64, uint64, uint32);
+extern void ColumnarResetCache(void);
+extern ColumnarCacheStatistics *ColumnarGetCacheStatistics(void);
+extern MemoryContext ColumnarCacheMemoryContext(void);
+
 
 #endif /* COLUMNAR_H */
