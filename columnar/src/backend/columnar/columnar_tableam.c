@@ -1189,7 +1189,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		
 		uint64 stripeRowCount = stripeMetadata->rowCount - lastStripeDeletedRows;
 
-		if ((totalRowNumberCount + stripeRowCount > columnarOptions.stripeRowCount))
+		if ((totalRowNumberCount + stripeRowCount >= columnarOptions.stripeRowCount))
 		{
 			break;
 		}
