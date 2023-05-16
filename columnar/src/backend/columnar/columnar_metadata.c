@@ -1363,7 +1363,7 @@ ReadChunkGroupRowCounts(uint64 storageId, uint64 stripe, uint32 chunkGroupCount,
 	HeapTuple heapTuple = NULL;
 
 	*chunkGroupRowCounts = palloc0(chunkGroupCount * sizeof(uint32));
-	*chunkGroupDeletedRows = palloc(chunkGroupCount * sizeof(uint32));
+	*chunkGroupDeletedRows = palloc0(chunkGroupCount * sizeof(uint32));
 
 	/*
 	 * Since we have now updates of `chunk_group`, there could be multiple tuples
