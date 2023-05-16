@@ -26,6 +26,7 @@
 
 #include "citus_version.h"
 #include "columnar/columnar.h"
+#include "columnar/columnar_metadata.h"
 #include "columnar/columnar_storage.h"
 #include "columnar/columnar_version_compat.h"
 #include "columnar/utils/listutils.h"
@@ -2533,4 +2534,33 @@ GetHighestUsedRowNumber(uint64 storageId)
 	}
 
 	return highestRowNumber;
+}
+
+/*
+ * RewriteMetadataRowWithNewValues rewrites a given metadata entry
+ * for a storageId and a stripeId in place with a new offset,
+ * rowCount, sizeBytes, and chunkCount.
+ *
+ * This is used in the vacuum UDF to fill any existing holes
+ * if possible.
+ */
+StripeMetadata *
+RewriteStripeMetadataRowWithNewValues(Relation rel, uint64 stripeId,
+              uint64 sizeBytes, uint64 fileOffset, uint64 rowCount, uint64 chunkCount)
+{
+	uint64 storageId = ColumnarStorageGetStorageId(rel, false);
+
+	bool update[Natts_columnar_stripe] = { false };
+	update[Anum_columnar_stripe_file_offset - 1] = true;
+	update[Anum_columnar_stripe_data_length - 1] = true;
+	update[Anum_columnar_stripe_row_count - 1] = true;
+	update[Anum_columnar_stripe_chunk_count - 1] = true;
+
+	Datum newValues[Natts_columnar_stripe] = { 0 };
+	newValues[Anum_columnar_stripe_file_offset - 1] = Int64GetDatum(fileOffset);
+	newValues[Anum_columnar_stripe_data_length - 1] = Int64GetDatum(sizeBytes);
+	newValues[Anum_columnar_stripe_row_count - 1] = UInt64GetDatum(rowCount);
+	newValues[Anum_columnar_stripe_chunk_count - 1] = Int32GetDatum(chunkCount);
+
+	return UpdateStripeMetadataRow(storageId, stripeId, update, newValues);
 }

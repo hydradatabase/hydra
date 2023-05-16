@@ -1,6 +1,7 @@
 #include "citus_version.h"
 
 #include "postgres.h"
+#include "fmgr.h"
 
 #include <math.h>
 
@@ -12,6 +13,8 @@
 #include "access/rewriteheap.h"
 #include "access/tableam.h"
 #include "access/tsmapi.h"
+#include "storage/lockdefs.h"
+#include "utils/palloc.h"
 #if PG_VERSION_NUM >= 130000
 #include "access/detoast.h"
 #else
@@ -31,7 +34,9 @@
 #include "commands/vacuum.h"
 #include "commands/extension.h"
 #include "executor/executor.h"
+#include "funcapi.h"
 #include "nodes/makefuncs.h"
+#include "nodes/pg_list.h"
 #include "optimizer/plancat.h"
 #include "pgstat.h"
 #include "safe_lib.h"
@@ -54,12 +59,14 @@
 #include "utils/syscache.h"
 #include "columnar/columnar.h"
 #include "columnar/columnar_customscan.h"
+#include "columnar/columnar_metadata.h"
 #include "columnar/columnar_storage.h"
 #include "columnar/columnar_tableam.h"
 #include "columnar/columnar_version_compat.h"
 #include "columnar/utils/listutils.h"
 
 #include "columnar/vectorization/columnar_vector_types.h"
+#include "columnar/columnar_metadata.h"
 
 /*
  * Timing parameters for truncate locking heuristics.
@@ -136,7 +143,8 @@ static void ColumnarProcessUtility(PlannedStmt *pstmt,
 								   DestReceiver *dest,
 								   QueryCompletionCompat *completionTag);
 static bool ConditionalLockRelationWithTimeout(Relation rel, LOCKMODE lockMode,
-											   int timeout, int retryInterval);
+											   int timeout, int retryInterval,
+											   bool acquire);
 static List * NeededColumnsList(TupleDesc tupdesc, Bitmapset *attr_needed);
 static void LogRelationStats(Relation rel, int elevel);
 static void TruncateColumnar(Relation rel, int elevel);
@@ -1477,7 +1485,8 @@ TruncateColumnar(Relation rel, int elevel)
 	 */
 	if (!ConditionalLockRelationWithTimeout(rel, AccessExclusiveLock,
 											VACUUM_TRUNCATE_LOCK_TIMEOUT,
-											VACUUM_TRUNCATE_LOCK_WAIT_INTERVAL))
+											VACUUM_TRUNCATE_LOCK_WAIT_INTERVAL,
+											false))
 	{
 		/*
 		 * We failed to establish the lock in the specified number of
@@ -1545,7 +1554,7 @@ TruncateColumnar(Relation rel, int elevel)
  */
 static bool
 ConditionalLockRelationWithTimeout(Relation rel, LOCKMODE lockMode, int timeout,
-								   int retryInterval)
+								   int retryInterval, bool acquire)
 {
 	int lock_retry = 0;
 
@@ -1561,7 +1570,7 @@ ConditionalLockRelationWithTimeout(Relation rel, LOCKMODE lockMode, int timeout,
 		 */
 		CHECK_FOR_INTERRUPTS();
 
-		if (++lock_retry > (timeout / retryInterval))
+		if (!acquire && (++lock_retry > (timeout / retryInterval)))
 		{
 			return false;
 		}
@@ -2874,4 +2883,437 @@ downgrade_columnar_storage(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+typedef struct StripeHole
+{
+	uint64 fileOffset;
+	uint64 dataLength;
+} StripeHole;
 
+/*
+ * HolesForRelation returns a list of holes in the Relation id in the current
+ * MemoryContext.
+ */
+static List *HolesForRelation(Relation rel)
+{
+	List *holes = NIL;
+
+	/* Get current columnar options */
+	ColumnarOptions columnarOptions = { 0 };
+	ReadColumnarOptions(rel->rd_id, &columnarOptions);
+
+	ListCell *lc = NULL;
+
+	List *stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
+	uint64 lastMinimalOffset = ColumnarFirstLogicalOffset;
+
+	foreach(lc, stripeMetadataList)
+	{
+		StripeMetadata * stripeMetadata = lfirst(lc);
+
+		/* Arbitrary check to see if the offset will be large enough, 10000 bytes is what was chosen. */
+		if (stripeMetadata->fileOffset == lastMinimalOffset || stripeMetadata->fileOffset - lastMinimalOffset < 10000) {
+			lastMinimalOffset = stripeMetadata->fileOffset + stripeMetadata->dataLength;
+			continue;
+		} else {
+			StripeHole * hole = palloc(sizeof(StripeHole));
+			hole->fileOffset = lastMinimalOffset;
+			hole->dataLength = stripeMetadata->fileOffset + stripeMetadata->dataLength - lastMinimalOffset;
+			lastMinimalOffset = stripeMetadata->fileOffset + stripeMetadata->dataLength;
+
+			holes = lappend(holes, hole);
+		}
+	}
+
+	return holes;
+}
+
+/*
+ * vacuum_columnar_table
+ */
+typedef struct StripeVacuumCandidate
+{
+	uint64 stripeId;
+	int32 stripeMetadataIndex;
+	uint32 candidateTotalSize;
+	uint32 activeRows;
+	StripeMetadata *stripeMetadata;
+} StripeVacuumCandidate;
+
+PG_FUNCTION_INFO_V1(vacuum_columnar_table);
+Datum
+vacuum_columnar_table(PG_FUNCTION_ARGS)
+{
+	Oid relid = PG_GETARG_OID(0);
+	Relation rel = RelationIdGetRelation(relid);
+	TupleDesc tupleDesc = RelationGetDescr(rel);
+	MemoryContext oldcontext = CurrentMemoryContext;
+	uint32 stripeCount = PG_GETARG_UINT32(1);
+	uint32 progress = 0;
+
+	MemoryContext vacuum_context = AllocSetContextCreate(CurrentMemoryContext,
+						"Columnar Vacuum Context",
+						ALLOCSET_SMALL_SIZES);
+
+	oldcontext = MemoryContextSwitchTo(vacuum_context);
+
+	if (tupleDesc->natts == 0)
+	{
+		ereport(INFO,
+				(errmsg("\"%s\": stopping vacuum due to zero column table",
+						RelationGetRelationName(rel))));
+
+		MemoryContextSwitchTo(oldcontext);
+
+		PG_RETURN_VOID();
+	}
+
+	/* Get current columnar options */
+	ColumnarOptions columnarOptions = { 0 };
+	ReadColumnarOptions(rel->rd_id, &columnarOptions);
+
+	/* Get all stripes in order. */
+	List *stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
+	List *vacuumCandidatesStripeList = NIL;
+
+	/* Empty table nothing to do */
+	if (stripeMetadataList == NIL)
+	{
+		ereport(INFO,
+				(errmsg("\"%s\": stopping vacuum due to empty table",
+						RelationGetRelationName(rel))));
+
+		/* Close the relation as we are done with it */
+		RelationClose(rel);
+
+		MemoryContextSwitchTo(oldcontext);
+
+		PG_RETURN_VOID();
+	}
+
+	ListCell *lc = NULL;
+
+	int stripeMetadataIndex = 0;
+
+	/*
+	 * Get a list of all stripes that can be combined into larger stripes.
+	 */
+	foreach(lc, stripeMetadataList)
+	{
+		/* We should not consider the last stripe. */
+		if (lfirst(lc) == llast(stripeMetadataList))
+		{
+			break;
+		}
+
+		StripeMetadata * stripeMetadata = lfirst(lc);
+		uint32 stripeDeletedRows = DeletedRowsForStripe(rel->rd_node,
+												 		stripeMetadata->chunkCount,
+														stripeMetadata->id);
+
+		float percentageOfDeleteRows = 
+			(float)stripeDeletedRows / (float)(stripeMetadata->rowCount);
+
+		/* 
+		 * If inspected stripe has less than 0.5 percent of maximum strip row size 
+		 * or percentage of deleted rows is less than 20% we will skip this stripe
+		 * for vacuum.
+		*/
+		if ((stripeMetadata->rowCount > columnarOptions.stripeRowCount * 0.5) &&
+			percentageOfDeleteRows <= 0.2f)
+		{
+			continue;
+		}
+
+		StripeVacuumCandidate *vacuumCandidate = palloc(sizeof(StripeVacuumCandidate));
+		vacuumCandidate->stripeMetadataIndex = stripeMetadataIndex;
+		vacuumCandidate->candidateTotalSize = stripeMetadata->rowCount - stripeDeletedRows; 
+		vacuumCandidate->stripeMetadata = stripeMetadata;
+		vacuumCandidate->activeRows = stripeMetadata->rowCount - stripeDeletedRows;
+
+		vacuumCandidatesStripeList = lappend(vacuumCandidatesStripeList, vacuumCandidate);
+	}
+
+	/* We need all columns. */
+	int natts = rel->rd_att->natts;
+	Bitmapset *attr_needed = bms_add_range(NULL, 0, natts - 1);
+
+	/* No quals for table rewrite */
+	List *scanQual = NIL;
+
+	/* Use SnapshotAny when re-writing table as heapAM does. */
+	Snapshot snapshot = SnapshotAny;
+
+	MemoryContext scanContext = CreateColumnarScanMemoryContext();
+	bool randomAccess = true;
+
+	ConditionalLockRelationWithTimeout(rel, AccessExclusiveLock,
+											VACUUM_TRUNCATE_LOCK_TIMEOUT,
+											VACUUM_TRUNCATE_LOCK_WAIT_INTERVAL,
+											true);
+
+	ColumnarWriteState *writeState = ColumnarBeginWrite(rel->rd_node,
+											columnarOptions,
+											tupleDesc);
+
+	/*
+	 * Combine the vacuum candidates into their own stripes appended to the rel, this
+	 * should clear out any space from partial stripes to make space to move stripes into.
+	 */
+	foreach(lc, vacuumCandidatesStripeList)
+	{
+		StripeVacuumCandidate *vacuumCandidate = lfirst(lc);
+
+		ColumnarReadState *readState = init_columnar_read_state(rel, tupleDesc,
+															attr_needed, scanQual,
+															scanContext, snapshot,
+															randomAccess,
+															NULL);
+
+
+		ColumnarSetStripeReadState(readState,
+								vacuumCandidate->stripeMetadata);
+		
+		Datum *values = palloc0(tupleDesc->natts * sizeof(Datum));
+		bool *nulls = palloc0(tupleDesc->natts * sizeof(bool));
+
+		int32 rowCount = 0;
+
+		while (rowCount < vacuumCandidate->activeRows && ColumnarReadNextRow(readState, values, nulls, NULL))
+		{
+			ColumnarWriteRow(writeState, values, nulls);
+			rowCount++;
+		}
+
+		DeleteMetadataRowsForStripeId(rel->rd_node, vacuumCandidate->stripeMetadata->id);
+		ColumnarEndRead(readState);
+
+		pfree(values);
+		pfree(nulls);
+
+		progress++;
+
+		if (stripeCount && progress >= stripeCount)
+		{
+			break;
+		}
+	}
+	
+	/*
+	 * We have finished the first route of writes, let's drop our lock until we are
+	 * ready for the next stage: compaction.
+	 */
+	ColumnarEndWrite(writeState);
+	UnlockRelation(rel, AccessExclusiveLock);
+
+	/* Lock the relation. */
+	ConditionalLockRelationWithTimeout(rel, AccessExclusiveLock,
+											VACUUM_TRUNCATE_LOCK_TIMEOUT,
+											VACUUM_TRUNCATE_LOCK_WAIT_INTERVAL,
+											true);
+
+	/*
+		* Get a list of all stripes in order.
+		*/
+	stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
+
+	/*
+	 * Continually iterate through the holes, finding where we can place
+	 * old stripes.
+	 */
+	bool done = false;
+	while (!done)
+	{
+		/*
+		 * Get a List of empty spaces to fill with later stripes.
+		 */
+		List *holes = HolesForRelation(rel);
+
+		if (list_length(holes) == 0 || (stripeCount && progress >= stripeCount))
+		{
+			done = true;
+			continue;
+		}
+
+		stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
+
+		int relocationCount = 0;
+		/*
+		 * Iterate through the holes, moving later slices into the holes.
+		 */
+		foreach(lc, holes)
+		{
+			StripeHole *hole = lfirst(lc);
+
+			ListCell *stripeLc = NULL;
+
+			foreach(stripeLc, stripeMetadataList)
+			{
+				StripeMetadata *stripe = lfirst(stripeLc);
+
+				/* If we are marked done, we should simply drop out. */
+				if (done)
+				{
+					break;
+				}
+
+				/* Find one that will fit, and move it. */
+				if (stripe->dataLength <= hole->dataLength && stripe->fileOffset > hole->fileOffset)
+				{
+					/* Read a copy of the old row. */
+					char * data = palloc(stripe->dataLength);
+					ColumnarStorageRead(rel, stripe->fileOffset, data, stripe->dataLength);
+
+					/* Write the data to the new offset. */
+					ColumnarStorageWrite(rel, hole->fileOffset, data, stripe->dataLength);
+
+					/* Update the stripe metadata for the moved stripe. */
+					StripeMetadata *newStripe = RewriteStripeMetadataRowWithNewValues(rel, stripe->id, stripe->dataLength, hole->fileOffset, stripe->rowCount, stripe->chunkCount);
+
+					relocationCount++;
+
+					/* Resize the hole for the next pass. */
+					hole->fileOffset += newStripe->dataLength;
+					hole->dataLength -= newStripe->dataLength;
+
+					pfree(data);
+
+					progress++;
+
+					if (stripeCount && progress >= stripeCount)
+					{
+						done = true;
+						break;
+					}
+				}
+			}
+
+
+			if (relocationCount == 0 || (stripeCount && progress >= stripeCount))
+			{
+				done = true;
+			}
+
+			holes = HolesForRelation(rel);
+		}
+	}
+
+	UnlockRelation(rel, AccessExclusiveLock);
+
+	relation_close(rel, NoLock);
+
+	MemoryContextSwitchTo(oldcontext);
+
+	PG_RETURN_UINT32(progress);
+}
+
+/*
+ * Data storage for columnar stats.
+ */
+typedef struct ColumnarStats
+{
+	uint64 stripeId;
+	uint64 fileOffset;
+	uint32 rowCount;
+	uint32 deletedRows;
+	uint32 chunkCount;
+	uint32 dataLength;
+} ColumnarStats;
+
+/* We return 6 columns. */
+#define STATS_INFO_NATTS 6
+
+PG_FUNCTION_INFO_V1(columnar_stats);
+Datum
+columnar_stats(PG_FUNCTION_ARGS)
+{
+	FuncCallContext *funcctx;
+	int call_cntr;
+	int max_calls;
+	TupleDesc tupdesc;
+	AttInMetadata *attinmeta;
+
+
+	/* If this is the first call in, set up the data. */
+	if (SRF_IS_FIRSTCALL())
+	{
+		MemoryContext oldcontext;
+
+		Oid relid = PG_GETARG_OID(0);
+		Relation rel = RelationIdGetRelation(relid);
+
+		/* Function context for persistance. */
+		funcctx = SRF_FIRSTCALL_INIT();
+
+		/* Use the SRF memory context */
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+		/* Retrieve the stripe metadata. */
+		List *stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
+
+		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+				ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+									errmsg("function returning record called in context "
+												"that cannot accept type record")));
+
+		attinmeta = TupleDescGetAttInMetadata(tupdesc);
+		funcctx->attinmeta = attinmeta;
+
+		/* Set up the stats. */
+		ColumnarStats *stats = palloc(sizeof(ColumnarStats) * list_length(stripeMetadataList));
+		funcctx->max_calls = list_length(stripeMetadataList);
+
+		/* Iterate through the stripes to get a copy of the important data. */
+		for (int i = 0; i < funcctx->max_calls; i++)
+		{
+			StripeMetadata *data = list_nth(stripeMetadataList, i);
+
+			stats[i].stripeId = data->id;
+			stats[i].fileOffset = data->fileOffset;
+			stats[i].rowCount = data->rowCount;
+			stats[i].chunkCount = data->chunkCount;
+			stats[i].dataLength = data->dataLength;
+			stats[i].deletedRows = DeletedRowsForStripe(rel->rd_node,
+												 		data->chunkCount,
+														data->id);
+		}
+
+		funcctx->user_fctx = stats;
+
+		table_close(rel, NoLock);
+
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	funcctx = SRF_PERCALL_SETUP();
+
+	call_cntr = funcctx->call_cntr;
+	max_calls = funcctx->max_calls;
+	ColumnarStats *stats = funcctx->user_fctx;
+
+	if (call_cntr < max_calls)
+	{
+		Datum result;
+
+		Datum values[STATS_INFO_NATTS] = { 0 };
+		bool nulls[STATS_INFO_NATTS] = { 0 };
+
+		get_call_result_type(fcinfo, NULL, &tupdesc);
+
+		values[0] = Int64GetDatum(stats[call_cntr].stripeId);
+		values[1] = Int64GetDatum(stats[call_cntr].fileOffset);
+		values[2] = Int32GetDatum(stats[call_cntr].rowCount);
+		values[3] = Int32GetDatum(stats[call_cntr].deletedRows);
+		values[4] = Int32GetDatum(stats[call_cntr].chunkCount);
+		values[5] = Int32GetDatum(stats[call_cntr].dataLength);
+
+		HeapTuple tuple = heap_form_tuple(tupdesc, values, nulls);
+		result = HeapTupleGetDatum(tuple);
+
+		SRF_RETURN_NEXT(funcctx, result);
+	}
+	else
+	{
+		SRF_RETURN_DONE(funcctx);
+	}
+}
