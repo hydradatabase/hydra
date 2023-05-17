@@ -43,6 +43,7 @@ int columnar_chunk_group_row_limit = DEFAULT_CHUNK_ROW_COUNT;
 int columnar_compression_level = 3;
 bool columnar_enable_parallel_execution = true;
 int columnar_min_parallel_processes = 8;
+int columnar_max_parallel_processes = 0;
 bool columnar_enable_vectorization = true;
 bool columnar_enable_dml = true;
 
@@ -138,6 +139,19 @@ columnar_init_gucs()
 							&columnar_min_parallel_processes,
 							8,
 							1,
+							32,
+							PGC_USERSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
+	
+	DefineCustomIntVariable("columnar.max_parallel_processes",
+							"Max number of parallel processes per query",
+							NULL,
+							&columnar_max_parallel_processes,
+							0,
+							0,
 							32,
 							PGC_USERSET,
 							0,

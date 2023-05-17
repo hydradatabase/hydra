@@ -1232,6 +1232,10 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 				Min(max_parallel_workers, columnar_min_parallel_processes);
 		}
 
+		if (columnar_max_parallel_processes)
+			columnar_min_parallel_process_running = 
+				Min(columnar_min_parallel_process_running, columnar_max_parallel_processes);
+
 		if (parallel_leader_participation)
 			columnar_min_parallel_process_running--;
 

@@ -238,6 +238,7 @@ extern int columnar_chunk_group_row_limit;
 extern int columnar_compression_level;
 extern bool columnar_enable_parallel_execution;
 extern int columnar_min_parallel_processes;
+extern int columnar_max_parallel_processes;
 extern bool columnar_enable_vectorization;
 extern bool columnar_enable_dml;
 
