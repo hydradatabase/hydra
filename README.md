@@ -21,11 +21,11 @@ Hydra is a modern, open source replacement for enterprise data warehouses. It’
 Hydra implements an open source columnar engine to Postgres, driving 23X query performance, better cache hit rates, and scalability over basic Postgres. When comparing to traditional warehouses, Hydra delivers 1500X more throughput to enable realtime analytical workloads.
 
 ## Contents
-- Benchmarks
-- Quick Start
-- Features
-- Community and Status
-- License
+- [Benchmarks](#-benchmarks)
+- [Quick Start](#-quick-start)
+- [Features](#features)
+- [Community and Status](#-community-and-status)
+- [License](#license)
 
 ## 💪 Benchmarks
 ![Hydra - the open source data warehouse](.images/FasterthanPG.png)
