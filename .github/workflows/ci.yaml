@@ -34,7 +34,7 @@ jobs:
         postgres: ["13", "14", "15"]
     name: Validate Columnar ${{ matrix.postgres }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -60,7 +60,7 @@ jobs:
         postgres: ["13", "14", "15"]
     name: Build and Validate Postgres ${{ matrix.postgres }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: setup POSTGRES_IMAGE env
         run: echo "POSTGRES_IMAGE=${{ format('{0}:{1}-{2}', env.POSTGRES_REPO, matrix.postgres, github.sha) }}" >> $GITHUB_ENV
@@ -116,7 +116,7 @@ jobs:
     if: github.repository == 'hydradatabase/hydra-internal'
     name: Build and Validate Spilo
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: setup SPILO_IMAGE
         run: echo "SPILO_IMAGE=${{ format('{0}:{1}', env.SPILO_REPO, github.sha) }}" >> $GITHUB_ENV
@@ -194,7 +194,7 @@ jobs:
         postgres: ["13", "14", "15"]
     name: Push Postgres ${{ matrix.postgres }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -223,7 +223,6 @@ jobs:
   push_spilo:
     needs: [build_validate_spilo]
     if: github.repository == 'hydradatabase/hydra-internal' && github.ref == 'refs/heads/main'
-    timeout-minutes: 10
     uses: ./.github/workflows/build_spilo.yaml
     with:
       production: true
