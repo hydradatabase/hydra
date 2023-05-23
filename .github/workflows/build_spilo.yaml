@@ -26,7 +26,7 @@ jobs:
     if: github.repository == 'hydradatabase/hydra-internal'
     name: Push Spilo
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
     - name: Checkout
       uses: actions/checkout@v3
