@@ -223,7 +223,6 @@ jobs:
   push_spilo:
     needs: [build_validate_spilo]
     if: github.repository == 'hydradatabase/hydra-internal' && github.ref == 'refs/heads/main'
-    timeout-minutes: 10
     uses: ./.github/workflows/build_spilo.yaml
     with:
       production: true
