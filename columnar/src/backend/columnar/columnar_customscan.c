@@ -25,6 +25,7 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_statistic.h"
 #include "commands/defrem.h"
+#include "commands/explain.h"
 #include "miscadmin.h"
 #include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
@@ -2398,6 +2399,54 @@ ColumnarScan_ExplainCustomScan(CustomScanState *node, List *ancestors,
 					context, columnarScanState->vectorization.vectorizedQualList);
 		ExplainPropertyText("Columnar Vectorized Filter", 
 							vectorizedWhereClauses, es);
+	}
+
+	if (columnar_enable_page_cache)
+	{
+		ColumnarCacheStatistics *statistics = ColumnarGetCacheStatistics();
+
+		ExplainPropertyUInteger(
+			"Cache Hits",
+			NULL,
+			statistics->hits,
+			es);
+
+		ExplainPropertyUInteger(
+			"Cache Misses",
+			NULL,
+			statistics->misses,
+			es);
+
+		ExplainPropertyUInteger(
+			"Cache Evictions",
+			NULL,
+			statistics->evictions,
+			es);
+
+		ExplainPropertyUInteger(
+			"Cache Writes",
+			NULL,
+			statistics->writes,
+			es);
+
+		ExplainPropertyUInteger(
+			"Cache Maximum Size",
+			NULL,
+			statistics->maximumCacheSize,
+			es);
+
+		ExplainPropertyUInteger(
+			"Cache Ending Size", 
+			NULL, 
+			statistics->endingCacheSize,
+			es);
+
+		ExplainPropertyUInteger(
+			"Total Cache Entries",
+			NULL,
+			statistics->entries,
+			es
+		);
 	}
 }
 

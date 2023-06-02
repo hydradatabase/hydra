@@ -45,6 +45,8 @@ bool columnar_enable_parallel_execution = true;
 int columnar_min_parallel_processes = 8;
 bool columnar_enable_vectorization = true;
 bool columnar_enable_dml = true;
+bool columnar_enable_page_cache = true;
+int columnar_page_cache_size = 200U;
 
 static const struct config_enum_entry columnar_compression_options[] =
 {
@@ -165,6 +167,30 @@ columnar_init_gucs()
 							GUC_NO_SHOW_ALL,
 							NULL, 
 							NULL, 
+							NULL);
+
+	DefineCustomBoolVariable("columnar.enable_column_cache",
+							gettext_noop("Enables column based caching"),
+							NULL,
+							&columnar_enable_page_cache,
+							false,
+							PGC_USERSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
+
+	DefineCustomIntVariable("columnar.column_cache_size",
+							gettext_noop("Size of the column based cache in megabytes"),
+							NULL,
+							&columnar_page_cache_size,
+							200U,
+							20U,
+							20000U,
+							PGC_USERSET,
+							GUC_UNIT_MB,
+							NULL,
+							NULL,
 							NULL);
 }
 

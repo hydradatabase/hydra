@@ -177,6 +177,9 @@ static ItemPointerData TupleSortSkipSmallerItemPointers(Tuplesortstate *tupleSor
 /* Custom tuple slot ops used for columnar. Initialized in columnar_tableam_init(). */
 static TupleTableSlotOps TTSOpsColumnar;
 
+/* Previous cache enabled state. */
+static bool previousCacheEnabledState = false;
+
 static const TupleTableSlotOps *
 columnar_slot_callbacks(Relation relation)
 {
@@ -190,6 +193,8 @@ columnar_beginscan(Relation relation, Snapshot snapshot,
 				   ParallelTableScanDesc parallel_scan,
 				   uint32 flags)
 {
+	previousCacheEnabledState = columnar_enable_page_cache;
+
 	int natts = relation->rd_att->natts;
 
 	/* attr_needed represents 0-indexed attribute numbers */
@@ -215,6 +220,8 @@ columnar_beginscan_extended(Relation relation, Snapshot snapshot,
 							ParallelColumnarScan parallelColumnarScan,
 							bool returnVectorizedTuple)
 {
+	previousCacheEnabledState = columnar_enable_page_cache;
+
 	Oid relfilenode = relation->rd_node.relNode;
 
 	/*
@@ -313,6 +320,14 @@ columnar_endscan(TableScanDesc sscan)
 	{
 		UnregisterSnapshot(scan->cs_base.rs_snapshot);
 	}
+
+	/* clean up any caches. */
+	if (columnar_enable_page_cache == true)
+	{
+		ColumnarResetCache();
+	}
+
+	columnar_enable_page_cache = previousCacheEnabledState;
 }
 
 
@@ -742,6 +757,9 @@ static TransactionId
 columnar_index_delete_tuples(Relation rel,
 							 TM_IndexDeleteOp *delstate)
 {
+	previousCacheEnabledState = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
+
 	/*
 	 * XXX: We didn't bother implementing index_delete_tuple for neither of
 	 * simple deletion and bottom-up deletion cases. There is no particular
@@ -801,6 +819,9 @@ static void
 columnar_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
 					  int options, BulkInsertState bistate)
 {
+	previousCacheEnabledState = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
+
 	/*
 	 * columnar_init_write_state allocates the write state in a longer
 	 * lasting context, so no need to worry about it.
