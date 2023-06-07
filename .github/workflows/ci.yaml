@@ -22,10 +22,8 @@ jobs:
           go-version-file: acceptance/go.mod
           cache-dependency-path: acceptance/go.sum
           check-latest: true
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          working-directory: acceptance
+      - name: Lint
+        run: make lint_acceptance
 
   validate_columnar:
     strategy:
