@@ -27,6 +27,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           working-directory: acceptance
+          version: v1.50.1
 
   validate_columnar:
     strategy:
