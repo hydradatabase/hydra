@@ -6,6 +6,8 @@ POSTGRES_BASE_VERSION ?= 14
 
 ECR_REGISTRY ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com
 
+GOLANGCI_LINT_VERSION ?= $$(cat .golangci_lint_version)
+
 $(DOCKER_CACHE_DIR):
 	mkdir -p $(DOCKER_CACHE_DIR)
 
@@ -106,9 +108,11 @@ spilo_acceptance_build_test: docker_build_local_spilo spilo_pull_upgrade_image s
 .PHONY: lint_acceptance
 # Runs the go linter
 lint_acceptance:
-	cd acceptance && golangci-lint run
+	docker run --rm -v $(CURDIR)/acceptance:/app -w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) \
+		golangci-lint run --timeout 5m --out-format colored-line-number
 
 .PHONY: lint_fix_acceptance
 # Runs the go linter with the auto-fixer
 lint_fix_acceptance:
-	cd acceptance && golangci-lint run --fix
+	docker run --rm -v $(CURDIR)/acceptance:/app -w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) \
+		golangci-lint run --fix

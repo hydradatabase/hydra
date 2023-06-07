@@ -9,6 +9,7 @@ linters:
     - unused
   disable:
     # unwanted
+    - depguard
     - exhaustivestruct
     - exhaustruct
     - gosec
