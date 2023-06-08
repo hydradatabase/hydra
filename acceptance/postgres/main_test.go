@@ -244,7 +244,7 @@ SELECT count(1) FROM pg_extension WHERE extname = 'http';
 				Name: "http put",
 				SQL: `
 SELECT status, content_type, content::json->>'data' AS data
-  FROM http_put('http://httpbin.org/put', 'some text', 'text/plain');
+  FROM http_put('http://httpbun.com/put', 'some text', 'text/plain');
 			`,
 				Validate: func(t *testing.T, row pgx.Row) {
 					var result struct {
