@@ -99,7 +99,7 @@ Read [documentation](https://docs.hydra.so/concepts/using-hydra-columnar) on usi
 
 ### Coming Soon
 Watch [releases](https://github.com/hydradatabase/hydra/releases) of this repo to get notified of updates.
-- [ ]  🧹 vacuum stripe optimizations and space reclamation
+- [x]  🧹 vacuum stripe optimizations and space reclamation
 - [ ]  🏎️ vectorized execution of aggregate functions
 - [ ]  🚅 use of SIMD in vectorized execution
 - [ ]  ↔️ separation of compute and storage
