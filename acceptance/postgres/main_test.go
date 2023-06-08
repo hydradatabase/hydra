@@ -243,8 +243,8 @@ SELECT count(1) FROM pg_extension WHERE extname = 'http';
 			{
 				Name: "http put",
 				SQL: `
-SELECT status, content_type, content::json->>'data' AS data
-  FROM http_put('http://httpbin.org/put', 'some text', 'text/plain');
+SELECT status, content_type, content::json AS data
+	FROM http_put('https://eoy5lmfzg43ppr.m.pipedream.net', '{ "foo": "bar" }', 'application/json');
 			`,
 				Validate: func(t *testing.T, row pgx.Row) {
 					var result struct {
@@ -260,10 +260,10 @@ SELECT status, content_type, content::json->>'data' AS data
 					if want, got := 200, result.Status; want != got {
 						t.Errorf("http put response status should match: want=%d got=%d", want, got)
 					}
-					if want, got := "application/json", result.ContentType; want != got {
+					if want, got := "application/json; charset=utf-8", result.ContentType; want != got {
 						t.Errorf("http put response content type should match: want=%s got=%s", want, got)
 					}
-					if want, got := "some text", result.Data; want != got {
+					if want, got := `{"foo":"bar"}`, result.Data; want != got {
 						t.Errorf("http put response data should match: want=%s got=%s", want, got)
 					}
 				},
