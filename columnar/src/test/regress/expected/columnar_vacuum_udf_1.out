@@ -226,7 +226,7 @@ DELETE FROM t1 WHERE a BETWEEN 500000 AND 1500000;
 SELECT * FROM columnar.vacuum('t1'::regclass);
  vacuum 
 --------
-     19
+     17
 (1 row)
 
 -- should show no holes
@@ -238,7 +238,7 @@ SELECT * FROM columnar.stats('t1'::regclass);
        16 |    1640580 |   150000 |           0 |         15 |     813703
        17 |    2454283 |   100000 |           0 |         10 |     543336
        18 |    2997619 |   150000 |           0 |         15 |     819249
-       19 |    1640580 |    50000 |           0 |          5 |     271618
+       19 |     825083 |    50000 |           0 |          5 |     271618
 (6 rows)
 
 DROP TABLE t1;
@@ -340,6 +340,29 @@ SELECT * FROM columnar.vacuum('t1'::regclass, 1);
  vacuum 
 --------
       0
+(1 row)
+
+DROP TABLE t1;
+CREATE table t1 (
+  i1 int,
+  i2 int,
+  i3 int,
+  i4 int
+) using columnar;
+INSERT INTO t1 SELECT t, t, t, t FROM generate_series(1, 7000000) t;
+DELETE FROM t1 WHERE i1 % 13 = 0;
+UPDATE t1 SET i1 = i1 * 2, i2 = i2 * 2, i3 = i3 * 3, i4 = i4 * 4;
+UPDATE t1 SET i4 = null where i4 % 23 = 0;
+SELECT columnar.vacuum('t1');
+ vacuum 
+--------
+     94
+(1 row)
+
+SELECT count(i1), count(i2), count(i3), count(i4) FROM t1;
+  count  |  count  |  count  |  count  
+---------+---------+---------+---------
+ 6461539 | 6461539 | 6461539 | 6180603
 (1 row)
 
 DROP TABLE t1;
