@@ -3174,7 +3174,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 				}
 
 				/* Find one that will fit, and move it. */
-				if (stripe->dataLength <= hole->dataLength && stripe->fileOffset > hole->fileOffset)
+				if (hole->fileOffset && stripe->dataLength <= hole->dataLength && stripe->fileOffset > hole->fileOffset)
 				{
 					/* Read a copy of the old row. */
 					char * data = palloc(stripe->dataLength);
@@ -3184,13 +3184,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 					ColumnarStorageWrite(rel, hole->fileOffset, data, stripe->dataLength);
 
 					/* Update the stripe metadata for the moved stripe. */
-					StripeMetadata *newStripe = RewriteStripeMetadataRowWithNewValues(rel, stripe->id, stripe->dataLength, hole->fileOffset, stripe->rowCount, stripe->chunkCount);
+					RewriteStripeMetadataRowWithNewValues(rel, stripe->id, stripe->dataLength, hole->fileOffset, stripe->rowCount, stripe->chunkCount);
 
 					relocationCount++;
-
-					/* Resize the hole for the next pass. */
-					hole->fileOffset += newStripe->dataLength;
-					hole->dataLength -= newStripe->dataLength;
 
 					pfree(data);
 
@@ -3199,8 +3195,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 					if (stripeCount && progress >= stripeCount)
 					{
 						done = true;
-						break;
 					}
+
+					break;
 				}
 			}
 
