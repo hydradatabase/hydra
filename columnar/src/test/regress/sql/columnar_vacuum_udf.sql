@@ -72,3 +72,20 @@ SELECT * FROM columnar.vacuum('t1'::regclass, 1);
 SELECT * FROM columnar.vacuum('t1'::regclass, 1);
 
 DROP TABLE t1;
+
+CREATE table t1 (
+  i1 int,
+  i2 int,
+  i3 int,
+  i4 int
+) using columnar;
+INSERT INTO t1 SELECT t, t, t, t FROM generate_series(1, 7000000) t;
+DELETE FROM t1 WHERE i1 % 13 = 0;
+UPDATE t1 SET i1 = i1 * 2, i2 = i2 * 2, i3 = i3 * 3, i4 = i4 * 4;
+UPDATE t1 SET i4 = null where i4 % 23 = 0;
+
+SELECT columnar.vacuum('t1');
+
+SELECT count(i1), count(i2), count(i3), count(i4) FROM t1;
+
+DROP TABLE t1;

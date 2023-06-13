@@ -3133,11 +3133,6 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 											true);
 
 	/*
-		* Get a list of all stripes in order.
-		*/
-	stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
-
-	/*
 	 * Continually iterate through the holes, finding where we can place
 	 * old stripes.
 	 */
@@ -3155,8 +3150,6 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 			continue;
 		}
 
-		stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
-
 		int relocationCount = 0;
 		/*
 		 * Iterate through the holes, moving later slices into the holes.
@@ -3166,6 +3159,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 			StripeHole *hole = lfirst(lc);
 
 			ListCell *stripeLc = NULL;
+
+			/* Reload the metadata. */
+			stripeMetadataList = StripesForRelfilenode(rel->rd_node, ForwardScanDirection);
 
 			foreach(stripeLc, stripeMetadataList)
 			{
