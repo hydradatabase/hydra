@@ -41,7 +41,7 @@ target "postgres" {
   inherits = ["shared"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}"
+    postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}-bullseye"
 
     columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
     http = "target:http_${POSTGRES_BASE_VERSION}"
@@ -179,7 +179,7 @@ target "s3_13" {
   inherits = ["s3"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13"
+    postgres_base = "docker-image://postgres:13-bullseye"
   }
 
   args = {
@@ -194,7 +194,7 @@ target "s3_15" {
   inherits = ["s3"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15"
+    postgres_base = "docker-image://postgres:15-bullseye"
   }
 
   args = {
@@ -209,7 +209,7 @@ target "s3_14" {
   inherits = ["s3"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14"
+    postgres_base = "docker-image://postgres:14-bullseye"
   }
 
   args = {
@@ -279,7 +279,7 @@ target "mysql_13" {
   inherits = ["mysql"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13"
+    postgres_base = "docker-image://postgres:13-bullseye"
   }
 
   args = {
@@ -294,7 +294,7 @@ target "mysql_14" {
   inherits = ["mysql"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14"
+    postgres_base = "docker-image://postgres:14-bullseye"
   }
 
   args = {
@@ -309,7 +309,7 @@ target "mysql_15" {
   inherits = ["mysql"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15"
+    postgres_base = "docker-image://postgres:15-bullseye"
   }
 
   args = {
@@ -337,7 +337,7 @@ target "multicorn_13" {
   inherits = ["multicorn"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13"
+    postgres_base = "docker-image://postgres:13-bullseye"
   }
 
   args = {
@@ -352,7 +352,7 @@ target "multicorn_14" {
   inherits = ["multicorn"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14"
+    postgres_base = "docker-image://postgres:14-bullseye"
   }
 
   args = {
@@ -367,7 +367,7 @@ target "multicorn_15" {
   inherits = ["multicorn"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15"
+    postgres_base = "docker-image://postgres:15-bullseye"
   }
 
   args = {
@@ -431,7 +431,7 @@ target "ivm_13" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13"
+    postgres_base = "docker-image://postgres:13-bullseye"
   }
 
   args = {
@@ -446,7 +446,7 @@ target "ivm_14" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14"
+    postgres_base = "docker-image://postgres:14-bullseye"
   }
 
   args = {
@@ -461,7 +461,7 @@ target "ivm_15" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15"
+    postgres_base = "docker-image://postgres:15-bullseye"
   }
 
   args = {
@@ -486,7 +486,7 @@ target "ivm_13" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13"
+    postgres_base = "docker-image://postgres:13-bullseye"
   }
 
   args = {
@@ -501,7 +501,7 @@ target "ivm_14" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14"
+    postgres_base = "docker-image://postgres:14-bullseye"
   }
 
   args = {
@@ -516,7 +516,7 @@ target "ivm_15" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15"
+    postgres_base = "docker-image://postgres:15-bullseye"
   }
 
   args = {
