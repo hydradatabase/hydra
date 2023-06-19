@@ -1,6 +1,5 @@
 ![Hydra - the open source data warehouse](.images/hydraGH.svg)
 <div align="center">
-<em>The Modern EDW - Everyone Data Warehouse</em>
 
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/hydradatabase.svg?style=social&label=Follow%20%40hydradatabase)](https://twitter.com/hydradatabase)
 [![GitHub Repo stars](https://img.shields.io/github/stars/hydradatabase/hydra?style=social)](https://github.com/hydradatabase/hydra/stargazers)
