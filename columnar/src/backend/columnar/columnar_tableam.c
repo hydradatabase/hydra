@@ -2949,6 +2949,30 @@ static List *HolesForRelation(Relation rel)
 }
 
 /*
+ * This is a check whether we need to bail out of a vacuum, it is set by the
+ * signal handler, and checked by the vacuum UDF process.
+ */
+static bool need_to_bail = false;
+static int last_signal = 0;
+static struct sigaction abt_action;
+static struct sigaction int_action;
+static struct sigaction trm_action;
+static struct sigaction kil_action;
+
+/*
+ * vacuum_signal_handler - catch any signals sent during the UDF vacuum, and
+ * attempt to clean up as much as we can and bail as cleanly as possible.
+ */
+static void vacuum_signal_handler(int signal)
+{
+	elog(DEBUG3, "Received signal %d during a vacuum request", signal);
+
+	/* Set up the ability to bail from the vacuum, with needed information. */
+	need_to_bail = true;
+	last_signal = signal;
+}
+
+/*
  * vacuum_columnar_table
  */
 typedef struct StripeVacuumCandidate
@@ -2970,6 +2994,24 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	MemoryContext oldcontext = CurrentMemoryContext;
 	uint32 stripeCount = PG_GETARG_UINT32(1);
 	uint32 progress = 0;
+	struct sigaction action;
+
+	/*
+	 * Set up signal handlers for any incoming signals during the vacuum,
+	 * killing during a write could cause corruption.  Give us time to
+	 * clean as much as we can up before letting the signal pass on.
+	 */
+	need_to_bail = false;
+	last_signal = 0;
+
+	action.sa_handler = vacuum_signal_handler;
+	sigemptyset (&action.sa_mask);
+	action.sa_flags = 0;
+
+	sigaction(SIGINT, &action, &int_action);
+	sigaction(SIGTERM, &action, &trm_action);
+	sigaction(SIGABRT, &action, &abt_action);
+	sigaction(SIGKILL, &action, &kil_action);
 
 	MemoryContext vacuum_context = AllocSetContextCreate(CurrentMemoryContext,
 						"Columnar Vacuum Context",
@@ -2987,6 +3029,8 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		PG_RETURN_VOID();
 	}
+
+	LockRelation(rel, ExclusiveLock);
 
 	/* Get current columnar options */
 	ColumnarOptions columnarOptions = { 0 };
@@ -3067,11 +3111,6 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	MemoryContext scanContext = CreateColumnarScanMemoryContext();
 	bool randomAccess = true;
 
-	ConditionalLockRelationWithTimeout(rel, AccessExclusiveLock,
-											VACUUM_TRUNCATE_LOCK_TIMEOUT,
-											VACUUM_TRUNCATE_LOCK_WAIT_INTERVAL,
-											true);
-
 	ColumnarWriteState *writeState = ColumnarBeginWrite(rel->rd_node,
 											columnarOptions,
 											tupleDesc);
@@ -3113,24 +3152,48 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		progress++;
 
+		/* Check if a signal has been sent, if so close out and deal with it. */
+		if (need_to_bail)
+		{
+			ColumnarEndWrite(writeState);
+			UnlockRelation(rel, ExclusiveLock);
+			relation_close(rel, NoLock);
+
+			need_to_bail = 0;
+			/* Reset the signal handlers back to their original state. */
+			sigaction(SIGINT, &int_action, NULL);
+			sigaction(SIGTERM, &trm_action, NULL);
+			sigaction(SIGABRT, &abt_action, NULL);
+			sigaction(SIGKILL, &kil_action, NULL);
+
+			/* Call any missed signal handlers. */
+			if (last_signal == SIGABRT && abt_action.sa_handler)
+			{
+				abt_action.sa_handler(SIGABRT);
+			} else if (last_signal == SIGTERM && trm_action.sa_handler)
+			{
+				trm_action.sa_handler(SIGTERM);
+			} else if (last_signal == SIGINT && int_action.sa_handler)
+			{
+				int_action.sa_handler(SIGINT);
+			} else if (last_signal == SIGKILL && kil_action.sa_handler)
+			{
+				kil_action.sa_handler(SIGKILL);
+			}
+
+			PG_RETURN_NULL();
+		}
+
 		if (stripeCount && progress >= stripeCount)
 		{
 			break;
 		}
 	}
-	
 	/*
 	 * We have finished the first route of writes, let's drop our lock until we are
 	 * ready for the next stage: compaction.
 	 */
 	ColumnarEndWrite(writeState);
-	UnlockRelation(rel, AccessExclusiveLock);
-
-	/* Lock the relation. */
-	ConditionalLockRelationWithTimeout(rel, AccessExclusiveLock,
-											VACUUM_TRUNCATE_LOCK_TIMEOUT,
-											VACUUM_TRUNCATE_LOCK_WAIT_INTERVAL,
-											true);
 
 	/*
 	 * Continually iterate through the holes, finding where we can place
@@ -3139,6 +3202,37 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	bool done = false;
 	while (!done)
 	{
+		/* Check if a signal has been sent, if so close out and deal with it. */
+		if (need_to_bail)
+		{
+			UnlockRelation(rel, ExclusiveLock);
+			relation_close(rel, NoLock);
+
+			need_to_bail = 0;
+			/* Reset the signal handlers back to their original state. */
+			sigaction(SIGINT, &int_action, NULL);
+			sigaction(SIGTERM, &trm_action, NULL);
+			sigaction(SIGABRT, &abt_action, NULL);
+			sigaction(SIGKILL, &kil_action, NULL);
+
+			/* Call any missed signal handlers. */
+			if (last_signal == SIGABRT && abt_action.sa_handler)
+			{
+				abt_action.sa_handler(SIGABRT);
+			} else if (last_signal == SIGTERM && trm_action.sa_handler)
+			{
+				trm_action.sa_handler(SIGTERM);
+			} else if (last_signal == SIGINT && int_action.sa_handler)
+			{
+				int_action.sa_handler(SIGINT);
+			} else if (last_signal == SIGKILL && kil_action.sa_handler)
+			{
+				kil_action.sa_handler(SIGKILL);
+			}
+
+			PG_RETURN_NULL();
+		}
+
 		/*
 		 * Get a List of empty spaces to fill with later stripes.
 		 */
@@ -3174,7 +3268,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 				}
 
 				/* Find one that will fit, and move it. */
-				if (hole->fileOffset && stripe->dataLength <= hole->dataLength && stripe->fileOffset > hole->fileOffset)
+				if (hole->fileOffset && stripe->dataLength < hole->dataLength && stripe->fileOffset > hole->fileOffset)
 				{
 					/* Read a copy of the old row. */
 					char * data = palloc(stripe->dataLength);
@@ -3211,11 +3305,19 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		}
 	}
 
-	UnlockRelation(rel, AccessExclusiveLock);
 
 	relation_close(rel, NoLock);
 
+	TruncateColumnar(rel, DEBUG3);
+	UnlockRelation(rel, ExclusiveLock);
+
 	MemoryContextSwitchTo(oldcontext);
+
+	/* Reset the signal handlers back to their original state. */
+	sigaction(SIGINT, &int_action, NULL);
+	sigaction(SIGTERM, &trm_action, NULL);
+	sigaction(SIGABRT, &abt_action, NULL);
+	sigaction(SIGKILL, &kil_action, NULL);
 
 	PG_RETURN_UINT32(progress);
 }
