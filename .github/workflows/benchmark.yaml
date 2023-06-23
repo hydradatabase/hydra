@@ -1,0 +1,113 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        required: true
+        type: choice
+        default: ghcr.io/hydradatabase/hydra
+        options:
+         - ghcr.io/hydradatabase/hydra
+         - 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
+      tag:
+        type: string
+
+  push:
+    branches:
+      - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+    paths:
+      - .github/workflows/benchmark.yaml
+      - 'columnar/**'
+
+env:
+  REPO: ${{ inputs.repo || 'ghcr.io/hydradatabase/hydra' }}
+  TAG: ${{ inputs.tag || format('15-{0}', github.sha) }}
+  NAME: hydra-benchmark
+
+jobs:
+  benchmarks:
+
+    name: Benchmark
+    if: github.repository == 'hydradatabase/hydra-internal'
+    # 16gb ram, 4vcpu, 150gb disk
+    runs-on: benchmarks-ubuntu-latest-4core
+
+    steps:
+
+      - name: Configure AWS credentials
+        if: ${{ env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+          mask-aws-account-id: no
+
+      - name: Login to Amazon ECR
+        if: ${{ env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
+        id: spilo-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: "011789831835"
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - uses: docker/setup-buildx-action@v2
+
+      - name: Checkout benchmarks
+        uses: actions/checkout@v3
+        with:
+          repository: hydradatabase/benchmarks
+
+      - name: Set up docker image
+        run: |
+          export IMAGE="$REPO:$TAG"
+          docker run -d -e POSTGRES_HOST_AUTH_METHOD=trust -v $PWD:/benchmarks -m 12288m --cpus=4 --shm-size=1024m --name=$NAME $IMAGE
+
+      - name: Prepare to download data
+        run: |
+          mkdir -p clickbench/data
+          mkdir -p warehouse/data
+
+      - name: Download clickbench data
+        uses: keithweaver/aws-s3-github-action@v1.0.0
+        with:
+          command: cp
+          source: s3://hydra-benchmarks/clickbench/data/hits.tsv.gz
+          destination: ./clickbench/data/hits.tsv.gz
+          aws_access_key_id: ${{ secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
+          aws_region: us-east-1
+          flags: --quiet
+
+      - name: Prepare clickbench data
+        run: |
+          mkfifo clickbench/data/hits.tsv
+          nohup gzip -d clickbench/data/hits.tsv.gz >clickbench/data/hits.tsv &
+
+      - name: Run clickbench benchmark
+        run: |
+          export IMAGE="$REPO:$TAG"
+          docker exec $NAME /bin/sh -c "RUNTIME=$TAG /benchmarks/run-benchmark.sh -z -b clickbench $benchmark -v zstd -u postgres"
+          ./analyze.js ./results/clickbench/zstd/$TAG > ./results-clickbench-zstd-$TAG.json
+
+      - name: Cleanup docker image
+        run: |
+          docker stop $NAME
+          docker rm $NAME
+
+      - name: Upload result
+        uses: keithweaver/aws-s3-github-action@v1.0.0
+        with:
+          command: cp
+          source: ./results-clickbench-zstd-${{ env.TAG }}.json
+          destination: s3://hydra-benchmarks/results/clickbench-zstd-${{ env.TAG }}.json
+          aws_access_key_id: ${{ secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
+          aws_region: us-east-1
+          flags: --quiet

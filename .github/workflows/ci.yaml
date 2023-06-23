@@ -3,6 +3,15 @@ name: CI
 on:
   workflow_dispatch:
   push:
+    paths:
+      - 'columnar/**'
+      - 'third-party/**'
+      - 'files/**'
+      - 'acceptance/**'
+      - Dockerfile
+      - Makefile
+      - VERSION
+      - .github/workflows/ci.yaml
 
 env:
   POSTGRES_REPO: ghcr.io/hydradatabase/hydra
