@@ -238,3 +238,15 @@ jobs:
       production: true
       spilo_repo: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo # env vars can't be used here
     secrets: inherit
+
+  benchmark_postgres:
+    needs: [push_postgres]
+    if: github.repository == 'hydradatabase/hydra' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        benchmark: ["clickbench-100M", "warehouse-10G"]
+    uses: ./.github/workflows/benchmark.yaml
+    with:
+      benchmark: ${{ matrix.benchmark }}
+      repo: ghcr.io/hydradatabase/hydra
+      tag: 15-${{ github.sha }}

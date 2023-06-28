@@ -1,6 +1,19 @@
 name: Benchmark
 
 on:
+  workflow_call:
+    inputs:
+      repo:
+        required: true
+        type: string
+        default: ghcr.io/hydradatabase/hydra
+      benchmark:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+
   workflow_dispatch:
     inputs:
       repo:
@@ -10,27 +23,34 @@ on:
         options:
          - ghcr.io/hydradatabase/hydra
          - 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
+      benchmark:
+        required: true
+        type: choice
+        default: clickbench-1M
+        options:
+          - clickbench-10k
+          - clickbench-1M
+          - clickbench-100M
+          - warehouse-1G
+          - warehouse-10G
       tag:
         type: string
 
-  push:
-    branches:
-      - main
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-    paths:
-      - .github/workflows/benchmark.yaml
-      - 'columnar/**'
-
 env:
+  BENCHMARK: ${{ inputs.benchmark || 'clickbench-1M' }}
   REPO: ${{ inputs.repo || 'ghcr.io/hydradatabase/hydra' }}
+  BASE_IMAGE: ${{ (inputs.repo == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' && 'spilo') || 'postgres' }}
   TAG: ${{ inputs.tag || format('15-{0}', github.sha) }}
   NAME: hydra-benchmark
+  BENCHER_PROJECT: hydra-${{ (inputs.repo == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' && 'spilo') || 'postgres' }}
+  BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+  BENCHER_ADAPTER: json
+  BENCHER_TESTBED: gh-4core
 
 jobs:
   benchmarks:
 
-    name: Benchmark
+    name: Run Benchmark
     if: github.repository == 'hydradatabase/hydra-internal'
     # 16gb ram, 4vcpu, 150gb disk
     runs-on: benchmarks-ubuntu-latest-4core
@@ -38,7 +58,7 @@ jobs:
     steps:
 
       - name: Configure AWS credentials
-        if: ${{ env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
+        if: ${{ github.repository == 'hydradatabase/hydra-internal' && env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
@@ -47,7 +67,7 @@ jobs:
           mask-aws-account-id: no
 
       - name: Login to Amazon ECR
-        if: ${{ env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
+        if: ${{ github.repository == 'hydradatabase/hydra-internal' && env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
         id: spilo-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
@@ -66,48 +86,69 @@ jobs:
 
       - name: Set up docker image
         run: |
-          export IMAGE="$REPO:$TAG"
-          docker run -d -e POSTGRES_HOST_AUTH_METHOD=trust -v $PWD:/benchmarks -m 12288m --cpus=4 --shm-size=1024m --name=$NAME $IMAGE
+          docker run -d -e POSTGRES_HOST_AUTH_METHOD=trust -v $PWD:/benchmarks -m 12288m --cpus=4 --shm-size=1024m --name=$NAME $REPO:$TAG
 
       - name: Prepare to download data
         run: |
-          mkdir -p clickbench/data
-          mkdir -p warehouse/data
+          set -eux
+          BENCHMARK_SRC="$(echo $BENCHMARK | cut -f 1 -d -)"
+          if [ "$BENCHMARK" != "$BENCHMARK_SRC" ]; then
+            ln -s $BENCHMARK_SRC $BENCHMARK
+          fi
+          mkdir -p $BENCHMARK/data
+          tree $BENCHMARK
 
-      - name: Download clickbench data
+      - name: Download data
         uses: keithweaver/aws-s3-github-action@v1.0.0
         with:
           command: cp
-          source: s3://hydra-benchmarks/clickbench/data/hits.tsv.gz
-          destination: ./clickbench/data/hits.tsv.gz
+          source: s3://hydra-benchmarks/data/${{ env.BENCHMARK }}
+          destination: ./${{ env.BENCHMARK }}/data
           aws_access_key_id: ${{ secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
           aws_region: us-east-1
-          flags: --quiet
+          flags: --no-progress --recursive
 
-      - name: Prepare clickbench data
+      - name: Prepare data
         run: |
-          mkfifo clickbench/data/hits.tsv
-          nohup gzip -d clickbench/data/hits.tsv.gz >clickbench/data/hits.tsv &
+          set -eux
+          pushd $BENCHMARK/data
+          for f in *.gz; do
+            TARGET="$(basename $f .gz)"
+            mkfifo $TARGET
+            nohup gzip -d -c $f >$TARGET &
+          done
+          popd
+          tree $BENCHMARK
 
-      - name: Run clickbench benchmark
+      - name: Run benchmark
         run: |
-          export IMAGE="$REPO:$TAG"
-          docker exec $NAME /bin/sh -c "RUNTIME=$TAG /benchmarks/run-benchmark.sh -z -b clickbench $benchmark -v zstd -u postgres"
-          ./analyze.js ./results/clickbench/zstd/$TAG > ./results-clickbench-zstd-$TAG.json
+          docker exec $NAME /bin/sh -c "RUNTIME=now /benchmarks/run-benchmark.sh -z -b $BENCHMARK -v zstd -u postgres"
+          ./analyze.js ./results/$BENCHMARK/zstd/now > ./results.json
 
       - name: Cleanup docker image
         run: |
           docker stop $NAME
           docker rm $NAME
 
-      - name: Upload result
+      - name: Upload result to S3
         uses: keithweaver/aws-s3-github-action@v1.0.0
         with:
           command: cp
-          source: ./results-clickbench-zstd-${{ env.TAG }}.json
-          destination: s3://hydra-benchmarks/results/clickbench-zstd-${{ env.TAG }}.json
+          source: ./results.json
+          destination: s3://hydra-benchmarks/results/${{ env.BASE_IMAGE }}-${{ env.BENCHMARK }}-zstd-${{ env.TAG }}.json
           aws_access_key_id: ${{ secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
           aws_region: us-east-1
-          flags: --quiet
+          flags: --no-progress
+
+      - uses: bencherdev/bencher@main
+
+      - name: Upload result to bencher
+        run: |
+          bencher run \
+            --if-branch "$GITHUB_REF_NAME" \
+            --else-if-branch "$GITHUB_BASE_REF" \
+            --else-if-branch main \
+            --err \
+            "./analyze-bencher.js ./results/$BENCHMARK/zstd/now $BENCHMARK"
