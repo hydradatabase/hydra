@@ -35,6 +35,10 @@ target "shared" {
     "linux/amd64",
     "linux/arm64"
   ]
+
+  args = {
+    TIMESTAMP = "${timestamp()}"
+  }
 }
 
 target "postgres" {
