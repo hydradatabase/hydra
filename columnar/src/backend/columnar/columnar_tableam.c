@@ -3123,6 +3123,10 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	{
 		StripeVacuumCandidate *vacuumCandidate = lfirst(lc);
 
+		MemoryContext combineContext = AllocSetContextCreate(CurrentMemoryContext,
+						"Stripe Combine Context", ALLOCSET_DEFAULT_SIZES);
+		MemoryContext previousContext = MemoryContextSwitchTo(combineContext);
+
 		ColumnarReadState *readState = init_columnar_read_state(rel, tupleDesc,
 															attr_needed, scanQual,
 															scanContext, snapshot,
@@ -3137,6 +3141,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		bool *nulls = palloc0(tupleDesc->natts * sizeof(bool));
 
 		int32 rowCount = 0;
+
 
 		while (rowCount < vacuumCandidate->activeRows && ColumnarReadNextRow(readState, values, nulls, NULL))
 		{
@@ -3188,6 +3193,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		{
 			break;
 		}
+
+		MemoryContextSwitchTo(previousContext);
+		MemoryContextDelete(combineContext);
 	}
 	/*
 	 * We have finished the first route of writes, let's drop our lock until we are
@@ -3202,6 +3210,10 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	bool done = false;
 	while (!done)
 	{
+		MemoryContext rewriteContext = AllocSetContextCreate(CurrentMemoryContext,
+					"Stripe Rewrite Context", ALLOCSET_DEFAULT_SIZES);
+		MemoryContext previousContext = MemoryContextSwitchTo(rewriteContext);
+
 		/* Check if a signal has been sent, if so close out and deal with it. */
 		if (need_to_bail)
 		{
@@ -3303,6 +3315,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 			holes = HolesForRelation(rel);
 		}
+
+		MemoryContextSwitchTo(previousContext);
+		MemoryContextDelete(rewriteContext);
 	}
 
 
