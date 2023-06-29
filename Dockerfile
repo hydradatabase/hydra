@@ -5,21 +5,21 @@ FROM postgres_base
 ARG PYTHON_VERSION
 
 RUN set -eux; \
-	apt-get update; \
-	apt-get install -y --no-install-recommends \
-        # http deps
-        ca-certificates \
-        libcurl4-gnutls-dev \
-        # mysql deps
-        default-libmysqlclient-dev \
-        # multicorn deps
-        python${PYTHON_VERSION} \
-        python${PYTHON_VERSION}-dev \
-        # s3 deps
-        lsb-release \
-        wget \
-	; \
-	rm -rf /var/lib/apt/lists/*
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+    # http deps
+    ca-certificates \
+    libcurl4-gnutls-dev \
+    # mysql deps
+    default-libmysqlclient-dev \
+    # multicorn deps
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    # s3 deps
+    lsb-release \
+    wget \
+    ; \
+    rm -rf /var/lib/apt/lists/*
 
 # mysql ext
 COPY --from=mysql /pg_ext /

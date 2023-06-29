@@ -23,7 +23,7 @@ variable "SPILO_POSTGRES_OLD_VERSIONS" {
 }
 
 variable "PYTHON_VERSION" {
-  default = "3.9"
+  default = "3.11"
 }
 
 group "default" {
@@ -41,7 +41,7 @@ target "postgres" {
   inherits = ["shared"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}-bullseye"
+    postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}-bookworm"
 
     columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
     http = "target:http_${POSTGRES_BASE_VERSION}"
@@ -52,6 +52,7 @@ target "postgres" {
   }
 
   args = {
+    POSTGRES_BASE_VERSION = "${POSTGRES_BASE_VERSION}"
     PYTHON_VERSION = "${PYTHON_VERSION}"
   }
 
@@ -170,7 +171,7 @@ target "s3" {
 
   args = {
     ARROW_TAG = "apache-arrow-10.0.0"
-    AWS_SDK_TAG = "1.10.4"
+    AWS_SDK_TAG = "1.10.57"
     PARQUET_S3_FDW_COMMIT = "3798786831635e5b9cce5dbf33826541c3852809"
   }
 }
@@ -179,7 +180,7 @@ target "s3_13" {
   inherits = ["s3"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13-bullseye"
+    postgres_base = "docker-image://postgres:13-bookworm"
   }
 
   args = {
@@ -194,7 +195,7 @@ target "s3_15" {
   inherits = ["s3"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15-bullseye"
+    postgres_base = "docker-image://postgres:15-bookworm"
   }
 
   args = {
@@ -209,7 +210,7 @@ target "s3_14" {
   inherits = ["s3"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14-bullseye"
+    postgres_base = "docker-image://postgres:14-bookworm"
   }
 
   args = {
@@ -279,7 +280,7 @@ target "mysql_13" {
   inherits = ["mysql"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13-bullseye"
+    postgres_base = "docker-image://postgres:13-bookworm"
   }
 
   args = {
@@ -294,7 +295,7 @@ target "mysql_14" {
   inherits = ["mysql"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14-bullseye"
+    postgres_base = "docker-image://postgres:14-bookworm"
   }
 
   args = {
@@ -309,7 +310,7 @@ target "mysql_15" {
   inherits = ["mysql"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15-bullseye"
+    postgres_base = "docker-image://postgres:15-bookworm"
   }
 
   args = {
@@ -327,7 +328,7 @@ target "multicorn" {
 
   args = {
     PYTHON_VERSION = "${PYTHON_VERSION}"
-    MULTICORN_TAG  = "v2.4"
+    MULTICORN_TAG  = "b68b75c253be72bdfd5b24bf76705c47c238d370"
     S3CSV_FDW_COMMIT = "f64e24f9fe3f7dbd1be76f9b8b3b5208f869e5e3"
     GSPREADSHEET_FDW_COMMIT = "d5bc5ae0b2d189abd6d2ee4610bd96ec39602594"
   }
@@ -337,7 +338,7 @@ target "multicorn_13" {
   inherits = ["multicorn"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13-bullseye"
+    postgres_base = "docker-image://postgres:13-bookworm"
   }
 
   args = {
@@ -352,7 +353,7 @@ target "multicorn_14" {
   inherits = ["multicorn"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14-bullseye"
+    postgres_base = "docker-image://postgres:14-bookworm"
   }
 
   args = {
@@ -367,7 +368,7 @@ target "multicorn_15" {
   inherits = ["multicorn"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15-bullseye"
+    postgres_base = "docker-image://postgres:15-bookworm"
   }
 
   args = {
@@ -431,7 +432,7 @@ target "ivm_13" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13-bullseye"
+    postgres_base = "docker-image://postgres:13-bookworm"
   }
 
   args = {
@@ -446,7 +447,7 @@ target "ivm_14" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14-bullseye"
+    postgres_base = "docker-image://postgres:14-bookworm"
   }
 
   args = {
@@ -461,7 +462,7 @@ target "ivm_15" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15-bullseye"
+    postgres_base = "docker-image://postgres:15-bookworm"
   }
 
   args = {
@@ -486,7 +487,7 @@ target "ivm_13" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:13-bullseye"
+    postgres_base = "docker-image://postgres:13-bookworm"
   }
 
   args = {
@@ -501,7 +502,7 @@ target "ivm_14" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:14-bullseye"
+    postgres_base = "docker-image://postgres:14-bookworm"
   }
 
   args = {
@@ -516,7 +517,7 @@ target "ivm_15" {
   inherits = ["ivm"]
 
   contexts = {
-    postgres_base = "docker-image://postgres:15-bullseye"
+    postgres_base = "docker-image://postgres:15-bookworm"
   }
 
   args = {
