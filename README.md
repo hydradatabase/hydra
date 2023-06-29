@@ -27,17 +27,16 @@ Hydra implements an open source columnar engine to Postgres, driving 23X query p
 - [License](#license)
 
 ## 💪 Benchmarks
-![Hydra - the open source data warehouse](.images/FasterthanPG.png)
+Results in seconds, smaller is better.<br />
+![Hydra - the open source data warehouse](.images/ReadmeBenchmarks.png)
 
 [Review Clickbench](https://tinyurl.com/clickbench) for comprehensive results and the list of 42 queries tested.
 
 This benchmark represents typical workload in the following areas: clickstream and traffic analysis, web analytics, machine-generated data, structured logs, and events data. It covers the typical queries in ad-hoc analytics and real-time dashboards.
 
-### Hydra vs Postgres
-Results in seconds, smaller is better.<br />
-![Hydra - the open source data warehouse](.images/ReadmeBenchmarks.png)
+![Hydra - the open source data warehouse](.images/FasterthanPG.png)
 
-### Hydra vs Enterprise data warehouses
+### Transactions / Second (TPS)
 
 Hydra delivers 1500X more throughput than traditional warehouses to enable realtime analytical workloads. This is accomplished with transactional heap tables.
 
