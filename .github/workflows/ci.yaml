@@ -245,6 +245,7 @@ jobs:
     needs: [push_postgres]
     if: github.repository == 'hydradatabase/hydra' && github.ref == 'refs/heads/main'
     strategy:
+      fail-fast: false
       matrix:
         benchmark: ["clickbench-100M", "warehouse-10G"]
     uses: ./.github/workflows/benchmark.yaml
@@ -259,6 +260,7 @@ jobs:
     needs: [push_spilo]
     if: github.repository == 'hydradatabase/hydra-internal' && github.ref == 'refs/heads/main'
     strategy:
+      fail-fast: false
       matrix:
         benchmark: ["clickbench-100M", "warehouse-10G"]
     uses: ./.github/workflows/benchmark.yaml
