@@ -34,9 +34,6 @@ RUN set -eux; \
   python${PYTHON_VERSION}-dev \
   python${PYTHON_VERSION}-venv
 
-# Update pip to the latest
-#RUN wget https://bootstrap.pypa.io/get-pip.py && python${PYTHON_VERSION} get-pip.py && rm get-pip.py
-
 FROM setup as builder
 
 RUN git clone https://github.com/pgsql-io/multicorn2 --single-branch && \
@@ -46,25 +43,16 @@ RUN git clone https://github.com/pgsql-io/multicorn2 --single-branch && \
   . .venv/bin/activate && \
   DESTDIR=/pg_ext USE_PGXS=1 make && \
   DESTDIR=/pg_ext USE_PGXS=1 make install && \
-  # install runtime python deps
+  # install s3csv_fdw
   python3 -m pip install \
   git+https://github.com/hydradatabase/s3csv_fdw@${S3CSV_FDW_COMMIT} \
-  # gspreadsheet_fdw deps
-  gspread \
-  oauth2client
-
-# Use a fork
-RUN git clone https://github.com/hydradatabase/gspreadsheet_fdw --single-branch && \
-  cd gspreadsheet_fdw && \
-  python${PYTHON_VERSION} -m venv .venv && \
-  . .venv/bin/activate && \
-  git checkout ${GSPREADSHEET_FDW_COMMIT} && \
-  python3 setup.py install
+  # install gspreadsheet_fdw
+  gspread oauth2client \
+  git+https://github.com/hydradatabase/gspreadsheet_fdw@${GSPREADSHEET_FDW_COMMIT}
 
 FROM scratch as output
 
 ARG PYTHON_VERSION
 
 COPY --from=builder /pg_ext /pg_ext
-COPY --from=builder /gspreadsheet_fdw/.venv/lib/python${PYTHON_VERSION}/site-packages /python-dist-packages
 COPY --from=builder /multicorn2/.venv/lib/python${PYTHON_VERSION}/site-packages /python-dist-packages
