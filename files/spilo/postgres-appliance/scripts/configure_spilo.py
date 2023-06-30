@@ -310,7 +310,7 @@ postgresql:
     pg_stat_statements.track_utility: 'off'
     extwlist.extensions: 'btree_gin,btree_gist,citext,extra_window_functions,first_last_agg,hll,\
 hstore,hypopg,intarray,ltree,pgcrypto,pgq,pgq_node,pg_ivm,pg_trgm,postgres_fdw,mysql_fdw,multicorn,\
-parquet_s3_fdw,tablefunc,uuid-ossp'
+parquet_s3_fdw,vector,tablefunc,uuid-ossp'
     extwlist.custom_path: /scripts
     cron.use_background_workers: 'on'
   pg_hba:
