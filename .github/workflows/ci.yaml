@@ -36,11 +36,11 @@ jobs:
         run: make lint_acceptance
 
   validate_columnar:
+    name: Validate Columnar ${{ matrix.postgres }}
     strategy:
       fail-fast: false
       matrix:
         postgres: ["13", "14", "15"]
-    name: Validate Columnar ${{ matrix.postgres }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -62,12 +62,12 @@ jobs:
             columnar.target=checker
 
   build_validate_postgres:
+    name: Build and Validate Postgres ${{ matrix.postgres }}
     needs: [validate_columnar]
     strategy:
       fail-fast: false
       matrix:
         postgres: ["13", "14", "15"]
-    name: Build and Validate Postgres ${{ matrix.postgres }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -121,9 +121,9 @@ jobs:
           targets: postgres
 
   build_validate_spilo:
+    name: Build and Validate Spilo
     needs: [validate_columnar]
     if: github.repository == 'hydradatabase/hydra-internal'
-    name: Build and Validate Spilo
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -196,13 +196,13 @@ jobs:
             *.platform=linux/amd64
 
   push_postgres:
+    name: Push Postgres ${{ matrix.postgres }}
     needs: [build_validate_postgres]
     if: github.repository == 'hydradatabase/hydra' && github.ref == 'refs/heads/main'
     strategy:
       fail-fast: false
       matrix:
         postgres: ["13", "14", "15"]
-    name: Push Postgres ${{ matrix.postgres }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -231,6 +231,7 @@ jobs:
             ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
   push_spilo:
+    name: Push Spilo
     needs: [build_validate_spilo]
     if: github.repository == 'hydradatabase/hydra-internal' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/build_spilo.yaml
@@ -240,13 +241,31 @@ jobs:
     secrets: inherit
 
   benchmark_postgres:
+    name: Benchmark Hydra Postgres image (${{ matrix.benchmark }})
     needs: [push_postgres]
     if: github.repository == 'hydradatabase/hydra' && github.ref == 'refs/heads/main'
     strategy:
+      fail-fast: false
       matrix:
         benchmark: ["clickbench-100M", "warehouse-10G"]
     uses: ./.github/workflows/benchmark.yaml
     with:
       benchmark: ${{ matrix.benchmark }}
       repo: ghcr.io/hydradatabase/hydra
-      tag: 15-${{ github.sha }}
+      tag: 14-${{ github.sha }}
+    secrets: inherit
+
+  benchmark_spilo:
+    name: Benchmark Hydra Spilo image (${{ matrix.benchmark }})
+    needs: [push_spilo]
+    if: github.repository == 'hydradatabase/hydra-internal' && github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark: ["clickbench-100M", "warehouse-10G"]
+    uses: ./.github/workflows/benchmark.yaml
+    with:
+      benchmark: ${{ matrix.benchmark }}
+      repo: 011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo
+      tag: ${{ github.sha }}
+    secrets: inherit

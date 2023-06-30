@@ -35,34 +35,43 @@ on:
           - warehouse-10G
       tag:
         type: string
-
 env:
   BENCHMARK: ${{ inputs.benchmark || 'clickbench-1M' }}
   REPO: ${{ inputs.repo || 'ghcr.io/hydradatabase/hydra' }}
-  BASE_IMAGE: ${{ (inputs.repo == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' && 'spilo') || 'postgres' }}
   TAG: ${{ inputs.tag || format('15-{0}', github.sha) }}
-  NAME: hydra-benchmark
-  BENCHER_PROJECT: hydra-${{ (inputs.repo == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' && 'spilo') || 'postgres' }}
   BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-  BENCHER_ADAPTER: json
   BENCHER_TESTBED: gh-4core
 
 jobs:
   benchmarks:
 
     name: Run Benchmark
-    if: github.repository == 'hydradatabase/hydra-internal'
     # 16gb ram, 4vcpu, 150gb disk
     runs-on: benchmarks-ubuntu-latest-4core
 
     steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - uses: docker/setup-buildx-action@v2
+
+      - uses: unfor19/install-aws-cli-action@v1
+        with:
+          arch: amd64
+
+      - uses: bencherdev/bencher@main
+
+      - name: Checkout benchmarks
+        uses: actions/checkout@v3
+        with:
+          repository: hydradatabase/benchmarks
 
       - name: Configure AWS credentials
-        if: ${{ github.repository == 'hydradatabase/hydra-internal' && env.REPO == '011789831835.dkr.ecr.us-east-1.amazonaws.com/spilo' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY || secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY || secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
           mask-aws-account-id: no
 
@@ -73,82 +82,5 @@ jobs:
         with:
           registries: "011789831835"
 
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - uses: docker/setup-buildx-action@v2
-
-      - name: Checkout benchmarks
-        uses: actions/checkout@v3
-        with:
-          repository: hydradatabase/benchmarks
-
-      - name: Set up docker image
-        run: |
-          docker run -d -e POSTGRES_HOST_AUTH_METHOD=trust -v $PWD:/benchmarks -m 12288m --cpus=4 --shm-size=1024m --name=$NAME $REPO:$TAG
-
-      - name: Prepare to download data
-        run: |
-          set -eux
-          BENCHMARK_SRC="$(echo $BENCHMARK | cut -f 1 -d -)"
-          if [ "$BENCHMARK" != "$BENCHMARK_SRC" ]; then
-            ln -s $BENCHMARK_SRC $BENCHMARK
-          fi
-          mkdir -p $BENCHMARK/data
-          tree $BENCHMARK
-
-      - name: Download data
-        uses: keithweaver/aws-s3-github-action@v1.0.0
-        with:
-          command: cp
-          source: s3://hydra-benchmarks/data/${{ env.BENCHMARK }}
-          destination: ./${{ env.BENCHMARK }}/data
-          aws_access_key_id: ${{ secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
-          aws_region: us-east-1
-          flags: --no-progress --recursive
-
-      - name: Prepare data
-        run: |
-          set -eux
-          pushd $BENCHMARK/data
-          for f in *.gz; do
-            TARGET="$(basename $f .gz)"
-            mkfifo $TARGET
-            nohup gzip -d -c $f >$TARGET &
-          done
-          popd
-          tree $BENCHMARK
-
       - name: Run benchmark
-        run: |
-          docker exec $NAME /bin/sh -c "RUNTIME=now /benchmarks/run-benchmark.sh -z -b $BENCHMARK -v zstd -u postgres"
-          ./analyze.js ./results/$BENCHMARK/zstd/now > ./results.json
-
-      - name: Cleanup docker image
-        run: |
-          docker stop $NAME
-          docker rm $NAME
-
-      - name: Upload result to S3
-        uses: keithweaver/aws-s3-github-action@v1.0.0
-        with:
-          command: cp
-          source: ./results.json
-          destination: s3://hydra-benchmarks/results/${{ env.BASE_IMAGE }}-${{ env.BENCHMARK }}-zstd-${{ env.TAG }}.json
-          aws_access_key_id: ${{ secrets.BENCHMARKS_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.BENCHMARKS_AWS_SECRET_ACCESS_KEY }}
-          aws_region: us-east-1
-          flags: --no-progress
-
-      - uses: bencherdev/bencher@main
-
-      - name: Upload result to bencher
-        run: |
-          bencher run \
-            --if-branch "$GITHUB_REF_NAME" \
-            --else-if-branch "$GITHUB_BASE_REF" \
-            --else-if-branch main \
-            --err \
-            "./analyze-bencher.js ./results/$BENCHMARK/zstd/now $BENCHMARK"
+        run: ./run-gha.sh
