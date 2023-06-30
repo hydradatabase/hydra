@@ -2,6 +2,7 @@
 
 ## Future release
 
+* default table access method is now columnar ([#107][])
 * add vacuum_full UDF ([#93][])
 * bugfix: vacuum udf could get into a look and overwrite stripes ([#92][])
 * add columnar decompressed chunk cache ([#86][])
@@ -62,6 +63,7 @@
 [#86]: https://github.com/hydradatabase/hydra/pull/86
 [#92]: https://github.com/hydradatabase/hydra/pull/92
 [#93]: https://github.com/hydradatabase/hydra/pull/93
+[#107]: https://github.com/hydradatabase/hydra/pull/107
 [02d2253]: https://github.com/hydradatabase/hydra/commit/02d2253
 [0d41837]: https://github.com/hydradatabase/hydra/commit/0d41837
 [15193be]: https://github.com/hydradatabase/hydra/commit/15193be
