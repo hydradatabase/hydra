@@ -373,6 +373,74 @@ SELECT count(*) FROM userdata_2;
 				}
 			},
 		},
+		{
+			Name: "pg_vector available",
+			SQL: `
+SELECT count(1) FROM pg_available_extensions WHERE name = 'vector';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				err := row.Scan()
+				if err == nil {
+					t.Error("pg_vector should exist")
+				}
+			},
+		},
+		{
+			Name: "enable pg_vector",
+			SQL: `
+CREATE EXTENSION vector;
+			`,
+		},
+		{
+			Name: "pg_vector ext enabled",
+			SQL: `
+SELECT count(1) FROM pg_extension WHERE extname = 'vector';
+			`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var count int
+				if err := row.Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, count; want != got {
+					t.Errorf("pg_vector ext should exist")
+				}
+			},
+		},
+		{
+			Name: "create pg_vector column",
+			SQL: `
+CREATE TABLE items (id bigserial PRIMARY KEY, embedding vector(3));
+		`,
+		},
+		{
+			Name: "insert pg_vector data",
+			SQL: `
+INSERT INTO items (embedding) VALUES ('[1,2,3]'), ('[4,5,6]');
+		`,
+		},
+		{
+			Name: "validate pg_vector data",
+			SQL: `
+SELECT * FROM items ORDER BY embedding <-> '[3,1,2]' LIMIT 1;
+		`,
+			Validate: func(t *testing.T, row pgx.Row) {
+				var result struct {
+					ID        int
+					Embedding string
+				}
+				if err := row.Scan(&result.ID, &result.Embedding); err != nil {
+					t.Fatal(err)
+				}
+
+				if want, got := 1, result.ID; want != got {
+					t.Errorf("item ID should equal")
+				}
+				if want, got := "[1,2,3]", result.Embedding; want != got {
+					t.Errorf("item embedding should equal: want=%s, got=%s", want, got)
+				}
+			},
+		},
 	}
 
 	var (

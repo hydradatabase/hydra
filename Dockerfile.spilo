@@ -22,7 +22,7 @@ RUN set -eux; \
     # s3 deps
     lsb-release \
     wget \
-	; \
+    ; \
     rm -rf /var/lib/apt/lists/*
 
 # mysql ext
@@ -70,3 +70,11 @@ COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
 ARG POSTGRES_BASE_VERSION
 # Default envs
 ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=postgres PGPASSWORD_SUPERUSER=hydra
+
+# Install pgxman extensions
+# Always force rebuild of this layer
+ARG TIMESTAMP=1
+COPY third-party/pgxman_install.sh /tmp/pgxman_install.sh
+RUN set -eux; \
+    /tmp/pgxman_install.sh 13,14; \
+    rm -f /tmp/pgxman_install.sh
