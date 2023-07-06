@@ -2,7 +2,7 @@
 
 ## Future release
 
-* add `pgvector` ([#106][])
+* add [pgvector][] extension ([#106][])
 * default table access method is now columnar ([#107][])
 * add vacuum_full UDF ([#93][])
 * bugfix: vacuum udf could get into a look and overwrite stripes ([#92][])
@@ -88,3 +88,4 @@
 [f399474]: https://github.com/hydradatabase/hydra/commit/f399474
 [f5e0cc1]: https://github.com/hydradatabase/hydra/commit/f5e0cc1
 [fec064b]: https://github.com/hydradatabase/hydra/commit/fec064b
+[pgvector]: https://github.com/pgvector/pgvector
