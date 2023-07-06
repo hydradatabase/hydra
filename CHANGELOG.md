@@ -2,6 +2,7 @@
 
 ## Future release
 
+* add `pgvector` (https://github.com/hydradatabase/hydra/pull/106)
 * add vacuum_full UDF ([#93][])
 * bugfix: vacuum udf could get into a look and overwrite stripes ([#92][])
 * add columnar decompressed chunk cache ([#86][])
