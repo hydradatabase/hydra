@@ -4,7 +4,7 @@
 
 * default table access method is now columnar ([#107][])
 * add [pgvector][] extension ([#106][])
-* * add vacuum_full UDF ([#93][])
+* add vacuum_full UDF ([#93][])
 * bugfix: vacuum udf could get into a look and overwrite stripes ([#92][])
 * add columnar decompressed chunk cache ([#86][])
 * bugfix: vacuum hanging indefinitely in some cases ([#80][])
