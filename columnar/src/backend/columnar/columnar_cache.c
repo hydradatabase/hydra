@@ -83,7 +83,6 @@ MemoryContext ColumnarCacheMemoryContext(void)
 	if (columnarCacheContext == NULL)
 	{
 		columnarCacheContext = AllocSetContextCreate(TopMemoryContext, "Columnar Decompression Cache", 0, (uint64) (columnar_page_cache_size * 1024 * 1024 * .1), columnar_page_cache_size * 1024 * 1024);
-
 		memset(&statistics, 0, sizeof(ColumnarCacheStatistics));
 	}
 
@@ -194,13 +193,21 @@ static void EvictCache(uint64 size)
 				totalAllocationLength -= entry->length;
 				statistics.evictions++;
 
+				StringInfo str = entry->store;
+				if (str->data) {
+					pfree(str->data);
+				}
+
+				pfree(str);
+
 				if (size < entry->length)
 				{
-					size = 0;
+					pfree(entry);
 					return;
 				}
 				else {
 					size -= entry->length;
+					pfree(entry);
 				}
 			}
 		}
