@@ -94,6 +94,7 @@ static void CostColumnarPaths(PlannerInfo *root, RelOptInfo *rel, Oid relationId
 static void CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 								  IndexPath *indexPath);
 static void CostColumnarSeqPath(RelOptInfo *rel, Oid relationId, Path *path);
+static void AdjustColumnarParallelScanCost(Path *path);
 static void CostColumnarScan(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 							 CustomPath *cpath, int numberOfColumnsRead,
 							 int nClauses);
@@ -1255,6 +1256,7 @@ AddColumnarScanPathsRec(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 
 			parallelColumnarScanPath->parallel_workers = columnar_min_parallel_process_running;
 			parallelColumnarScanPath->parallel_aware = true;
+			AdjustColumnarParallelScanCost(parallelColumnarScanPath);
 
 			add_partial_path(rel, parallelColumnarScanPath);
 		}
@@ -1462,6 +1464,36 @@ AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 
 	return path;
 }
+
+
+/*
+ * AdjustColumnarParallelScanCost calculates path cost based on
+ * number of parallel workers (based on postgres code).
+ */
+static void
+AdjustColumnarParallelScanCost(Path *path) 
+{
+	/* Adjust costing for parallelism, if used. */
+	if (path->parallel_workers > 0)
+	{
+		double parallel_divisor = path->parallel_workers;
+
+		if (parallel_leader_participation)
+		{
+			double leader_contribution;
+
+			leader_contribution = 1.0 - (0.3 * path->parallel_workers);
+			if (leader_contribution > 0)
+				parallel_divisor += leader_contribution;
+		}
+
+		/* The CPU cost is divided among all the workers. */
+		path->total_cost /= parallel_divisor;
+
+		path->rows = clamp_row_est(path->rows / parallel_divisor);
+	}
+}
+
 
 /*
  * CostColumnarScan calculates the cost of scanning the columnar table. The
