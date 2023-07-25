@@ -9,3 +9,4 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./volumes/db:/var/lib/postgresql/data
+      - ./files/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
