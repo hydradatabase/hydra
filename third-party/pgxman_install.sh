@@ -11,7 +11,7 @@ main() {
   echo "Installing PGXMan extensions for PostgreSQL $pg_version..."
 
   wget -O "/tmp/pgxman_linux_${_arch}.deb" "https://github.com/pgxman/release/releases/latest/download/pgxman_linux_${_arch}.deb"
-  apt install "/tmp/pgxman_linux_${_arch}.deb"
+  apt install -y "/tmp/pgxman_linux_${_arch}.deb"
 
   pgxman update
 
