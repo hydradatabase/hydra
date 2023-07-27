@@ -52,5 +52,7 @@ jobs:
         push: true
         targets: spilo
         set: |
+          *.cache-to=
+          *.cache-from=
           spilo.tags=${{ inputs.spilo_repo }}:${{ inputs.production && github.sha || format('dev-{0}', github.sha) }}
           ${{ inputs.production && format('spilo.tags={0}:latest', inputs.spilo_repo) || '' }}
