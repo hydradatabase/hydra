@@ -26,7 +26,7 @@ This release adds update and delete support for columnar tables. Incremental mat
 
 ## 0.2.0-alpha
 
-This release has huge gains for performance, bringing parallelization to columnar scans, as well as vectorization of WHERE clauses.
+This release has huge gains for performance, bringing parallelization to columnar scans and vectorization of WHERE clauses.
 
 * upgrade to spilo 2.1-p9 ([4e06ec5][])
 * bugfix: memory leak when decompressing chunks ([15193be][])
