@@ -2,6 +2,8 @@
 
 ## Future release
 
+Columnar-optimized vacuuming allows columnar tables to be compacted after updates and deletes without full rewrite, which will also improve peformance after vacuum. Auto-vacuum support combines recent inserts into a single stripe. A column cache was added to make JOIN queries more efficient, and add the pgvector extension.
+
 * default table access method is now columnar ([#107][])
 * add [pgvector][] extension ([#106][])
 * add vacuum_full UDF ([#93][])
@@ -15,12 +17,16 @@
 
 ## 0.3.0-alpha
 
+This release added update and delete support for columnar tables. Incremental materialized views were added via pg_ivm.
+
 * add incremental materialized views (pg_ivm extension) ([#67][])
 * bugfix: WHERE clause with certain custom types ([4f5b508][])
 * add counts of deleted rows, optimize if no data has been deleted ([c987c6e][])
 * add columnar updates and deletes ([f33b0bd][], [4f939f4][], [f5e0cc1][], [7e15b4c][])
 
 ## 0.2.0-alpha
+
+This release has huge gains for performance, bringing parallelization to columnar scans, as well as vectorization of WHERE clauses.
 
 * upgrade to spilo 2.1-p9 ([4e06ec5][])
 * bugfix: memory leak when decompressing chunks ([15193be][])
@@ -32,6 +38,8 @@
 * add parallel execution ([f399474][])
 
 ## 0.1.0-alpha
+
+The initial release focused on adding several new FDWs and productionization work for our cloud service.
 
 * add parquet_s3_fdw ([02d2253][])
 * add multicorn2, s3csv_fdw, and gspreadsheet_fdw extensions ([1d7cb47][], [a22ecdc][])
