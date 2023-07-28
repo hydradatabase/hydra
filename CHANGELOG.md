@@ -2,7 +2,7 @@
 
 ## Future release
 
-Columnar-optimized vacuuming allows columnar tables to be compacted after updates and deletes without full rewrite, which will also improve peformance after vacuum. Auto-vacuum support combines recent inserts into a single stripe. A column cache was added to make JOIN queries more efficient, and add the pgvector extension.
+Columnar-optimized vacuuming allows columnar tables to be compacted after updates and deletes without full rewrite, which will also improve peformance after vacuum. Auto-vacuum support combines recent inserts into a single stripe. A new column cache makes JOIN queries more efficient. Vector similarity search and data types are now available via pgvector.
 
 * default table access method is now columnar ([#107][])
 * add [pgvector][] extension ([#106][])
@@ -17,7 +17,7 @@ Columnar-optimized vacuuming allows columnar tables to be compacted after update
 
 ## 0.3.0-alpha
 
-This release added update and delete support for columnar tables. Incremental materialized views were added via pg_ivm.
+This release adds update and delete support for columnar tables. Incremental materialized views are now available via pg_ivm.
 
 * add incremental materialized views (pg_ivm extension) ([#67][])
 * bugfix: WHERE clause with certain custom types ([4f5b508][])
@@ -39,7 +39,7 @@ This release has huge gains for performance, bringing parallelization to columna
 
 ## 0.1.0-alpha
 
-The initial release focused on adding several new FDWs and productionization work for our cloud service.
+The initial release focuses on adding several new FDWs and productionization work for our cloud service.
 
 * add parquet_s3_fdw ([02d2253][])
 * add multicorn2, s3csv_fdw, and gspreadsheet_fdw extensions ([1d7cb47][], [a22ecdc][])
