@@ -36,13 +36,15 @@ This benchmark represents typical workload in the following areas: clickstream a
 
 ![Hydra - the open source data warehouse](.images/FasterthanPG.png)
 
+For our continuous benchmark results, see [BENCHMARKS.md](BENCHMARKS.md).
+
 ### Transactions / Second (TPS)
 
 Hydra delivers 1500X more throughput than traditional warehouses to enable realtime analytical workloads. This is accomplished with transactional heap tables.
 
-|  | Hydra | Redshift |
-| --- | --- | --- |
-| TPS | 21988 | 15 |
+|     | Hydra | Redshift |
+| --- | ----- | -------- |
+| TPS | 21988 | 15       |
 
 [View detailed results](https://github.com/hydradatabase/benchmarking/tree/main/pgbench/results)
 
