@@ -1,5 +1,4 @@
 SHELL=/bin/bash -o pipefail
-DOCKER_CACHE_DIR=tmp/bake_cache
 
 TARGET ?= default
 POSTGRES_BASE_VERSION ?= 14
@@ -8,16 +7,13 @@ ECR_REGISTRY ?= 011789831835.dkr.ecr.us-east-1.amazonaws.com
 
 GOLANGCI_LINT_VERSION ?= $$(cat .golangci_lint_version)
 
-$(DOCKER_CACHE_DIR):
-	mkdir -p $(DOCKER_CACHE_DIR)
-
 TEST_ARTIFACT_DIR ?= $(CURDIR)/tmp/test_artifacts
 $(TEST_ARTIFACT_DIR):
 	mkdir -p $(TEST_ARTIFACT_DIR)
 
 .PHONY: docker_build
 # Runs a full multi-platform docker build
-docker_build: $(DOCKER_CACHE_DIR)
+docker_build:
 	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --pull $(TARGET)
 
 uname_m := $(shell uname -m)
@@ -30,7 +26,7 @@ endif
 .PHONY: docker_build_local
 # Runs a docker build for the target platform and loads it into the local docker
 # environment
-docker_build_local: $(DOCKER_CACHE_DIR)
+docker_build_local:
 	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --pull --load $(TARGET)
 
 .PHONY: docker_build_local_postgres

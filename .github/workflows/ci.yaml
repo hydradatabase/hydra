@@ -59,8 +59,6 @@ jobs:
           targets: ${{ format('columnar_{0}', matrix.postgres) }}
           set: |
             *.platform=linux/amd64
-            *.cache-to=
-            *.cache-from=
             columnar.target=checker
 
   build_validate_postgres:
@@ -91,8 +89,6 @@ jobs:
           targets: postgres
           set: |
             *.platform=linux/amd64
-            *.cache-to=
-            *.cache-from=
             postgres.tags=${{ env.POSTGRES_IMAGE }}
       - uses: actions/setup-go@v3
         with:
@@ -123,9 +119,6 @@ jobs:
           project: ${{ secrets.DEPOT_PROJECT }}
           pull: true
           targets: postgres
-          set: |
-            *.cache-to=
-            *.cache-from=
 
   build_validate_spilo:
     name: Build and Validate Spilo
@@ -150,8 +143,6 @@ jobs:
           targets: spilo
           set: |
             *.platform=linux/amd64
-            *.cache-to=
-            *.cache-from=
             spilo.tags=${{ env.SPILO_IMAGE }}
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -203,8 +194,6 @@ jobs:
           targets: spilo
           set: |
             *.platform=linux/amd64
-            *.cache-to=
-            *.cache-from=
 
   push_postgres:
     name: Push Postgres ${{ matrix.postgres }}
@@ -237,8 +226,6 @@ jobs:
           push: true
           targets: postgres
           set: |
-            *.cache-to=
-            *.cache-from=
             postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}
             postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
             ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}

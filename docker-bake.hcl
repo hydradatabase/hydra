@@ -64,9 +64,6 @@ target "postgres" {
     "${POSTGRES_REPO}:latest",
     "${POSTGRES_REPO}:${POSTGRES_BASE_VERSION}"
   ]
-
-  cache-to = ["type=local,dest=tmp/bake_cache/postgres"]
-  cache-from = ["type=local,src=tmp/bake_cache/postgres"]
 }
 
 target "spilo" {
@@ -105,9 +102,6 @@ target "spilo" {
     "${SPILO_REPO}:latest",
     "${SPILO_REPO}:${SPILO_VERSION}-latest"
   ]
-
-  cache-to = ["type=local,dest=tmp/bake_cache/spilo"]
-  cache-from = ["type=local,src=tmp/bake_cache/spilo"]
 }
 
 target "spilo_base" {
@@ -120,9 +114,6 @@ target "spilo_base" {
     PGVERSION = "${SPILO_POSTGRES_VERSION}"
     PGOLDVERSIONS = "${SPILO_POSTGRES_OLD_VERSIONS}"
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/spilo_base"]
-  cache-from = ["type=local,src=tmp/bake_cache/spilo_base"]
 }
 
 target "http" {
@@ -141,9 +132,6 @@ target "http_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/http_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/http_13"]
 }
 
 target "http_14" {
@@ -152,9 +140,6 @@ target "http_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/http_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/http_14"]
 }
 
 target "http_15" {
@@ -163,9 +148,6 @@ target "http_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/http_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/http_15"]
 }
 
 target "s3" {
@@ -190,9 +172,6 @@ target "s3_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/s3_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/s3_13"]
 }
 
 target "s3_15" {
@@ -206,8 +185,6 @@ target "s3_15" {
     POSTGRES_BASE_VERSION = 15
   }
 
-  cache-to = ["type=local,dest=tmp/bake_cache/s3_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/s3_15"]
 }
 
 target "s3_14" {
@@ -220,9 +197,6 @@ target "s3_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/s3_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/s3_14"]
 }
 
 target "s3_spilo_13" {
@@ -235,9 +209,6 @@ target "s3_spilo_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/s3_spilo_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_13"]
 }
 
 target "s3_spilo_14" {
@@ -250,9 +221,6 @@ target "s3_spilo_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/s3_spilo_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_14"]
 }
 
 target "s3_spilo_15" {
@@ -265,9 +233,6 @@ target "s3_spilo_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/s3_spilo_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/s3_spilo_15"]
 }
 
 target "mysql" {
@@ -290,9 +255,6 @@ target "mysql_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/mysql_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/mysql_13"]
 }
 
 target "mysql_14" {
@@ -305,9 +267,6 @@ target "mysql_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/mysql_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/mysql_14"]
 }
 
 target "mysql_15" {
@@ -320,9 +279,6 @@ target "mysql_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/mysql_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/mysql_15"]
 }
 
 target "multicorn" {
@@ -348,9 +304,6 @@ target "multicorn_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/multicorn_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/multicorn_13"]
 }
 
 target "multicorn_14" {
@@ -363,9 +316,6 @@ target "multicorn_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/multicorn_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/multicorn_14"]
 }
 
 target "multicorn_15" {
@@ -378,9 +328,6 @@ target "multicorn_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/multicorn_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/multicorn_15"]
 }
 
 target "columnar" {
@@ -395,9 +342,6 @@ target "columnar_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/columnar_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/columnar_13"]
 }
 
 target "columnar_14" {
@@ -406,9 +350,6 @@ target "columnar_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/columnar_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/columnar_14"]
 }
 
 target "columnar_15" {
@@ -417,9 +358,6 @@ target "columnar_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/columnar_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/columnar_15"]
 }
 
 target "ivm" {
@@ -442,9 +380,6 @@ target "ivm_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/ivm_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/ivm_13"]
 }
 
 target "ivm_14" {
@@ -457,9 +392,6 @@ target "ivm_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/ivm_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/ivm_14"]
 }
 
 target "ivm_15" {
@@ -472,9 +404,6 @@ target "ivm_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/ivm_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/ivm_15"]
 }
 
 target "ivm" {
@@ -497,9 +426,6 @@ target "ivm_13" {
   args = {
     POSTGRES_BASE_VERSION = 13
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/ivm_13"]
-  cache-from = ["type=local,src=tmp/bake_cache/ivm_13"]
 }
 
 target "ivm_14" {
@@ -512,9 +438,6 @@ target "ivm_14" {
   args = {
     POSTGRES_BASE_VERSION = 14
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/ivm_14"]
-  cache-from = ["type=local,src=tmp/bake_cache/ivm_14"]
 }
 
 target "ivm_15" {
@@ -527,7 +450,4 @@ target "ivm_15" {
   args = {
     POSTGRES_BASE_VERSION = 15
   }
-
-  cache-to = ["type=local,dest=tmp/bake_cache/ivm_15"]
-  cache-from = ["type=local,src=tmp/bake_cache/ivm_15"]
 }
