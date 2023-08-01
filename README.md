@@ -12,7 +12,7 @@
 
 Try the [Hydra Free Tier](https://dashboard.hydra.so/signup) to create a column-oriented Postgres instance. Then connect to it with your preferred Postgres client (psql, dbeaver, etc).
 
-Alternatively, you can run Hydra locally.
+Alternatively, you can run Hydra [locally](https://github.com/hydradatabase/hydra/blob/jd/readme-1.0-beta/README.md#run-locally).
 
 ## 💪 Benchmarks - fastest Postgres aggregates on earth
 
