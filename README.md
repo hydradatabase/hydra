@@ -12,7 +12,7 @@
 
 Try the [Hydra Free Tier](https://dashboard.hydra.so/signup) to create a column-oriented Postgres instance. Then connect to it with your preferred Postgres client (psql, dbeaver, etc).
 
-Alternatively, you can run Hydra locally.
+Alternatively, you can run Hydra [locally](#run-locally).
 
 ## 💪 Benchmarks - fastest Postgres aggregates on earth
 
@@ -67,7 +67,7 @@ A: Hydra is a Postgres extension, not a fork. Hydra makes use of `tableam` (tabl
 
 ## :technologist: Developer resources
 
-- [CHANGELOG](https://github.com/hydradatabase/hydra/blob/main/CHANGELOG.md) for details of recent changes.
+- [CHANGELOG](https://github.com/hydradatabase/hydra/blob/main/CHANGELOG.md) for details of recent changes
 - [GitHub Issues](https://github.com/hydradatabase/hydra/issues) for bugs and missing features
 - [Discord](https://discord.com/invite/zKpVxbXnNY) discussion with the Community and Hydra team
 - [Docs](https://docs.hydra.so/) for Hydra features and warehouse ops
