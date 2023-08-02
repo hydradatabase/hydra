@@ -84,6 +84,7 @@ MemoryContext ColumnarCacheMemoryContext(void)
 	{
 		columnarCacheContext = AllocSetContextCreate(TopMemoryContext, "Columnar Decompression Cache", 0, (uint64) (columnar_page_cache_size * 1024 * 1024 * .1), columnar_page_cache_size * 1024 * 1024);
 		memset(&statistics, 0, sizeof(ColumnarCacheStatistics));
+		head = NULL;
 	}
 
 	return columnarCacheContext;
@@ -332,6 +333,11 @@ void *ColumnarRetrieveCache(uint64 relId, uint64 stripeId, uint64 chunkId, uint3
 static uint64 ColumnarCacheLength()
 {
 	uint64 count = 0;
+
+	if (head == NULL)
+	{
+		return 0;
+	}
 
 	dlist_iter iter;
 	dlist_foreach(iter, head)

@@ -3122,3 +3122,17 @@ SELECT SUM(value)
 
 COMMIT;
 DROP TABLE test_2;
+CREATE TABLE t1 (i int) USING columnar;
+INSERT INTO t1 SELECT generate_series(1, 1000000, 1);
+EXPLAIN SELECT COUNT(*) FROM t1;
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=1472.17..1472.18 rows=1 width=8)
+   ->  Gather  (cost=1471.54..1472.15 rows=6 width=8)
+         Workers Planned: 6
+         ->  Partial Aggregate  (cost=471.54..471.55 rows=1 width=8)
+               ->  Parallel Custom Scan (ColumnarScan) on t1  (cost=0.00..54.88 rows=166667 width=0)
+                     Columnar Projected Columns: <columnar optimized out all columns>
+(6 rows)
+
+DROP TABLE t1;
