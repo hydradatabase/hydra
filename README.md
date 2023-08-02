@@ -1,110 +1,92 @@
-![Hydra - the open source data warehouse](.images/hydraGH.svg)
 <div align="center">
 
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/hydradatabase.svg?style=social&label=Follow%20%40hydradatabase)](https://twitter.com/hydradatabase)
-[![GitHub Repo stars](https://img.shields.io/github/stars/hydradatabase/hydra?style=social)](https://github.com/hydradatabase/hydra/stargazers)
-
-<h3>
-    <a href="https://dashboard.hydra.so/signup">Free Cloud Trial</a> |
-    <a href="https://docs.hydra.so">Docs</a> |
-    <a href="https://discord.com/invite/SQrwnAxtDw">Discord</a> |
-    <a href="https://hydra.so/">Website</a>
-</h3>
+[![Hydra - the open source data warehouse](.images/header.png)](https://hydra.so)
 
 </div>
 
-## The world’s fastest Postgres for analytics
+# 🐘🤘 Hydra
 
-Hydra is a modern, open source replacement for enterprise data warehouses. It’s fast and feature-rich so devs can build better analytics, quicker.
+**Hydra is open source, column-oriented Postgres. You can query billions of rows instantly on Postgres without code changes. Parallelized analytics in minutes, not weeks.**
 
-Hydra implements an open source columnar engine to Postgres, driving 23X query performance, better cache hit rates, and scalability over basic Postgres. When comparing to traditional warehouses, Hydra delivers 1500X more throughput to enable realtime analytical workloads.
+## 🚀 Quick start
 
-## Contents
-- [Benchmarks](#-benchmarks)
-- [Quick Start](#-quick-start)
-- [Features](#features)
-- [Community and Status](#-community-and-status)
-- [License](#license)
+Try the [Hydra Free Tier](https://dashboard.hydra.so/signup) to create a column-oriented Postgres instance. Then connect to it with your preferred Postgres client (psql, dbeaver, etc).
 
-## 💪 Benchmarks
-Results in seconds, smaller is better.<br />
+Alternatively, you can run Hydra [locally](#run-locally).
+
+## 💪 Benchmarks - fastest Postgres aggregates on earth
+
+Benchmarks were run on a c6a.4xlarge (16 vCPU, 32 GB RAM) with 500 GB of GP2 storage.
+Results in seconds, smaller is better.
+
 ![Hydra - the open source data warehouse](.images/ReadmeBenchmarks.png)
 
-[Review Clickbench](https://tinyurl.com/clickbench) for comprehensive results and the list of 42 queries tested.
+[Review Clickbench](https://tinyurl.com/clickbench) for comprehensive results and the list of 42 queries tested.
 
-This benchmark represents typical workload in the following areas: clickstream and traffic analysis, web analytics, machine-generated data, structured logs, and events data. It covers the typical queries in ad-hoc analytics and real-time dashboards.
+This benchmark represents typical workload in the following areas: clickstream and traffic analysis, web analytics, machine-generated data, structured logs, and events data.
 
 ![Hydra - the open source data warehouse](.images/FasterthanPG.png)
 
-For our continuous benchmark results, see [BENCHMARKS.md](BENCHMARKS.md).
+### For our continuous benchmark results, see [BENCHMARKS](https://github.com/hydradatabase/hydra/blob/main/BENCHMARKS.md).
 
-### Transactions / Second (TPS)
+## 🙋 FAQs
 
-Hydra delivers 1500X more throughput than traditional warehouses to enable realtime analytical workloads. This is accomplished with transactional heap tables.
+View complete answers in [our documentation](https://docs.hydra.so/concepts/faqs).
 
-|     | Hydra | Redshift |
-| --- | ----- | -------- |
-| TPS | 21988 | 15       |
+### Q: Why is Hydra so fast?
 
-[View detailed results](https://github.com/hydradatabase/benchmarking/tree/main/pgbench/results)
+A: Columnar storage, query parallelization, vectorized execution, column-level caching, and tuning Postgres.
 
-## 🚀 Quick Start
-### Run Hydra locally
+### Q: How do I start using the columnar format on Postgres?
 
-The Hydra [Docker image](https://github.com/hydradatabase/hydra/pkgs/container/hydra) is a drop-in replacement for [postgres Docker image](https://hub.docker.com/_/postgres).
+A: Data is loaded into columnar format by default. Use Postgres normally.
 
-You can also try out Hydra locally using [docker-compose](https://docs.docker.com/compose/).
+### Q: What operations is Hydra meant for? Provide examples.
 
-```
+A: Aggregates (COUNT, SUM, AVG), WHERE clauses, bulk INSERTS, UPDATE, DELETE…
+
+### Q: What is columnar not meant for?
+
+A: Frequent large updates, small transactions…
+
+### Q: What Postgres features are unsupported on columnar?
+
+* Logical replication.
+* Columnar tables don’t typically use indexes, only supporting btree and hash indexes, and their associated constraints.
+
+### Q: Is Hydra a fork?
+
+A: Hydra is a Postgres extension, not a fork. Hydra makes use of `tableam` (table access method API), which was added in Postgres 12 released in 2019.
+
+## 🤝 Community and Status
+
+- [x] Alpha: Limited to select design partners
+- [x] Public Alpha: available for use, but with noted frictions
+- [x] Hydra 1.0 beta: Stable for non-enterprise use cases
+- [ ] Hydra 1.0 Release: Generally Available (GA) and ready for production use
+
+## :technologist: Developer resources
+
+- [CHANGELOG](https://github.com/hydradatabase/hydra/blob/main/CHANGELOG.md) for details of recent changes
+- [GitHub Issues](https://github.com/hydradatabase/hydra/issues) for bugs and missing features
+- [Discord](https://discord.com/invite/zKpVxbXnNY) discussion with the Community and Hydra team
+- [Docs](https://docs.hydra.so/) for Hydra features and warehouse ops
+
+## 💻 Run locally
+
+The Hydra [Docker image](https://github.com/hydradatabase/hydra/pkgs/container/hydra) is a drop-in replacement for [postgres Docker image](https://hub.docker.com/_/postgres).
+
+You can try out Hydra locally using [docker-compose](https://docs.docker.com/compose/).
+
+```bash
 git clone https://github.com/hydradatabase/hydra && cd hydra
 cp .env.example .env
 docker compose up
 psql postgres://postgres:hydra@127.0.0.1:5432
 ```
 
-### Use Hydra Cloud
-
-Hydra Cloud is the fastest and most reliable way to run Hydra. It is a cloud-based data warehouse that allows you to consolidate data from various sources into a single, unified system. It provides a user-friendly interface for automated data ingestion and transformation.
-
-Hydra Cloud provides a scalable and secure cloud environment where automatic backups, resource scaling, high availability, point-in-time recovery, and more is available instantly with new databases.
-
-Sign up for [Hydra Cloud](https://dashboard.hydras.io/signup) and get a free, managed database.
-
-## 🎁 Features
-🐘 hosted postgres database - [docs](https://docs.hydra.so/getting-started)
-<br>📊 columnar store with updates and deletes- [docs](https://docs.hydra.so/concepts/using-hydra-columnar)
-<br>🔀 query parallelization
-<br>🔍 vectorized execution of WHERE clauses
-<br>🌐 external tables - [docs](https://docs.hydra.so/concepts/using-hydra-external-tables)
-
-![Hydra - the open source data warehouse](.images/Columnar_diagram.png)
-
-Read [documentation](https://docs.hydra.so/concepts/using-hydra-columnar) on using Hydra’s columnar table access method.
-
-## 🤝 Community and Status
-[DEVELOPERS.md](https://github.com/hydradatabase/hydra/blob/main/DEVELOPERS.md) for contributing and building the image.
-<br>[Discord](https://discord.com/invite/zKpVxbXnNY) discussion with the Community and Hydra team
-<br>[GitHub Discussions](https://github.com/hydradatabase/hydra/discussions) for longer topics
-<br>[GitHub Issues](https://github.com/hydradatabase/hydra/issues) for bugs and missing features
-<br>[Blog](https://blog.hydra.so/) for latest announcements, tutorials, product updates
-<br>[@hydradatabase](https://twitter.com/hydradatabase) for the tweets, memes, and social posts
-<br>[Docs](https://docs.hydra.so/) for Hydra features and warehouse ops
-
-
-![follow the repo](.images/follow.gif)
-
-- [x]  Private Alpha: Limited to select design partners
-- [x]  Public Beta: Talk with Hydra team to learn more
-- [ ]  Hydra 1.0 Release: Generally Available (GA) and ready for production use
-
-### Coming Soon
-Watch [releases](https://github.com/hydradatabase/hydra/releases) of this repo to get notified of updates.
-- [x]  🧹 vacuum stripe optimizations and space reclamation
-- [ ]  🏎️ vectorized execution of aggregate functions
-- [ ]  🚅 use of SIMD in vectorized execution
-- [ ]  ↔️ separation of compute and storage
-
 ## 📝 License
+
 Hydra is only possible by building on the shoulders of giants.
 
 The code in this repo is licensed under:
