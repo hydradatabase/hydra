@@ -8,6 +8,7 @@ on:
       - 'third-party/**'
       - 'files/**'
       - 'acceptance/**'
+      - docker-bake.hcl
       - Dockerfile
       - Makefile
       - VERSION
