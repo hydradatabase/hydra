@@ -109,3 +109,8 @@ COMMIT;
 
 DROP TABLE test_2;
 
+CREATE TABLE t1 (i int) USING columnar;
+
+INSERT INTO t1 SELECT generate_series(1, 1000000, 1);
+EXPLAIN SELECT COUNT(*) FROM t1;
+DROP TABLE t1;

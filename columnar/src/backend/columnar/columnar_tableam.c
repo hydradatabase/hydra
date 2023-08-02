@@ -1219,6 +1219,11 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		startingStripeListPosition++;
 	}
 
+	if (startingStripeListPosition == 0)
+	{
+		return false;
+	}
+
 	/* 
 	 * There is only one stripe that is candidate. Maybe we should vacuum
 	 * it if condition is met.
