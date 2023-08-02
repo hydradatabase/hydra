@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Future release
+## 1.0.0-beta
 
 Columnar-optimized vacuuming allows columnar tables to be compacted after updates and deletes without full rewrite, which will also improve peformance after vacuum. Auto-vacuum support combines recent inserts into a single stripe. A new column cache makes JOIN queries more efficient. Vector similarity search and data types are now available via pgvector.
 
