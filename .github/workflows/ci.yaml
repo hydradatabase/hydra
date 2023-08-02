@@ -12,6 +12,7 @@ on:
       - Dockerfile
       - Makefile
       - VERSION
+      - HYDRA_PROD_VER
       - .github/workflows/ci.yaml
 
 env:
