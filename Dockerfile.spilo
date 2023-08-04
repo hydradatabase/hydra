@@ -7,6 +7,7 @@ ARG PYTHON_VERSION
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends software-properties-common; \
+    curl \
     # make the latest python available
     add-apt-repository ppa:deadsnakes/ppa; \
     apt-get update; \

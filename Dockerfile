@@ -7,6 +7,7 @@ ARG PYTHON_VERSION
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
+    curl \
     # http deps
     ca-certificates \
     libcurl4-gnutls-dev \
