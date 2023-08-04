@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 main() {
   install_pgxman
@@ -14,7 +14,7 @@ main() {
   done
 }
 
-install_pgxman () {
+install_pgxman() {
   get_architecture || return 1
   local _arch="$RETVAL"
 
@@ -25,7 +25,7 @@ install_pgxman () {
   pgxman update
 }
 
-get_architecture () {
+get_architecture() {
   local _cputype _arch
   _cputype="$(uname -m)"
 
