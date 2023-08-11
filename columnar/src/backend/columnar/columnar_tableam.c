@@ -203,7 +203,7 @@ columnar_beginscan(Relation relation, Snapshot snapshot,
 	TableScanDesc scandesc = columnar_beginscan_extended(relation, snapshot, nkeys, key,
 														 parallel_scan,
 														 flags, attr_needed, NULL,
-														 NULL, 
+														 NULL,
 														 false);
 
 	bms_free(attr_needed);
@@ -371,10 +371,10 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 	if (scan->returnVectorizedTuple)
 	{
 		VectorTupleTableSlot * vectorTTS = (VectorTupleTableSlot *) slot;
-	
+
 		int newVectorSize = 0;
 
-		bool nextRowFound = ColumnarReadNextVector(scan->cs_readState, 
+		bool nextRowFound = ColumnarReadNextVector(scan->cs_readState,
 												   vectorTTS->tts.tts_values,
 												   vectorTTS->tts.tts_isnull,
 												   vectorTTS->rowNumber,
@@ -384,7 +384,7 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 			return false;
 
 		vectorTTS->dimension = newVectorSize;
-		
+
 		memset(vectorTTS->skip, 0, newVectorSize);
 
 		ExecStoreVirtualTuple(slot);
@@ -403,7 +403,7 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 		ExecStoreVirtualTuple(slot);
 		slot->tts_tid = row_number_to_tid(rowNumber);
 	}
-	
+
 	return true;
 }
 
@@ -690,7 +690,7 @@ columnar_fetch_row_version(Relation relation,
 						   TupleTableSlot *slot)
 {
 	uint64 rowNumber = tid_to_row_number(*tid);
-	ColumnarReadState **readState = 
+	ColumnarReadState **readState =
 		FindReadStateCache(relation, GetCurrentSubTransactionId());
 
 	if (readState == NULL)
@@ -1185,7 +1185,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 
 	/* Get all stripes in reverse order */
 	List *stripeMetadataList = StripesForRelfilenode(rel->rd_node, BackwardScanDirection);
-	
+
 	/* Empty table nothing to do */
 	if (stripeMetadataList == NIL)
 	{
@@ -1207,7 +1207,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 													 stripeMetadata->chunkCount,
 													 stripeMetadata->id);
 
-		
+
 		uint64 stripeRowCount = stripeMetadata->rowCount - lastStripeDeletedRows;
 
 		if ((totalRowNumberCount + stripeRowCount >= columnarOptions.stripeRowCount))
@@ -1224,7 +1224,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		return false;
 	}
 
-	/* 
+	/*
 	 * There is only one stripe that is candidate. Maybe we should vacuum
 	 * it if condition is met.
 	 */
@@ -1233,7 +1233,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		/* Maybe we should vacuum only one stripe if count of
 		 * deleted rows is higher than 20 percent.
 		 */
-		float percentageOfDeleteRows = 
+		float percentageOfDeleteRows =
 			(float)lastStripeDeletedRows / (float)(totalRowNumberCount + lastStripeDeletedRows);
 
 		bool shouldVacuumOnlyStripe = percentageOfDeleteRows > 0.2f;
@@ -1249,10 +1249,10 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 	 * Current process has flag `PROC_IN_VACUUM` which is problematic because
 	 * we write here into metadata heap tables. If concurrent process
 	 * read page in which we inserted metadata tuples these tuples will be considered
-	 * DEAD and will be removed (in problematic scenarion). 
+	 * DEAD and will be removed (in problematic scenarion).
 	 * Concurrent process, when assigning RecentXmin will scan all active processes in
-	 * system but will NOT consider this process because of 
-	 * `PROC_IN_VACUUM` flag set. It looks that invalidating status flag here doesn't affect 
+	 * system but will NOT consider this process because of
+	 * `PROC_IN_VACUUM` flag set. It looks that invalidating status flag here doesn't affect
 	 * further execution.
 	 */
 
@@ -1290,7 +1290,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 
 	ColumnarSetStripeReadState(readState,
 							   list_nth(stripeMetadataList, startingStripeListPosition - 1));
-	
+
 	Datum *values = palloc0(tupleDesc->natts * sizeof(Datum));
 	bool *nulls = palloc0(tupleDesc->natts * sizeof(bool));
 
@@ -1299,7 +1299,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 	{
 		ColumnarWriteRow(writeState, values, nulls);
 	}
-	
+
 	uint64 newDataReservation;
 
 	if (list_length(stripeMetadataList) > startingStripeListPosition)
@@ -2419,8 +2419,8 @@ ColumnarProcessUtility(PlannedStmt *pstmt,
 			{
 				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								errmsg("unsupported access method for the "
-									   "index on columnar table %s",
-									   RelationGetRelationName(rel))));
+									   "index on columnar table %s (%s)",
+									   RelationGetRelationName(rel), indexStmt->accessMethod)));
 			}
 		}
 
@@ -2440,7 +2440,11 @@ bool
 ColumnarSupportsIndexAM(char *indexAMName)
 {
 	return strncmp(indexAMName, "btree", NAMEDATALEN) == 0 ||
-		   strncmp(indexAMName, "hash", NAMEDATALEN) == 0;
+				strncmp(indexAMName, "hash", NAMEDATALEN) == 0 ||
+				strncmp(indexAMName, "gin", NAMEDATALEN) == 0 ||
+				strncmp(indexAMName, "gist", NAMEDATALEN) == 0 ||
+				strncmp(indexAMName, "spgist", NAMEDATALEN) == 0 ||
+				strncmp(indexAMName, "rum", NAMEDATALEN) == 0;
 }
 
 
@@ -3080,11 +3084,11 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 												 		stripeMetadata->chunkCount,
 														stripeMetadata->id);
 
-		float percentageOfDeleteRows = 
+		float percentageOfDeleteRows =
 			(float)stripeDeletedRows / (float)(stripeMetadata->rowCount);
 
-		/* 
-		 * If inspected stripe has less than 0.5 percent of maximum strip row size 
+		/*
+		 * If inspected stripe has less than 0.5 percent of maximum strip row size
 		 * or percentage of deleted rows is less than 20% we will skip this stripe
 		 * for vacuum.
 		*/
@@ -3096,7 +3100,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		StripeVacuumCandidate *vacuumCandidate = palloc(sizeof(StripeVacuumCandidate));
 		vacuumCandidate->stripeMetadataIndex = stripeMetadataIndex;
-		vacuumCandidate->candidateTotalSize = stripeMetadata->rowCount - stripeDeletedRows; 
+		vacuumCandidate->candidateTotalSize = stripeMetadata->rowCount - stripeDeletedRows;
 		vacuumCandidate->stripeMetadata = stripeMetadata;
 		vacuumCandidate->activeRows = stripeMetadata->rowCount - stripeDeletedRows;
 
@@ -3141,7 +3145,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		ColumnarSetStripeReadState(readState,
 								vacuumCandidate->stripeMetadata);
-		
+
 		Datum *values = palloc0(tupleDesc->natts * sizeof(Datum));
 		bool *nulls = palloc0(tupleDesc->natts * sizeof(bool));
 

@@ -595,5 +595,54 @@ BEGIN;
 ROLLBACK;
 COPY index_tuple_delete FROM PROGRAM 'seq 10000';
 
+-- gist exclusions
+CREATE TABLE circles (
+  c circle,
+  EXCLUDE USING gist (c WITH &&)
+);
+
+-- first should succeed
+INSERT INTO circles (c) VALUES (CIRCLE(POINT(1.2, 123.1), 10));
+-- second should fail
+INSERT INTO circles (c) VALUES (CIRCLE(POINT(1.2, 123.1), 10));
+
+-- gist
+CREATE TABLE circles_and_stuff (
+  c circle,
+  label text
+) USING columnar;
+
+CREATE INDEX gist_1 ON circles_and_stuff USING GIST (c);
+INSERT INTO circles_and_stuff (c, label) VALUES (circle(point(4.2, 123.1), 10), 'hello');
+INSERT INTO circles_and_stuff (c, label) VALUES (circle(point(1.2, 123.1), 10), 'world');
+INSERT INTO circles_and_stuff (c, label) VALUES (circle(point(6.2, 123.1), 100), 'hello');
+
+BEGIN;
+  SET LOCAL columnar.enable_custom_scan TO 'OFF';
+  SELECT columnar_test_helpers.uses_index_scan (
+  $$
+  SELECT * FROM circles_and_stuff WHERE c && CIRCLE(POINT(1.2, 123.1), 10);
+  $$
+  );
+ROLLBACK;
+
+BEGIN;
+  SET LOCAL columnar.enable_custom_scan TO 'ON';
+  SET LOCAL enable_indexscan TO 'OFF';
+  SELECT columnar_test_helpers.uses_custom_scan (
+    $$
+    SELECT * FROM circles_and_stuff WHERE c && CIRCLE(POINT(1.2, 123.1), 10);
+    $$
+  );
+ROLLBACK;
+
+BEGIN;
+  SET LOCAL columnar.enable_custom_scan TO 'OFF';
+  SET LOCAL enable_indexscan TO 'ON';
+  DELETE FROM circles_and_stuff WHERE label = 'hello';
+  SELECT COUNT(*) FROM circles_and_stuff; -- should return 1
+ROLLBACK;
+
+
 SET client_min_messages TO WARNING;
 DROP SCHEMA columnar_indexes CASCADE;
