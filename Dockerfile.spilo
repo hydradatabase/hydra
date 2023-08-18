@@ -74,7 +74,7 @@ ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=pos
 # Install pgxman extensions
 # Always force rebuild of this layer
 ARG TIMESTAMP=1
-COPY third-party/pgxman_install.sh /tmp/pgxman_install.sh
+COPY third-party/pgxman /tmp
 RUN set -eux; \
-    /tmp/pgxman_install.sh 13 14; \
-    rm -f /tmp/pgxman_install.sh
+    /tmp/pgxman/install.sh 13 14; \
+    rm -rf /tmp/pgxman
