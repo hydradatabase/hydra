@@ -52,7 +52,7 @@ COPY files/postgres/docker-entrypoint-initdb.d /docker-entrypoint-initdb.d/
 ARG POSTGRES_BASE_VERSION
 # Always force rebuild of this layer
 ARG TIMESTAMP=1
-COPY third-party/pgxman_install.sh /tmp/pgxman_install.sh
+COPY third-party/pgxman /tmp/pgxman/
 RUN set -eux; \
-    /tmp/pgxman_install.sh ${POSTGRES_BASE_VERSION}; \
-    rm -f /tmp/pgxman_install.sh
+    /tmp/pgxman/install.sh ${POSTGRES_BASE_VERSION}; \
+    rm -rf /tmp/pgxman
