@@ -76,5 +76,5 @@ ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=pos
 ARG TIMESTAMP=1
 COPY third-party/pgxman_install.sh /tmp/pgxman_install.sh
 RUN set -eux; \
-    /tmp/pgxman_install.sh 13,14; \
+    /tmp/pgxman_install.sh 13 14; \
     rm -f /tmp/pgxman_install.sh
