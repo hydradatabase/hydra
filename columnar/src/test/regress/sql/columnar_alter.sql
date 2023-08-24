@@ -245,7 +245,7 @@ BEGIN;
   ALTER TABLE products ADD COLUMN store_id text PRIMARY KEY;
 ROLLBACK;
 
--- Add an EXCLUSION constraint (should fail)
+-- Add an EXCLUSION constraint (should succeed)
 CREATE TABLE circles (
     c circle,
     EXCLUDE USING gist (c WITH &&)

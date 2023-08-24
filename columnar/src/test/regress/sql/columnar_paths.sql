@@ -76,6 +76,7 @@ BEGIN;
 ROLLBACK;
 
 BEGIN;
+  SET LOCAL enable_indexscan TO 'OFF';
   TRUNCATE full_correlated;
   INSERT INTO full_correlated SELECT i, i::text FROM generate_series(1, 1000) i;
 
