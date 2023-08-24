@@ -37,6 +37,7 @@
 #include "optimizer/pathnode.h"
 #include "optimizer/paths.h"
 #include "optimizer/plancat.h"
+#include "optimizer/planner.h"
 #include "optimizer/restrictinfo.h"
 #include "storage/smgr.h"
 #include "utils/builtins.h"
@@ -126,6 +127,9 @@ static void ColumnarSetRelPathlistHook(PlannerInfo *root, RelOptInfo *rel, Index
 									   RangeTblEntry *rte);
 static void ColumnarGetRelationInfoHook(PlannerInfo *root, Oid relationObjectId,
 										bool inhparent, RelOptInfo *rel);
+static PlannedStmt *ColumnarPlannerHook(Query *parse, const char *query_string,
+										int cursorOptions, ParamListInfo boundParams);
+
 static Plan * ColumnarScanPath_PlanCustomPath(PlannerInfo *root,
 											  RelOptInfo *rel,
 											  struct CustomPath *best_path,
@@ -172,10 +176,12 @@ static List * set_deparse_context_planstate(List *dpcontext, Node *node,
 /* other helpers */
 static List * ColumnarVarNeeded(ColumnarScanState *columnarScanState);
 static Bitmapset * ColumnarAttrNeeded(ScanState *ss, List *customList);
+static bool IsCreateTableAs(const char *query);
 
 /* saved hook value in case of unload */
 static set_rel_pathlist_hook_type PreviousSetRelPathlistHook = NULL;
 static get_relation_info_hook_type PreviousGetRelationInfoHook = NULL;
+static planner_hook_type PreviousPlannerHook = NULL;
 
 static bool EnableColumnarCustomScan = true;
 static bool EnableColumnarQualPushdown = true;
@@ -239,6 +245,9 @@ columnar_customscan_init()
 	PreviousGetRelationInfoHook = get_relation_info_hook;
 	get_relation_info_hook = ColumnarGetRelationInfoHook;
 
+	PreviousPlannerHook = planner_hook;
+	planner_hook = ColumnarPlannerHook;
+
 	/* register customscan specific GUC's */
 	DefineCustomBoolVariable(
 		"columnar.enable_custom_scan",
@@ -300,6 +309,86 @@ columnar_customscan_init()
 		NULL);
 
 	RegisterCustomScanMethods(&ColumnarScanScanMethods);
+}
+
+/*
+ * IsCreateTableAs
+ *
+ * Searches a lower case copy of the query string using strstr to check
+ * for the keywords CREATE, TABLE, and AS, in that order.  There can be
+ * false positives, but we try to minimize them.
+ */
+static
+bool IsCreateTableAs(const char *query)
+{
+	char *c, *t, *a;
+	char *haystack = (char *) palloc(strlen(query) + 1);
+	int16 i;
+
+	/* Create a lower case copy of the string. */
+	for (i = 0; i < strlen(query); i++)
+	{
+		haystack[i] = tolower(query[i]);
+	}
+
+	haystack[i] = '\0';
+
+	c = strstr(haystack, "create");
+	if (c == NULL)
+	{
+		pfree(haystack);
+		return false;
+	}
+
+	t = strstr(c + 6, "table");
+	if (t == NULL)
+	{
+		pfree(haystack);
+		return false;
+	}
+
+	a = strstr(t + 5, "as");
+	if (a == NULL)
+	{
+		pfree(haystack);
+		return false;
+	}
+
+	pfree(haystack);
+
+	return true;
+}
+
+static
+PlannedStmt *ColumnarPlannerHook(Query *parse, const char *query_string,
+										int cursorOptions, ParamListInfo boundParams)
+{
+	PlannedStmt *stmt;
+
+	if (PreviousPlannerHook)
+	{
+		stmt = (*PreviousPlannerHook)(parse, query_string, cursorOptions, boundParams);
+	}
+	else
+	{
+		stmt = standard_planner(parse, query_string, cursorOptions, boundParams);
+	}
+
+	/*
+	 * In the case of a CREATE TABLE AS query, we are not able to successfully
+	 * drop out of a parallel insert situation.  This checks for a CMD_SELECT
+	 * and in that case examines the query string to see if it matches the
+	 * pattern of a CREATE TABLE AS.  If so, set the parallelism to 0 (off).
+	 */
+	if (parse->commandType == CMD_SELECT)
+	{
+		if (IsCreateTableAs(query_string))
+		{
+			stmt->parallelModeNeeded = 0;
+		}
+	}
+
+	return stmt;
 }
 
 
