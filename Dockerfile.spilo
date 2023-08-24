@@ -2,63 +2,16 @@
 
 FROM spilo_base
 
-ARG PYTHON_VERSION
-
 RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends software-properties-common; \
-    # make the latest python available
-    add-apt-repository ppa:deadsnakes/ppa; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-    # http deps
-    ca-certificates \
-    libcurl4-gnutls-dev \
-    # mysql deps
-    default-libmysqlclient-dev \
-    # multicorn deps
-    python${PYTHON_VERSION} \
-    python${PYTHON_VERSION}-dev \
-    # s3 deps
-    lsb-release \
-    wget \
-    ; \
-    rm -rf /var/lib/apt/lists/*
-
-# mysql ext
-COPY --from=mysql_13 /pg_ext /
-COPY --from=mysql_14 /pg_ext /
-COPY --from=mysql_15 /pg_ext /
-
-# http ext
-#COPY --from=http_13 /pg_ext /
-#COPY --from=http_14 /pg_ext /
-
-# multicorn ext
-COPY --from=multicorn_13 /pg_ext /
-COPY --from=multicorn_14 /pg_ext /
-COPY --from=multicorn_15 /pg_ext /
-COPY --from=multicorn_14 /python-dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
-COPY --from=multicorn_15 /python-dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
-
-# s3 ext
-COPY --from=s3_13 /pg_ext /
-COPY --from=s3_14 /pg_ext /
-COPY --from=s3_15 /pg_ext /
-COPY third-party/s3/scripts /tmp
-RUN set -eux; \
-    /tmp/install-arrow; \
-    rm -f /tmp/install
-COPY --from=s3_14 /lib/* /s3_lib/
-COPY --from=s3_15 /lib/* /s3_lib/
-RUN cp -r /s3_lib/* /usr/lib/$(uname -m)-linux-gnu/
-
-# ivm ext
-COPY --from=ivm_13 /pg_ivm /
-COPY --from=ivm_14 /pg_ivm /
-COPY --from=ivm_15 /pg_ivm /
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+  curl \
+  ca-certificates \
+  ; \
+  rm -rf /var/lib/apt/lists/*
 
 # columnar ext
+# NOTE(owenthereal): build columnar with pgxman in this repo
 COPY --from=columnar_13 /pg_ext /
 COPY --from=columnar_14 /pg_ext /
 COPY --from=columnar_15 /pg_ext /
@@ -76,5 +29,5 @@ ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=pos
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
 RUN set -eux; \
-    /tmp/pgxman/install.sh 13 14; \
-    rm -rf /tmp/pgxman
+  /tmp/pgxman/install.sh /tmp/pgxman/pgxman_13_spilo.yaml /tmp/pgxman/pgxman_14.yaml; \
+  rm -rf /tmp/pgxman
