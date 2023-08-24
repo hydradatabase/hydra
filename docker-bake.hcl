@@ -85,3 +85,33 @@ target "spilo_base" {
     PGOLDVERSIONS = "${SPILO_POSTGRES_OLD_VERSIONS}"
   }
 }
+
+target "columnar" {
+  inherits = ["shared"]
+  context = "columnar"
+  target = "output"
+}
+
+target "columnar_13" {
+  inherits = ["columnar"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 13
+  }
+}
+
+target "columnar_14" {
+  inherits = ["columnar"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 14
+  }
+}
+
+target "columnar_15" {
+  inherits = ["columnar"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 15
+  }
+}
