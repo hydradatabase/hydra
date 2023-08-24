@@ -24,5 +24,7 @@ ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
 RUN set -eux; \
   /tmp/pgxman/install.sh 13 14; \
+  # NOTE(owenthereal): install these extensions manually
+  # because they have conflicting files in the deb packages
   apt install -y --no-install-recommends -o Dpkg::Options::="--force-overwrite" postgresql-13-pgxman-multicorn=2.4+b68b75c postgresql-13-pgxman-parquet-s3-fdw=1.0.0+5298b7f; \
   rm -rf /tmp/pgxman
