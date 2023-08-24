@@ -11,12 +11,13 @@ RUN set -eux; \
   rm -rf /var/lib/apt/lists/*
 
 # columnar ext
-# NOTE(owenthereal): move columnar out to a separate repo so that we don't have a circular dependency between pgxman & this repo
+# NOTE(owenthereal): build columnar with pgxman in this repo
 COPY --from=columnar /pg_ext /
 
 COPY files/postgres/docker-entrypoint-initdb.d /docker-entrypoint-initdb.d/
 
 ARG POSTGRES_BASE_VERSION
+# Install pgxman extensions
 # Always force rebuild of this layer
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
