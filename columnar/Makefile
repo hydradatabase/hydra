@@ -21,6 +21,7 @@ install-extension: extension
 	$(MAKE) -C src/backend/columnar install
 
 install-headers: extension
+	@mkdir -p '$(DESTDIR)$(includedir_server)'
 	$(INSTALL_DATA) $(citus_top_builddir)/src/include/citus_version.h '$(DESTDIR)$(includedir_server)/'
 
 clean-extension:
