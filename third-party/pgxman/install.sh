@@ -21,6 +21,7 @@ install_pgxman() {
   echo "Installing PGXMan for ${_arch}..."
 
   curl --silent --show-error --fail --location "https://github.com/pgxman/release/releases/latest/download/pgxman_linux_${_arch}.deb" --output "/tmp/pgxman_linux_${_arch}.deb"
+  apt update
   apt install -y "/tmp/pgxman_linux_${_arch}.deb"
   pgxman update
 }

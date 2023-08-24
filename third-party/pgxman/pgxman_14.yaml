@@ -1,6 +1,16 @@
 apiVersion: v1
 pgVersions: [14]
 extensions:
+  - name: "hydra_columnar"
+    version: "1.0.0-beta"
+  - name: "multicorn"
+    version: "2.4+b68b75c"
+  - name: "mysql_fdw"
+    version: "2.9.1"
+  - name: "parquet_s3_fdw"
+    version: "1.0.0+5298b7f"
+  - name: "pg_ivm"
+    version: "1.5.1"
   - name: "pgvector"
     version: "0.4.4"
   - name: "pg_hint_plan-14"
