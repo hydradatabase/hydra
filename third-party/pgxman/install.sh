@@ -2,30 +2,28 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
 main() {
   install_pgxman
 
-  local _version
-  for _version in "$@"; do
-    echo "Installing extensions for PostgreSQL ${_version}..."
-    pgxman install --file "${SCRIPT_DIR}/pgxman_${_version}.yaml"
+  for _file in "$@"; do
+    echo "Installing extensions from ${_file}..."
+    pgxman install --file "$_file"
   done
 }
 
-install_pgxman () {
+install_pgxman() {
   get_architecture || return 1
   local _arch="$RETVAL"
 
   echo "Installing PGXMan for ${_arch}..."
 
-  wget -O "/tmp/pgxman_linux_${_arch}.deb" "https://github.com/pgxman/release/releases/latest/download/pgxman_linux_${_arch}.deb"
+  curl --silent --show-error --fail --location "https://github.com/pgxman/release/releases/latest/download/pgxman_linux_${_arch}.deb" --output "/tmp/pgxman_linux_${_arch}.deb"
+  apt update
   apt install -y "/tmp/pgxman_linux_${_arch}.deb"
   pgxman update
 }
 
-get_architecture () {
+get_architecture() {
   local _cputype _arch
   _cputype="$(uname -m)"
 
