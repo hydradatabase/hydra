@@ -17,6 +17,6 @@ ARG POSTGRES_BASE_VERSION
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
 RUN set -eux; \
-  /tmp/pgxman/install.sh ${POSTGRES_BASE_VERSION}; \
+  /tmp/pgxman/install.sh /tmp/pgxman/pgxman_${POSTGRES_BASE_VERSION}.yaml; \
   pgxman install pgsql-http=1.5.0@${POSTGRES_BASE_VERSION}; \
   rm -rf /tmp/pgxman
