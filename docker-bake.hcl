@@ -41,6 +41,7 @@ target "postgres" {
   inherits = ["shared"]
 
   contexts = {
+    columnar = "target:columnar_${POSTGRES_BASE_VERSION}"
     postgres_base = "docker-image://postgres:${POSTGRES_BASE_VERSION}-bookworm"
   }
 
@@ -60,8 +61,10 @@ target "spilo" {
   dockerfile = "Dockerfile.spilo"
 
   contexts = {
-    #spilo_base = "docker-image://ghcr.io/zalando/spilo-15:2.1-p9"
     spilo_base = "target:spilo_base"
+    columnar_13 = "target:columnar_13"
+    columnar_14 = "target:columnar_14"
+    columnar_15 = "target:columnar_15"
   }
 
   args = {

@@ -10,6 +10,12 @@ RUN set -eux; \
   ; \
   rm -rf /var/lib/apt/lists/*
 
+# columnar ext
+# NOTE(owenthereal): move columnar out to a separate repo so that we don't have a circular dependency between pgxman & this repo
+COPY --from=columnar_13 /pg_ext /
+COPY --from=columnar_14 /pg_ext /
+COPY --from=columnar_15 /pg_ext /
+
 # configuration
 COPY files/spilo/postgres-appliance/scripts /scripts/
 COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
