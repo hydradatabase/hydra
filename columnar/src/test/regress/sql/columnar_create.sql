@@ -129,3 +129,9 @@ SELECT COUNT(*)=0 FROM columnar_temp;
 -- since we deleted all the rows, we shouldn't have any stripes for table
 SELECT columnar_test_helpers.columnar_metadata_has_storage_id(:columnar_temp_storage_id);
 
+-- make sure we can create a table from a table
+CREATE TABLE sampletable (x numeric) using columnar;
+INSERT INTO sampletable SELECT generate_series(1, 1000000, 1);
+CREATE TABLE sampletable_columnar USING columnar AS SELECT * FROM sampletable ORDER BY 1 ASC;
+DROP TABLE sampletable;
+DROP TABLE sampletable_columnar;
