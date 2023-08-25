@@ -7,7 +7,7 @@ main() {
 
   for _file in "$@"; do
     echo "Installing extensions from ${_file}..."
-    pgxman install --file "$_file"
+    pgxman install --file "$_file" || exit 1
   done
 }
 

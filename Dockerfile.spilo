@@ -29,5 +29,5 @@ ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=pos
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
 RUN set -eux; \
-  /tmp/pgxman/install.sh /tmp/pgxman/pgxman_13_spilo.yaml /tmp/pgxman/pgxman_14.yaml; \
+  /tmp/pgxman/install.sh /tmp/pgxman/pgxman_13.yaml /tmp/pgxman/pgxman_14_spilo.yaml; \
   rm -rf /tmp/pgxman
