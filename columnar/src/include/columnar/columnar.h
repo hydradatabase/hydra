@@ -435,6 +435,7 @@ extern void CleanupReadStateCache(SubTransactionId currentSubXid);
 extern MemoryContext GetColumnarReadStateCache(void);
 
 /* columnar_cache.c */
+extern void ColumnarMarkChunkGroupInUse(uint64 relId, uint64 stripeId, uint32 chunkId);
 extern void ColumnarAddCacheEntry(uint64, uint64, uint64, uint32, void *);
 extern void *ColumnarRetrieveCache(uint64, uint64, uint64, uint32);
 extern void ColumnarResetCache(void);
