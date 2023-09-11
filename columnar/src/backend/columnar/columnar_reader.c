@@ -2066,7 +2066,7 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 				continue;
 		}
 
-		stripeReadState->currentRow += *newVectorSize;
+		stripeReadState->currentRow += stripeReadState->chunkGroupReadState->rowCount;
 
 		return true;
 	}
@@ -2111,7 +2111,6 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 
 			if (checkLookupMask & checkColumnMask)
 			{
-				(*chunkReadRows)++;
 				chunkGroupReadState->currentRow++;
 				continue;
 			}

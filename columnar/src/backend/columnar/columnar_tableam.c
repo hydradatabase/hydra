@@ -385,7 +385,7 @@ columnar_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlo
 
 		vectorTTS->dimension = newVectorSize;
 
-		memset(vectorTTS->skip, 0, newVectorSize);
+		memset(vectorTTS->keep, true, newVectorSize);
 
 		ExecStoreVirtualTuple(slot);
 	}
@@ -1219,6 +1219,9 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		startingStripeListPosition++;
 	}
 
+	/*
+	 * One stripe that is "full" so do nothing.
+	 */
 	if (startingStripeListPosition == 0)
 	{
 		return false;
@@ -1228,7 +1231,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 	 * There is only one stripe that is candidate. Maybe we should vacuum
 	 * it if condition is met.
 	 */
-	if (startingStripeListPosition == 1)
+	else if (startingStripeListPosition == 1)
 	{
 		/* Maybe we should vacuum only one stripe if count of
 		 * deleted rows is higher than 20 percent.

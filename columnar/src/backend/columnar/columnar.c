@@ -37,6 +37,8 @@
 #define DEFAULT_COMPRESSION_TYPE COMPRESSION_PG_LZ
 #endif
 
+static void columnar_guc_init(void);
+
 int columnar_compression = DEFAULT_COMPRESSION_TYPE;
 int columnar_stripe_row_limit = DEFAULT_STRIPE_ROW_COUNT;
 int columnar_chunk_group_row_limit = DEFAULT_CHUNK_ROW_COUNT;
@@ -64,13 +66,14 @@ static const struct config_enum_entry columnar_compression_options[] =
 void
 columnar_init(void)
 {
-	columnar_init_gucs();
+	columnar_guc_init();
 	columnar_tableam_init();
+	columnar_planner_init();
 }
 
 
-void
-columnar_init_gucs()
+static void
+columnar_guc_init()
 {
 	DefineCustomEnumVariable("columnar.compression",
 							 "Compression type for columnar.",

@@ -1,5 +1,6 @@
 
 #include "postgres.h"
+#include "common/int.h"
 
 #include "fmgr.h"
 #include "nodes/execnodes.h"

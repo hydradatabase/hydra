@@ -17,6 +17,7 @@
 #include "fmgr.h"
 #include "lib/stringinfo.h"
 #include "nodes/parsenodes.h"
+#include "nodes/extensible.h"
 #include "port/atomics.h"
 #include "storage/bufpage.h"
 #include "storage/lockdefs.h"
@@ -260,7 +261,6 @@ extern int columnar_page_cache_size;
 typedef void (*ColumnarTableSetOptions_hook_type)(Oid relid, ColumnarOptions options);
 
 extern void columnar_init(void);
-extern void columnar_init_gucs(void);
 
 extern CompressionType ParseCompressionType(const char *compressionTypeString);
 
@@ -375,6 +375,9 @@ extern bytea * ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
 								MemoryContext ctx,
 								uint64 stripeFirstRowNumber, int rowCount);
 extern Datum create_table_row_mask(PG_FUNCTION_ARGS);
+
+/* columnar_planner_hook.c */
+extern void columnar_planner_init(void);
 
 /* write_state_interface.c */
 extern void FlushWriteStateWithNewSnapshot(Oid relfilenode,

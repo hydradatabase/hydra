@@ -17,6 +17,8 @@
 #include "columnar/columnar.h"
 #include "columnar/vectorization/columnar_vector_types.h"
 
+#include "columnar/utils/listutils.h"
+
 VectorColumn *
 BuildVectorColumn(int16 columnDimension, int16 columnTypeLen, 
 				  bool columnIsVal, uint64 *rowNumber)
@@ -54,7 +56,7 @@ CreateVectorTupleTableSlot(TupleDesc tupleDesc)
 	vectorTTS = (VectorTupleTableSlot*) slot;
 	
 	/* All tuples should be skipped in initialization */
-	memset(vectorTTS->skip, true, sizeof(vectorTTS->skip));
+	memset(vectorTTS->keep, false, COLUMNAR_VECTOR_COLUMN_SIZE);
 
 	for (i = 0; i < slotTupleDesc->natts; i++)
 	{		
@@ -81,26 +83,89 @@ CreateVectorTupleTableSlot(TupleDesc tupleDesc)
 		vectorTTS->tts.tts_isnull[i] = false;
 	}
 
+	vectorTTS->tts.tts_nvalid = tupleDesc->natts;
+
 	return slot;
 }
 
 
 void
-extractTupleFromVectorSlot(TupleTableSlot *out, VectorTupleTableSlot *vectorSlot, 
-						   int32 index, Bitmapset *attrNeeded)
+ExtractTupleFromVectorSlot(TupleTableSlot *out, VectorTupleTableSlot *vectorSlot, 
+						   int32 index, List *attrNeededList)
 {
-	int bmsMember = -1;
-	while ((bmsMember = bms_next_member(attrNeeded, bmsMember)) >= 0)
+	int attno;
+	foreach_int(attno, attrNeededList)
 	{
-		VectorColumn *column = (VectorColumn *) vectorSlot->tts.tts_values[bmsMember];
-
-		int8 *rawColumRawData = (int8*) column->value + column->columnTypeLen * index;
-
-		out->tts_values[bmsMember] = fetch_att(rawColumRawData, column->columnIsVal, column->columnTypeLen);
-		out->tts_isnull[bmsMember] = column->isnull[index];
+		if (!out->tts_tupleDescriptor->attrs[attno].attisdropped)
+		{
+			VectorColumn *column = (VectorColumn *) vectorSlot->tts.tts_values[attno];
+			int8 *rawColumRawData = (int8*) column->value + column->columnTypeLen * index;
+			out->tts_values[attno] = fetch_att(rawColumRawData, column->columnIsVal, column->columnTypeLen);
+			out->tts_isnull[attno] = column->isnull[index];
+		}
 	}
 
-	out->tts_tid = row_number_to_tid(vectorSlot->rowNumber[index]);
-
 	ExecStoreVirtualTuple(out);
+}
+
+void
+WriteTupleToVectorSlot(TupleTableSlot *in, VectorTupleTableSlot *vectorSlot, 
+					   int32 index)
+{
+	TupleDesc tupDesc = in->tts_tupleDescriptor;
+
+	int i;
+
+	//vectorSlot->keep[index] = true;
+
+	for (i = 0; i < tupDesc->natts; i++)
+	{
+		VectorColumn *column = (VectorColumn *) vectorSlot->tts.tts_values[i];
+
+		if (!in->tts_isnull[i])
+		{
+			column->isnull[column->dimension] = false;
+
+			if (column->columnIsVal)
+			{
+				int8 *writeColumnRowPosition = (int8 *) column->value + column->columnTypeLen * index;
+
+				store_att_byval(writeColumnRowPosition, in->tts_values[i], column->columnTypeLen);
+			}
+			else
+			{
+				Pointer val = DatumGetPointer(in->tts_values[i]);
+
+				Size data_length = VARSIZE_ANY(val);
+
+				Datum *varLenTypeContainer = NULL;
+
+				varLenTypeContainer = palloc0(sizeof(int8) * data_length);
+				memcpy(varLenTypeContainer, val, data_length);
+
+				*(Datum *) ((int8 *) column->value + column->columnTypeLen * index) = 
+					PointerGetDatum(varLenTypeContainer);
+			}
+		}
+
+		column->dimension++;
+	}
+}
+
+void
+CleanupVectorSlot(VectorTupleTableSlot *vectorSlot)
+{
+	TupleDesc tupDesc = vectorSlot->tts.tts_tupleDescriptor;
+
+	int i;
+
+	for (i = 0; i < tupDesc->natts; i++)
+	{
+		VectorColumn *column = (VectorColumn *) vectorSlot->tts.tts_values[i];
+		memset(column->isnull, true, COLUMNAR_VECTOR_COLUMN_SIZE);
+		column->dimension = 0;
+	}
+	
+	memset(vectorSlot->keep, true, COLUMNAR_VECTOR_COLUMN_SIZE);
+	vectorSlot->dimension = 0;
 }
