@@ -526,6 +526,12 @@ columnar_index_fetch_end(IndexFetchTableData *sscan)
 		ColumnarEndRead(scan->cs_readState);
 		scan->cs_readState = NULL;
 	}
+
+	/* clean up any caches. */
+	if (columnar_enable_page_cache == true)
+	{
+		ColumnarResetCache();
+	}
 }
 
 

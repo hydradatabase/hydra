@@ -72,17 +72,34 @@ static uint64 totalAllocationLength = 0;
 static ColumnarCacheStatistics statistics = { 0 };
 
 /*
+ * Housekeeping of current chunk in use - so they are not evicted.
+ */
+typedef struct ColumarCacheChunkGroupInUse
+{
+	uint64 relId;
+	uint64 stripeId;
+	uint64 chunkId;
+} ColumarCacheChunkGroupInUse;
+
+static List * ChunkGroupsInUse = NIL;
+
+/*
  * ColumnarCacheMemoryContext
  *
  * Returns the cache MemoryContext, initializing the cache MemoryContext
  * as a child of TopMemoryContext if it does not exist, also clears any
  * statistics gathered.
  */
-MemoryContext ColumnarCacheMemoryContext(void)
+MemoryContext
+ColumnarCacheMemoryContext(void)
 {
 	if (columnarCacheContext == NULL)
 	{
-		columnarCacheContext = AllocSetContextCreate(TopMemoryContext, "Columnar Decompression Cache", 0, (uint64) (columnar_page_cache_size * 1024 * 1024 * .1), columnar_page_cache_size * 1024 * 1024);
+		columnarCacheContext = 
+			AllocSetContextCreate(TopMemoryContext, 
+								  "Columnar Decompression Cache", 
+								  0, (uint64) (columnar_page_cache_size * 1024 * 1024 * .1), 
+								  columnar_page_cache_size * 1024 * 1024);
 		memset(&statistics, 0, sizeof(ColumnarCacheStatistics));
 		head = NULL;
 	}
@@ -91,22 +108,24 @@ MemoryContext ColumnarCacheMemoryContext(void)
 }
 
 /*
- * ColumnarResetCache
- *
- * Deletes the caching memory context and sets it to NULL, thus removing the
- * cache and all of its entries.
- */
- void ColumnarResetCache(void)
- {
+* ColumnarResetCache
+*
+* Deletes the caching memory context and sets it to NULL, thus removing the
+* cache and all of its entries.
+*/
+void
+ColumnarResetCache(void)
+{
 	if (columnarCacheContext != NULL)
 	{
 		MemoryContextDelete(columnarCacheContext);
 		columnarCacheContext = NULL;
+		ChunkGroupsInUse = NIL;
 	}
 
 	totalAllocationLength = 0U;
 	head = NULL;
- }
+}
 
 /*
  * ColumnarFindInCache
@@ -115,7 +134,8 @@ MemoryContext ColumnarCacheMemoryContext(void)
  * If found, it increments the readCount, and returns the entry.	If
  * none are found, NULL is returned instead.
  */
-static ColumnarCacheEntry *ColumnarFindInCache(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId)
+static ColumnarCacheEntry *
+ColumnarFindInCache(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId)
 {
 	if (head == NULL)
 	{
@@ -127,7 +147,8 @@ static ColumnarCacheEntry *ColumnarFindInCache(uint64 relId, uint64 stripeId, ui
 	{
 		ColumnarCacheEntry *entry = dlist_container(ColumnarCacheEntry, list_node, iter.cur);
 
-		if (entry->relId == relId && entry->stripeId == stripeId && entry->chunkId == chunkId && entry->columnId == columnId)
+		if (entry->relId == relId && entry->stripeId == stripeId &&
+			entry->chunkId == chunkId && entry->columnId == columnId)
 		{
 			entry->readCount++;
 
@@ -147,7 +168,8 @@ static ColumnarCacheEntry *ColumnarFindInCache(uint64 relId, uint64 stripeId, ui
  *
  * Returns boolean.
  */
-static bool ColumnarInvalidateCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId)
+static bool
+ColumnarInvalidateCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId)
 {
 	dlist_mutable_iter miter;
 
@@ -155,7 +177,8 @@ static bool ColumnarInvalidateCacheEntry(uint64 relId, uint64 stripeId, uint64 c
 	{
 		ColumnarCacheEntry *entry = dlist_container(ColumnarCacheEntry, list_node, miter.cur);
 
-		if (entry->relId == relId && entry->stripeId == stripeId && entry->chunkId == chunkId && entry->columnId == columnId)
+		if (entry->relId == relId && entry->stripeId == stripeId &&
+			entry->chunkId == chunkId && entry->columnId == columnId)
 		{
 			dlist_delete(miter.cur);
 
@@ -169,7 +192,8 @@ static bool ColumnarInvalidateCacheEntry(uint64 relId, uint64 stripeId, uint64 c
 	return true;
 }
 
-static void EvictCache(uint64 size)
+static void
+EvictCache(uint64 size)
 {
 	uint64 lastCount = 0;
 	uint64 nextLowestCount = PG_UINT64_MAX;
@@ -189,6 +213,25 @@ static void EvictCache(uint64 size)
 
 			if (entry->readCount == lastCount)
 			{
+				bool skipCacheEntry = false;
+				ListCell *lc;
+				foreach(lc, ChunkGroupsInUse)
+				{
+					ColumarCacheChunkGroupInUse *chunkGroupInUse =
+						(ColumarCacheChunkGroupInUse *) lfirst(lc);
+
+					if (chunkGroupInUse->relId == entry->relId &&
+						chunkGroupInUse->stripeId == entry->stripeId &&
+						chunkGroupInUse->chunkId == entry->chunkId)
+					{
+						skipCacheEntry = true;
+						break;
+					}
+				}
+
+				if (skipCacheEntry)
+					continue;
+
 				dlist_delete(miter.cur);
 
 				totalAllocationLength -= entry->length;
@@ -218,12 +261,50 @@ static void EvictCache(uint64 size)
 	}
 }
 
+void
+ColumnarMarkChunkGroupInUse(uint64 relId, uint64 stripeId, uint32 chunkId)
+{
+	bool found = false;
+	ListCell *lc;
+
+	MemoryContext ctx = MemoryContextSwitchTo(ColumnarCacheMemoryContext());
+
+	foreach(lc, ChunkGroupsInUse)
+	{
+		ColumarCacheChunkGroupInUse *chunkGroupInUse =
+			(ColumarCacheChunkGroupInUse *) lfirst(lc);
+
+		if (chunkGroupInUse->relId == relId)
+		{
+			chunkGroupInUse->stripeId = stripeId;
+			chunkGroupInUse->chunkId = chunkId;
+			found = true;
+		}
+	}
+
+	if (!found)
+	{
+		ColumarCacheChunkGroupInUse *newChunkGroupInUse =
+			palloc0(sizeof(ColumarCacheChunkGroupInUse));
+
+		newChunkGroupInUse->relId = relId;
+		newChunkGroupInUse->stripeId = stripeId;
+		newChunkGroupInUse->chunkId = chunkId;
+
+		ChunkGroupsInUse = lappend(ChunkGroupsInUse, newChunkGroupInUse);
+	}
+
+	MemoryContextSwitchTo(ctx);
+}
+
 /*
  * ColumnarAddCacheEntry
  *
  * Adds a cache entry, or updates an existing entry.
  */
-void ColumnarAddCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId, void *data)
+void
+ColumnarAddCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId, 
+					  uint32 columnId, void *data)
 {
 	if (columnar_enable_page_cache == false)
 	{
@@ -288,7 +369,8 @@ void ColumnarAddCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId, uint32
 	/* If we are over our cache allocation, clear until we are at 90%. */
 	if (totalAllocationLength >= (columnar_page_cache_size * 1024 * 1024))
 	{
-		EvictCache((columnar_page_cache_size * 1024 * 1024 * .1) + (totalAllocationLength - (columnar_page_cache_size * 1024 * 1024)));
+		EvictCache((columnar_page_cache_size * 1024 * 1024 * .1) + 
+					(totalAllocationLength - (columnar_page_cache_size * 1024 * 1024)));
 	}
 
 	statistics.writes++;
@@ -302,7 +384,8 @@ void ColumnarAddCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId, uint32
  * Search for a cache entry, returning NULL if not found.	If found,
  * make a copy in the current memory context and return it.
  */
-void *ColumnarRetrieveCache(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId)
+void *
+ColumnarRetrieveCache(uint64 relId, uint64 stripeId, uint64 chunkId, uint32 columnId)
 {
 	if (columnar_enable_page_cache == false)
 	{
@@ -330,7 +413,8 @@ void *ColumnarRetrieveCache(uint64 relId, uint64 stripeId, uint64 chunkId, uint3
  *
  * Returns how large our cache is, used for accounting.
  */
-static uint64 ColumnarCacheLength()
+static uint64
+ColumnarCacheLength()
 {
 	uint64 count = 0;
 
@@ -348,7 +432,8 @@ static uint64 ColumnarCacheLength()
 	return count;
 }
 
-ColumnarCacheStatistics *ColumnarGetCacheStatistics(void)
+ColumnarCacheStatistics *
+ColumnarGetCacheStatistics(void)
 {
 	statistics.endingCacheSize = totalAllocationLength;
 	statistics.entries = ColumnarCacheLength();
