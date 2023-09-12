@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 1.0.0-rc
+
+In addition to bug fixes, this release includes significant vectorization optimization for aggregates (eg.g COUNT and SUM), enabled new index types, and added `pg_hint_plan`.
+
+* vectorization of direct aggregates ([#143][])
+* fix an inefficiency with vacuum if there is only one stripe ([#143][])
+* enable `O3` compilation optimizations ([#143][])
+* disable parallelism for `CREATE TABLE ... AS` queries ([#138][])
+* allow gin, gist, spgist, and rum indexes ([#133][])
+* add [pg_hint_plan][] extension ([#134][])
+* fix `columnar.alter_table_set_access_method` bug with disallowing foreign keys ([#136][])
+* fix `explain` crash when cache is enabled ([#125][])
+* extensions are now installed during the build process using pgxman ([#137][])
+* fix a cache eviction bug where a chunk currently in use could be evicted ([#142][])
+
+[#143]: https://github.com/hydradatabase/hydra/pull/143
+[#138]: https://github.com/hydradatabase/hydra/pull/138
+[#133]: https://github.com/hydradatabase/hydra/pull/133
+[#134]: https://github.com/hydradatabase/hydra/pull/134
+[#136]: https://github.com/hydradatabase/hydra/pull/136
+[#125]: https://github.com/hydradatabase/hydra/pull/125
+[#137]: https://github.com/hydradatabase/hydra/pull/137
+[#142]: https://github.com/hydradatabase/hydra/pull/137
+[pg_hint_plan]: https://github.com/ossc-db/pg_hint_plan
+
 ## 1.0.0-beta
 
 Columnar-optimized vacuuming allows columnar tables to be compacted after updates and deletes without full rewrite, which will also improve peformance after vacuum. Auto-vacuum support combines recent inserts into a single stripe. A new column cache makes JOIN queries more efficient. Vector similarity search and data types are now available via pgvector.
