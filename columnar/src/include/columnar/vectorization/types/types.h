@@ -85,5 +85,20 @@ Datum v##FNAME##OPSTR(PG_FUNCTION_ARGS) 									\
 	_BUILD_CMP_OP_INT(FNAME, LTYPE, RTYPE, <=, le)		\
 	_BUILD_CMP_OP_INT(FNAME, LTYPE, RTYPE, >=, ge)		\
 
+
+typedef struct Int128AggState
+{
+	bool		calcSumX2;		/* if true, calculate sumX2 */
+	int64		N;				/* count of processed numbers */
+	int128		sumX;			/* sum of processed numbers */
+	int128		sumX2;			/* sum of squares of processed numbers */
+} Int128AggState;
+
+typedef struct Int64AggState
+{
+	int64		N;				/* count of processed numbers */
+	int64		sumX;			/* sum of processed numbers */
+} Int64AggState;
+
 #endif
 

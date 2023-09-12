@@ -28,8 +28,8 @@ typedef struct VectorTupleTableSlot
 	TupleTableSlot tts;
 	/* How many tuples does this slot contain */ 
 	uint32 dimension;
-	/* Skip array to represent filtered tuples */
-	bool skip[COLUMNAR_VECTOR_COLUMN_SIZE];
+	/* Keep array to represent filtered tuples */
+	bool keep[COLUMNAR_VECTOR_COLUMN_SIZE];
 	/* Row Number */
 	uint64 rowNumber[COLUMNAR_VECTOR_COLUMN_SIZE];
 } VectorTupleTableSlot;
@@ -50,10 +50,14 @@ extern VectorColumn * BuildVectorColumn(int16 columnDimension,
 										int16 columnTypeLen,
 										bool columnIsVal,
 										uint64 *rowNumber);
-extern void extractTupleFromVectorSlot(TupleTableSlot *out, 
+extern void ExtractTupleFromVectorSlot(TupleTableSlot *out, 
 									   VectorTupleTableSlot *vectorSlot, 
 									   int32 index,
-									   Bitmapset *attrNeeded);
+									   List *attrNeededList);
+extern void WriteTupleToVectorSlot(TupleTableSlot *in,
+								   VectorTupleTableSlot *vectorSlot,
+								   int32 index);
+extern void CleanupVectorSlot(VectorTupleTableSlot *vectorSlot);
 
 typedef enum VectorQualType
 {

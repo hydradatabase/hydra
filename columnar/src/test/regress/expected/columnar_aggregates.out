@@ -1,0 +1,241 @@
+-- Custom direct aggregates implementation 
+-- 1. SMALLINT
+CREATE TABLE t_smallint(a SMALLINT) USING columnar;
+INSERT INTO t_smallint SELECT g % 16384 FROM GENERATE_SERIES(0, 3000000) g;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(*), SUM(a), AVG(a), MIN(a), MAX(a) FROM t_smallint;
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: vcount(*), vsum(a), vavg(a), vmin(a), vmax(a)
+   ->  Gather
+         Output: (PARTIAL vcount(*)), (PARTIAL vsum(a)), (PARTIAL vavg(a)), (PARTIAL vmin(a)), (PARTIAL vmax(a))
+         Workers Planned: 7
+         ->  Parallel Custom Scan (VectorAggNode)
+               Output: (PARTIAL vcount(*)), (PARTIAL vsum(a)), (PARTIAL vavg(a)), (PARTIAL vmin(a)), (PARTIAL vmax(a))
+               ->  Parallel Custom Scan (ColumnarScan) on public.t_smallint
+                     Output: a
+                     Columnar Projected Columns: a
+(10 rows)
+
+SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_smallint;
+     sum     |          avg          | min |  max  
+-------------+-----------------------+-----+-------
+ 24561838944 | 8187.2769189076936974 |   0 | 16383
+(1 row)
+
+SET columnar.enable_vectorization TO false;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(*), SUM(a), AVG(a), MIN(a), MAX(a) FROM t_smallint;
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: count(*), sum(a), avg(a), min(a), max(a)
+   ->  Gather
+         Output: (PARTIAL count(*)), (PARTIAL sum(a)), (PARTIAL avg(a)), (PARTIAL min(a)), (PARTIAL max(a))
+         Workers Planned: 7
+         ->  Partial Aggregate
+               Output: PARTIAL count(*), PARTIAL sum(a), PARTIAL avg(a), PARTIAL min(a), PARTIAL max(a)
+               ->  Parallel Custom Scan (ColumnarScan) on public.t_smallint
+                     Output: a
+                     Columnar Projected Columns: a
+(10 rows)
+
+SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_smallint;
+     sum     |          avg          | min |  max  
+-------------+-----------------------+-----+-------
+ 24561838944 | 8187.2769189076936974 |   0 | 16383
+(1 row)
+
+SET columnar.enable_vectorization TO default;
+DROP TABLE t_smallint;
+-- 2. INT
+CREATE TABLE t_int(a INT) USING columnar;
+INSERT INTO t_int SELECT g FROM GENERATE_SERIES(0, 3000000) g;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_int;
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: vsum(a), vavg(a), vmin(a), vmax(a)
+   ->  Gather
+         Output: (PARTIAL vsum(a)), (PARTIAL vavg(a)), (PARTIAL vmin(a)), (PARTIAL vmax(a))
+         Workers Planned: 7
+         ->  Parallel Custom Scan (VectorAggNode)
+               Output: (PARTIAL vsum(a)), (PARTIAL vavg(a)), (PARTIAL vmin(a)), (PARTIAL vmax(a))
+               ->  Parallel Custom Scan (ColumnarScan) on public.t_int
+                     Output: a
+                     Columnar Projected Columns: a
+(10 rows)
+
+SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_int;
+      sum      |         avg          | min |   max   
+---------------+----------------------+-----+---------
+ 4500001500000 | 1500000.000000000000 |   0 | 3000000
+(1 row)
+
+SET columnar.enable_vectorization TO false;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_int;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: sum(a), avg(a), min(a), max(a)
+   ->  Gather
+         Output: (PARTIAL sum(a)), (PARTIAL avg(a)), (PARTIAL min(a)), (PARTIAL max(a))
+         Workers Planned: 7
+         ->  Partial Aggregate
+               Output: PARTIAL sum(a), PARTIAL avg(a), PARTIAL min(a), PARTIAL max(a)
+               ->  Parallel Custom Scan (ColumnarScan) on public.t_int
+                     Output: a
+                     Columnar Projected Columns: a
+(10 rows)
+
+SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_int;
+      sum      |         avg          | min |   max   
+---------------+----------------------+-----+---------
+ 4500001500000 | 1500000.000000000000 |   0 | 3000000
+(1 row)
+
+SET columnar.enable_vectorization TO default;
+DROP TABLE t_int;
+-- 3. BIGINT
+CREATE TABLE t_bigint(a BIGINT) USING columnar;
+INSERT INTO t_bigint SELECT g FROM GENERATE_SERIES(0, 3000000) g;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_bigint;
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: vsum(a), vavg(a), vmin(a), vmax(a)
+   ->  Gather
+         Output: (PARTIAL vsum(a)), (PARTIAL vavg(a)), (PARTIAL vmin(a)), (PARTIAL vmax(a))
+         Workers Planned: 7
+         ->  Parallel Custom Scan (VectorAggNode)
+               Output: (PARTIAL vsum(a)), (PARTIAL vavg(a)), (PARTIAL vmin(a)), (PARTIAL vmax(a))
+               ->  Parallel Custom Scan (ColumnarScan) on public.t_bigint
+                     Output: a
+                     Columnar Projected Columns: a
+(10 rows)
+
+SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_bigint;
+      sum      |         avg          | min |   max   
+---------------+----------------------+-----+---------
+ 4500001500000 | 1500000.000000000000 |   0 | 3000000
+(1 row)
+
+SET columnar.enable_vectorization TO false;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_bigint;
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: sum(a), avg(a), min(a), max(a)
+   ->  Gather
+         Output: (PARTIAL sum(a)), (PARTIAL avg(a)), (PARTIAL min(a)), (PARTIAL max(a))
+         Workers Planned: 7
+         ->  Partial Aggregate
+               Output: PARTIAL sum(a), PARTIAL avg(a), PARTIAL min(a), PARTIAL max(a)
+               ->  Parallel Custom Scan (ColumnarScan) on public.t_bigint
+                     Output: a
+                     Columnar Projected Columns: a
+(10 rows)
+
+SELECT SUM(a), AVG(a), MIN(a), MAX(a) FROM t_bigint;
+      sum      |         avg          | min |   max   
+---------------+----------------------+-----+---------
+ 4500001500000 | 1500000.000000000000 |   0 | 3000000
+(1 row)
+
+SET columnar.enable_vectorization TO default;
+DROP TABLE t_bigint;
+-- 4. DATE
+CREATE TABLE t_date(a DATE) USING columnar;
+INSERT INTO t_date VALUES ('2000-01-01'), ('2020-01-01'), ('2010-01-01'), ('2000-01-02');
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT MIN(a), MAX(a) FROM t_date;
+                    QUERY PLAN                     
+---------------------------------------------------
+ Custom Scan (VectorAggNode)
+   Output: (vmin(a)), (vmax(a))
+   ->  Custom Scan (ColumnarScan) on public.t_date
+         Output: a
+         Columnar Projected Columns: a
+(5 rows)
+
+SELECT MIN(a), MAX(a) FROM t_date;
+    min     |    max     
+------------+------------
+ 01-01-2000 | 01-01-2020
+(1 row)
+
+SET columnar.enable_vectorization TO false;
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT MIN(a), MAX(a) FROM t_date;
+                    QUERY PLAN                     
+---------------------------------------------------
+ Aggregate
+   Output: min(a), max(a)
+   ->  Custom Scan (ColumnarScan) on public.t_date
+         Output: a
+         Columnar Projected Columns: a
+(5 rows)
+
+SELECT MIN(a), MAX(a) FROM t_date;
+    min     |    max     
+------------+------------
+ 01-01-2000 | 01-01-2020
+(1 row)
+
+SET columnar.enable_vectorization TO default;
+DROP TABLE t_date;
+-- Test exception when we fallback to PG aggregator node
+SET client_min_messages TO 'DEBUG1';
+CREATE TABLE t_mixed(a INT, b BIGINT, c DATE, d TIME) using columnar;
+INSERT INTO t_mixed VALUES (0, 1000, '2000-01-01', '23:50'), (10, 2000, '2010-01-01', '00:50');
+DEBUG:  Flushing Stripe of size 2
+-- Vectorized aggregate not found (TIME aggregates are not implemented)
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT MIN(d) FROM t_mixed;
+DEBUG:  Query can't be vectorized. Falling back to original execution.
+DETAIL:  Vectorized aggregate not found.
+                     QUERY PLAN                     
+----------------------------------------------------
+ Aggregate
+   Output: min(d)
+   ->  Custom Scan (ColumnarScan) on public.t_mixed
+         Output: d
+         Columnar Projected Columns: d
+(5 rows)
+
+--Unsupported aggregate argument combination.
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a + b) FROM t_mixed;
+DEBUG:  Query can't be vectorized. Falling back to original execution.
+DETAIL:  Unsupported aggregate argument combination.
+                     QUERY PLAN                     
+----------------------------------------------------
+ Aggregate
+   Output: sum((a + b))
+   ->  Custom Scan (ColumnarScan) on public.t_mixed
+         Output: a, b
+         Columnar Projected Columns: a, b
+(5 rows)
+
+-- Vectorized Aggregates accepts only non-const values.
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(1) FROM t_mixed;
+DEBUG:  Query can't be vectorized. Falling back to original execution.
+DETAIL:  Vectorized Aggregates accepts only non-const values.
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Aggregate
+   Output: count(1)
+   ->  Custom Scan (ColumnarScan) on public.t_mixed
+         Columnar Projected Columns: <columnar optimized out all columns>
+(4 rows)
+
+-- Vectorized aggregate with DISTINCT not supported.
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(DISTINCT a) FROM t_mixed;
+DEBUG:  Query can't be vectorized. Falling back to original execution.
+DETAIL:  Vectorized aggregate with DISTINCT not supported.
+                     QUERY PLAN                     
+----------------------------------------------------
+ Aggregate
+   Output: count(DISTINCT a)
+   ->  Custom Scan (ColumnarScan) on public.t_mixed
+         Output: a
+         Columnar Projected Columns: a
+(5 rows)
+
+DROP TABLE t_mixed;
+SET client_min_messages TO default;

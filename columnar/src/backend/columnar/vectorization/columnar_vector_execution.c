@@ -32,8 +32,8 @@
  * For now, vectorization only support "normal" clauses where
  * we compare tuple column against constant value.
  */
-static bool
-checkOpExprArgumentRules(List *args)
+bool
+CheckOpExprArgumentRules(List *args)
 {
 	ListCell *lcOpExprArgs;
 	bool invalidArgument = false;
@@ -77,6 +77,79 @@ checkOpExprArgumentRules(List *args)
 	return invalidArgument;
 }
 
+/*
+ * Get vectorized procedure OID.
+ */
+bool
+GetVectorizedProcedureOid(Oid procedureOid, Oid *vectorizedProcedureOid)
+{
+	Form_pg_proc procedureForm;
+	HeapTuple procedureTuple;
+
+	List *funcNames = NIL;
+	Oid *argtypes;
+	FuncDetailCode fdResult;
+	int i;
+
+	bool retset;
+	Oid retype;
+	int nvargs;
+	Oid vatype;
+	Oid *true_oid_array;
+
+	procedureTuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(procedureOid));
+	procedureForm = (Form_pg_proc) GETSTRUCT(procedureTuple);
+
+	int originalProcedureNameLen = strlen(NameStr(procedureForm->proname));
+
+	char * vectorizedProcedureName =
+		palloc0(sizeof(char) * originalProcedureNameLen + 2);
+	
+	vectorizedProcedureName[0] = 'v';
+
+	memcpy(vectorizedProcedureName + 1,
+		NameStr(procedureForm->proname),
+		originalProcedureNameLen);
+	
+	ReleaseSysCache(procedureTuple);
+
+	funcNames = lappend(funcNames, makeString(vectorizedProcedureName));
+
+	argtypes = palloc(sizeof(Oid) * procedureForm->pronargs);
+
+	for (i = 0; i < procedureForm->pronargs; i++)
+		argtypes[i] = procedureForm->proargtypes.values[i];
+	
+#if PG_VERSION_NUM >= PG_VERSION_14
+	fdResult = func_get_detail(funcNames, NIL, NIL,
+								procedureForm->pronargs, argtypes,
+								false, true, false,
+								vectorizedProcedureOid,
+								&retype, &retset,
+								&nvargs, &vatype,
+								&true_oid_array, NULL);
+#else
+	fdResult = func_get_detail(funcNames,
+								NIL, NIL,
+								procedureForm->pronargs, argtypes,
+								false, false,
+								vectorizedProcedureOid, &retype,
+								&retset, &nvargs, &vatype,
+								&true_oid_array, NULL);
+#endif
+
+	if ((fdResult == FUNCDETAIL_NOTFOUND || fdResult == FUNCDETAIL_MULTIPLE) || 
+		!OidIsValid(*vectorizedProcedureOid) ||
+		(procedureForm->pronargs != 0 && 
+		 memcmp(argtypes, true_oid_array, procedureForm->pronargs * sizeof(Oid)) != 0))
+	{
+		return false;
+	}
+
+	return true;
+
+}
+
 List *
 CreateVectorizedExprList(List *exprList)
 {
@@ -103,20 +176,8 @@ CreateVectorizedExprList(List *exprList)
 			{
 				OpExpr *opExprNode = (OpExpr *) node;
 
-				Form_pg_proc procedureForm;
 				Form_pg_operator operatorForm;
 				HeapTuple operatorTuple;
-				HeapTuple procedureTuple;
-				List *funcNames = NIL;
-				Oid *argtypes;
-				FuncDetailCode fdResult;
-				int i;
-
-				bool retset;
-				Oid retype;
-				int nvargs;
-				Oid vatype;
-				Oid *true_oid_array;
 
 				if (list_length(opExprNode->args) != 2)
 				{
@@ -128,7 +189,7 @@ CreateVectorizedExprList(List *exprList)
 				 * Let's inspect argument rules and break if they
 				 * don't match rules for vectorized execution.
 				 */
-				if (checkOpExprArgumentRules(opExprNode->args))
+				if (CheckOpExprArgumentRules(opExprNode->args))
 				{
 					newQualList = lappend(newQualList, opExprNode);
 					break;
@@ -136,63 +197,18 @@ CreateVectorizedExprList(List *exprList)
 
 				operatorTuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(opExprNode->opno));
 				operatorForm = (Form_pg_operator) GETSTRUCT(operatorTuple);
-
-				Oid operatorOid = operatorForm->oprcode;
-
+				Oid procedureOid = operatorForm->oprcode;
 				ReleaseSysCache(operatorTuple);
 
-				procedureTuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(operatorOid));
-				procedureForm = (Form_pg_proc) GETSTRUCT(procedureTuple);
-
-				int originalProcedureNameLen =
-					strlen(NameStr(procedureForm->proname));
-
-				char * vectorizedProcedureName =
-					palloc0(sizeof(char) * originalProcedureNameLen + 2);
-				
-				vectorizedProcedureName[0] = 'v';
-
-				memcpy(vectorizedProcedureName + 1,
-					NameStr(procedureForm->proname),
-					originalProcedureNameLen);
-				
-				ReleaseSysCache(procedureTuple);
-
-				funcNames = lappend(funcNames, makeString(vectorizedProcedureName));
-
-				argtypes = palloc(sizeof(Oid) * procedureForm->pronargs);
-
-				for (i = 0; i < procedureForm->pronargs; i++)
-					argtypes[i] = procedureForm->proargtypes.values[i];
-				
-				Oid vectorizedProcedureOperatorOid;
-
-#if PG_VERSION_NUM >= PG_VERSION_14
-				fdResult = func_get_detail(funcNames, NIL, NIL,
-										   procedureForm->pronargs, argtypes,
-										   false, false, false,
-										   &vectorizedProcedureOperatorOid,
-										   &retype, &retset,
-										   &nvargs, &vatype,
-										   &true_oid_array, NULL);
-#else
-				fdResult = func_get_detail(funcNames,
-										   NIL, NIL,
-										   procedureForm->pronargs, argtypes,
-										   false, false,
-										   &vectorizedProcedureOperatorOid, &retype,
-										   &retset, &nvargs, &vatype,
-										   &true_oid_array, NULL);
-#endif
-
-				if (fdResult == FUNCDETAIL_NOTFOUND)
+				Oid vectorizedOid;
+				if (!GetVectorizedProcedureOid(procedureOid, &vectorizedOid))
 				{
 					newQualList = lappend(newQualList, opExprNode);
 					break;
 				}
 
 				OpExpr *opExprNodeVector = copyObject(opExprNode);
-				opExprNodeVector->opfuncid = vectorizedProcedureOperatorOid;
+				opExprNodeVector->opfuncid = vectorizedOid;
 				newQualList = lappend(newQualList, opExprNodeVector);
 				
 				break;
@@ -279,7 +295,7 @@ ConstructVectorizedQualList(TupleTableSlot *slot, List *vectorizedQual)
 				/* Initialize function call parameter structure too */
 				InitFunctionCallInfoData(*(newVectorQual->u.expr.fcInfo), 
 										 newVectorQual->u.expr.fmgrInfo,
-										 nargs, opExprNode->opcollid, NULL, NULL);
+										 nargs, opExprNode->inputcollid, NULL, NULL);
 
 				ListCell *lcOpExprArgs;
 				foreach(lcOpExprArgs, opExprNode->args)
@@ -351,12 +367,16 @@ ConstructVectorizedQualList(TupleTableSlot *slot, List *vectorizedQual)
 	return vectorQualList;
 }
 
+/*
+ * vectorizedOr / vectorizedAnd
+ */
+
 static void
 vectorizedAnd(bool *left, bool *right, int dimension)
 {
 	for (int n = 0; n < dimension; n++)
 	{
-		left[n] = left[n] && right[n];
+		left[n] &= right[n];
 	}
 }
 
@@ -365,8 +385,8 @@ vectorizedOr(bool *left, bool *right, int dimension)
 {
 	for (int n = 0; n < dimension; n++)
 	{
-		left[n] = left[n] || right[n];
-	}
+		left[n] |= right[n];
+	} 
 }
 
 static bool *

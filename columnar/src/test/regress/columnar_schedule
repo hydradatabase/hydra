@@ -34,3 +34,4 @@ test: columnar_matview
 #test: columnar_memory
 test: columnar_alter_table_set_access_method
 test: columnar_cache
+test: columnar_aggregates

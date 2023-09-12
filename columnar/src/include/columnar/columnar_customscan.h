@@ -13,7 +13,12 @@
 #ifndef COLUMNAR_CUSTOMSCAN_H
 #define COLUMNAR_CUSTOMSCAN_H
 
-void columnar_customscan_init(void);
+#include "nodes/extensible.h"
 
+/* Flag to indicate is vectorized aggregate used in execution */
+#define CUSTOM_SCAN_VECTORIZED_AGGREGATE 1
+
+extern void columnar_customscan_init(void);
+extern const CustomScanMethods * columnar_customscan_methods(void);
 
 #endif /* COLUMNAR_CUSTOMSCAN_H */
