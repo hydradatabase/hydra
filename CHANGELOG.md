@@ -10,10 +10,10 @@ In addition to bug fixes, this release includes significant vectorization optimi
 * disable parallelism for `CREATE TABLE ... AS` queries ([#138][])
 * allow gin, gist, spgist, and rum indexes on columnar tables ([#133][])
 * add [pg_hint_plan][] extension ([#134][])
-* fix `columnar.alter_table_set_access_method` to correctly disallow conversion of heap tables that have foreign keys ([#136][])
-* fix `explain` crash when cache is enabled ([#125][])
 * extensions are now installed during the build process using pgxman ([#137][])
-* fix a cache eviction bug where a chunk currently in use could be evicted ([#142][])
+* bugfix: `columnar.alter_table_set_access_method` should correctly disallow conversion of heap tables that have foreign keys ([#136][])
+* bugfix: crash when using `explain` when cache is enabled ([#125][])
+* bugfix: cache could evict a chunk currently in use ([#142][])
 
 [#143]: https://github.com/hydradatabase/hydra/pull/143
 [#138]: https://github.com/hydradatabase/hydra/pull/138
