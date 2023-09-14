@@ -1,10 +1,16 @@
 # CHANGELOG
 
+## 1.0.0-rc2
+
+* bugfix: disable custom vectorization on non-column arguments ([#147][])
+
+[#147]: https://github.com/hydradatabase/hydra/pull/147
+
 ## 1.0.0-rc
 
-In addition to bug fixes, this release includes significant vectorization optimization for aggregates (eg.g COUNT and SUM), enabled new index types, and added `pg_hint_plan`.
+In addition to bug fixes, this release includes significant vectorization optimization for aggregates (e.g. COUNT and SUM), enabled new index types, and added `pg_hint_plan`.
 
-* vectorization of direct aggregates ([#143][])
+* vectorization of direct aggregates - PG14+ only ([#143][])
 * fix an inefficiency with vacuum if there is only one stripe ([#143][])
 * enable `O3` compilation optimizations ([#143][])
 * disable parallelism for `CREATE TABLE ... AS` queries ([#138][])
