@@ -197,7 +197,7 @@ EXPLAIN (verbose, costs off, timing off, summary off) SELECT MIN(d) FROM t_mixed
          Columnar Projected Columns: d
 (5 rows)
 
---Unsupported aggregate argument combination.
+-- Unsupported aggregate argument combination.
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a + b) FROM t_mixed;
                      QUERY PLAN                     
 ----------------------------------------------------
@@ -227,6 +227,18 @@ EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(DISTINCT a) F
    ->  Custom Scan (ColumnarScan) on public.t_mixed
          Output: a
          Columnar Projected Columns: a
+(5 rows)
+
+-- github#145
+-- Vectorized aggregate doesn't accept function as argument
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(length(b::text)) FROM t_mixed;
+                     QUERY PLAN                     
+----------------------------------------------------
+ Aggregate
+   Output: sum(length((b)::text))
+   ->  Custom Scan (ColumnarScan) on public.t_mixed
+         Output: b
+         Columnar Projected Columns: b
 (5 rows)
 
 DROP TABLE t_mixed;

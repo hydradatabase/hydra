@@ -92,7 +92,7 @@ INSERT INTO t_mixed VALUES (0, 1000, '2000-01-01', '23:50'), (10, 2000, '2010-01
 
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT MIN(d) FROM t_mixed;
 
---Unsupported aggregate argument combination.
+-- Unsupported aggregate argument combination.
 
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a + b) FROM t_mixed;
 
@@ -103,6 +103,11 @@ EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(1) FROM t_mix
 -- Vectorized aggregate with DISTINCT not supported.
 
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(DISTINCT a) FROM t_mixed;
+
+-- github#145
+-- Vectorized aggregate doesn't accept function as argument
+
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(length(b::text)) FROM t_mixed;
 
 DROP TABLE t_mixed;
 

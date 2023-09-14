@@ -105,10 +105,10 @@ AggRefArgsExpressionMutator(Node *node, void *context)
 		return (Node *) opExprNode;
 	}
 
-	/* This should handle aggregates that use only const as argument */
-	if (previousNode != NULL && IsA(previousNode, TargetEntry) && IsA(node, Const))
+	/* This should handle aggregates that have non var(column) as argument*/
+	if (previousNode != NULL && IsA(previousNode, TargetEntry) && !IsA(node, Var))
 	{
-		elog(ERROR, "Vectorized Aggregates accepts only non-const values.");
+		elog(ERROR, "Vectorized Aggregates accepts accepts only valid column argument");
 		return false;
 	}
 

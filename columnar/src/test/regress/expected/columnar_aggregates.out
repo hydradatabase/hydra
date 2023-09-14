@@ -199,7 +199,7 @@ DETAIL:  Vectorized aggregate not found.
          Columnar Projected Columns: d
 (5 rows)
 
---Unsupported aggregate argument combination.
+-- Unsupported aggregate argument combination.
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(a + b) FROM t_mixed;
 DEBUG:  Query can't be vectorized. Falling back to original execution.
 DETAIL:  Unsupported aggregate argument combination.
@@ -215,7 +215,7 @@ DETAIL:  Unsupported aggregate argument combination.
 -- Vectorized Aggregates accepts only non-const values.
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(1) FROM t_mixed;
 DEBUG:  Query can't be vectorized. Falling back to original execution.
-DETAIL:  Vectorized Aggregates accepts only non-const values.
+DETAIL:  Vectorized Aggregates accepts accepts only valid column argument
                                 QUERY PLAN                                
 --------------------------------------------------------------------------
  Aggregate
@@ -235,6 +235,20 @@ DETAIL:  Vectorized aggregate with DISTINCT not supported.
    ->  Custom Scan (ColumnarScan) on public.t_mixed
          Output: a
          Columnar Projected Columns: a
+(5 rows)
+
+-- github#145
+-- Vectorized aggregate doesn't accept function as argument
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(length(b::text)) FROM t_mixed;
+DEBUG:  Query can't be vectorized. Falling back to original execution.
+DETAIL:  Vectorized Aggregates accepts accepts only valid column argument
+                     QUERY PLAN                     
+----------------------------------------------------
+ Aggregate
+   Output: sum(length((b)::text))
+   ->  Custom Scan (ColumnarScan) on public.t_mixed
+         Output: b
+         Columnar Projected Columns: b
 (5 rows)
 
 DROP TABLE t_mixed;
