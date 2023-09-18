@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.0.0
+
+No changes since 1.0.0-rc2.
+
 ## 1.0.0-rc2
 
 * bugfix: disable custom vectorization on non-column arguments ([#147][])
