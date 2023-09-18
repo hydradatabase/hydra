@@ -114,7 +114,7 @@ jobs:
           path: ${{ env.TEST_ARTIFACT_DIR }}
           retention-days: 7
       - name: Bake multi-platform Postgres
-        if: github.ref == 'refs/heads/main'
+        #if: github.ref == 'refs/heads/main'
         uses: depot/bake-action@v1
         with:
           token: ${{ secrets.DEPOT_TOKEN }}
@@ -200,7 +200,7 @@ jobs:
   push_postgres:
     name: Push Postgres ${{ matrix.postgres }}
     needs: [build_validate_postgres]
-    if: github.repository == 'hydradatabase/hydra' && github.ref == 'refs/heads/main'
+    if: github.repository == 'hydradatabase/hydra'
     strategy:
       fail-fast: false
       matrix:
@@ -229,6 +229,7 @@ jobs:
           targets: postgres
           set: |
             postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}
+            postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-1.0.0
             postgres.tags=${{ env.POSTGRES_REPO }}:${{ matrix.postgres }}-${{ github.sha }}
             ${{ matrix.postgres == '14' && format('postgres.tags={0}:latest', env.POSTGRES_REPO) || '' }}
 
