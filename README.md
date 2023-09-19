@@ -63,7 +63,7 @@ A: Hydra is a Postgres extension, not a fork. Hydra makes use of `tableam` (tabl
 - [x] Alpha: Limited to select design partners
 - [x] Public Alpha: available for use, but with noted frictions
 - [x] Hydra 1.0 beta: Stable for non-enterprise use cases
-- [ ] Hydra 1.0 Release: Generally Available (GA) and ready for production use
+- [x] Hydra 1.0 Release: Generally Available (GA) and ready for production use
 
 ## :technologist: Developer resources
 
