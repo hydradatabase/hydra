@@ -17,6 +17,8 @@
 #include "access/amapi.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_am.h"
+#include "catalog/pg_class.h"
+#include "catalog/pg_index.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
@@ -39,12 +41,14 @@
 
 #include "columnar/columnar.h"
 #include "columnar/columnar_customscan.h"
+#include "columnar/columnar_indexscan.h"
 #include "columnar/vectorization/columnar_vector_execution.h"
 #include "columnar/vectorization/nodes/columnar_aggregator_node.h"
 
 #include "columnar/utils/listutils.h"
 
 static planner_hook_type PreviousPlannerHook = NULL;
+static Oid columnar_tableam_oid = InvalidOid;
 
 static PlannedStmt * ColumnarPlannerHook(Query *parse,  const char *query_string,
 										 int cursorOptions, ParamListInfo boundParams);
@@ -57,10 +61,36 @@ typedef struct PlanTreeMutatorContext
 	bool vectorizedAggregation;
 } PlanTreeMutatorContext;
 
-
 #define FLATCOPY(newnode, node, nodetype)  \
 	( (newnode) = (nodetype *) palloc(sizeof(nodetype)), \
 	  memcpy((newnode), (node), sizeof(nodetype)) )
+
+
+static bool
+columnar_index_table(Oid indexOid, Oid columnarTableAmOid)
+{
+	HeapTuple ht_idx;
+	Form_pg_index idxrec;
+	HeapTuple ht_table;
+	Form_pg_class tablerec;
+	bool index_on_columnar = false;
+
+	/*
+	 * Fetch the pg_index tuple by the Oid of the index
+	 */
+	ht_idx = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(indexOid));
+	idxrec = (Form_pg_index) GETSTRUCT(ht_idx);
+
+	ht_table = SearchSysCache1(RELOID, ObjectIdGetDatum(idxrec->indrelid));
+	tablerec = (Form_pg_class) GETSTRUCT(ht_table);
+
+	index_on_columnar = tablerec->relam == columnarTableAmOid;
+
+	ReleaseSysCache(ht_idx);
+	ReleaseSysCache(ht_table);
+
+	return index_on_columnar;
+}
 
 static Node *
 AggRefArgsExpressionMutator(Node *node, void *context)
@@ -192,6 +222,9 @@ PlanTreeMutator(Plan *node, void *context)
 			Agg	*newAgg;
 			CustomScan *vectorizedAggNode;
 
+			if (!columnar_enable_vectorization)
+				return node;
+
 			if (aggNode->plan.lefttree->type == T_CustomScan)
 			{
 				if (aggNode->aggstrategy == AGG_PLAIN)
@@ -236,9 +269,41 @@ PlanTreeMutator(Plan *node, void *context)
 
 			break;
 		}
+		case T_IndexScan:
+		{
+			if (!columnar_index_scan)
+				return node;
+
+			IndexScan *indexScanNode = (IndexScan *) node;
+			IndexScan *newIndexScan;
+			CustomScan *columnarIndexScan;
+
+			/* Check if index is build on columnar table */
+			if (!columnar_index_table(indexScanNode->indexid, columnar_tableam_oid))
+				return node;
+
+			columnarIndexScan = columnar_create_indexscan_node();
+			FLATCOPY(newIndexScan, indexScanNode, IndexScan);
+
+			columnarIndexScan->custom_plans = 
+						lappend(columnarIndexScan->custom_plans, newIndexScan);
+		
+			columnarIndexScan->scan.plan.targetlist = 
+						CustomBuildTargetList(indexScanNode->scan.plan.targetlist, INDEX_VAR);
+
+			columnarIndexScan->custom_scan_tlist = newIndexScan->scan.plan.targetlist;
+
+			Plan *columnarIndexScanPlan = (Plan *) columnarIndexScan;
+			columnarIndexScanPlan->parallel_aware = indexScanNode->scan.plan.parallel_aware;
+			columnarIndexScanPlan->startup_cost = indexScanNode->scan.plan.startup_cost;
+			columnarIndexScanPlan->total_cost = indexScanNode->scan.plan.total_cost;
+			columnarIndexScanPlan->plan_rows = indexScanNode->scan.plan.plan_rows;
+			columnarIndexScanPlan->plan_width = indexScanNode->scan.plan.plan_width;
+
+			return (Plan *) columnarIndexScan;
+		}
 		default:
 		{
-			
 			break;
 		}
 	}
@@ -269,11 +334,14 @@ ColumnarPlannerHook(Query *parse,
 		stmt = standard_planner(parse, query_string, cursorOptions, boundParams);
 
 #if PG_VERSION_NUM >= PG_VERSION_14
-	if (!columnar_enable_vectorization			/* Vectorization should be enabled */
-		|| stmt->commandType != CMD_SELECT		 /* only SELECTS are supported  */
-		|| list_length(stmt->rtable) != 1)		 /* JOINs are not yet supported */
+	if (!(columnar_enable_vectorization			/* Vectorization should be enabled */
+			|| columnar_index_scan)				/* or Columnar Index Scan */
+		|| stmt->commandType != CMD_SELECT		/* only SELECTS are supported  */
+		|| list_length(stmt->rtable) != 1)		/* JOINs are not yet supported */
 		return stmt;
 
+	if (columnar_tableam_oid == InvalidOid)
+		columnar_tableam_oid = get_table_am_oid("columnar", true);
 
 	savedPlanTree = stmt->planTree;
 	savedSubplan = stmt->subplans;
@@ -329,4 +397,5 @@ void columnar_planner_init(void)
 #if  PG_VERSION_NUM >= PG_VERSION_14
 	columnar_register_aggregator_node();
 #endif
+	columnar_register_indexscan_node();
 }

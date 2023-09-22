@@ -20,5 +20,6 @@
 
 extern void columnar_customscan_init(void);
 extern const CustomScanMethods * columnar_customscan_methods(void);
+extern Bitmapset * ColumnarAttrNeeded(ScanState *ss, List *customList);
 
 #endif /* COLUMNAR_CUSTOMSCAN_H */
