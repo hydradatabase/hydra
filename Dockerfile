@@ -21,7 +21,6 @@ ARG POSTGRES_BASE_VERSION
 # Always force rebuild of this layer
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
-RUN set -eux; \
-  /tmp/pgxman/install.sh /tmp/pgxman/pgxman_${POSTGRES_BASE_VERSION}.yaml; \
-  pgxman install pgsql-http=1.5.0@${POSTGRES_BASE_VERSION}; \
+RUN curl -sfL https://github.com/pgxman/release/releases/latest/download/install.sh | sh -s -- /tmp/pgxman/pgxman_${POSTGRES_BASE_VERSION}.yaml && \
+  pgxman install pgsql-http=1.5.0@${POSTGRES_BASE_VERSION} --yes && \
   rm -rf /tmp/pgxman
