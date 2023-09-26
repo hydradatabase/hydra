@@ -28,6 +28,5 @@ ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=pos
 # Always force rebuild of this layer
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
-RUN set -eux; \
-  /tmp/pgxman/install.sh /tmp/pgxman/pgxman_13.yaml /tmp/pgxman/pgxman_14_spilo.yaml; \
+RUN curl -sfL https://github.com/pgxman/release/releases/latest/download/install.sh | sh -s -- /tmp/pgxman/pgxman_13.yaml /tmp/pgxman/pgxman_14_spilo.yaml && \
   rm -rf /tmp/pgxman
