@@ -4,5 +4,8 @@ contact_links:
     url: https://docs.hydra.so/
     about: Please consult the documentation before opening any issues!
   - name: 🙋 Ask a question on Discord
-    url: https://discord.com/invite/SQrwnAxtDw
-    about: Ask questions about how to use Hydra on our Discord (and show off your cute pets on our hydra-pets channel!).
+    url: https://hydra.so/discord
+    about: Ask questions about how to use Hydra on our Discord.
+  - name: 📝 Open a documentation issue or PR
+    url: https://github.com/hydradatabase/docs
+    about: You can open issues or PRs directly against our documentation.
