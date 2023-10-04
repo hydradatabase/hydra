@@ -69,7 +69,7 @@ A: Hydra is a Postgres extension, not a fork. Hydra makes use of `tableam` (tabl
 
 - [CHANGELOG](https://github.com/hydradatabase/hydra/blob/main/CHANGELOG.md) for details of recent changes
 - [GitHub Issues](https://github.com/hydradatabase/hydra/issues) for bugs and missing features
-- [Discord](https://discord.com/invite/zKpVxbXnNY) discussion with the Community and Hydra team
+- [Discord](https://hydra.so/discord) discussion with the Community and Hydra team
 - [Docs](https://docs.hydra.so/) for Hydra features and warehouse ops
 
 ## 💻 Run locally
