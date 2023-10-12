@@ -106,12 +106,16 @@ jobs:
           TEST_AWS_REGION: us-east-1
           TEST_AWS_S3_BUCKET: hydra-test-fixtures
         run: make postgres_pull_upgrade_image postgres_acceptance_test
+      - name: tgz container logs
+        if: failure()
+        run: |
+          tar -czf /tmp/test_results.tar.gz ${{ env.TEST_ARTIFACT_DIR }}
       - name: Upload test container logs
         if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: postgres_${{ matrix.postgres }}_container_logs
-          path: ${{ env.TEST_ARTIFACT_DIR }}
+          path: /tmp/test_results.tar.gz
           retention-days: 7
       - name: Bake multi-platform Postgres
         if: github.ref == 'refs/heads/main'
