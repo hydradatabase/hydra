@@ -129,8 +129,12 @@ func (c *postgresAcceptanceCompose) StartCompose(t *testing.T, ctx context.Conte
 		t.Fatal(err)
 	}
 
+	if err := os.MkdirAll(c.artifactDir(), 0755); err != nil {
+		t.Fatal(err)
+	}
+
 	// ArtifactDir may be empty, in which case the system tmp directory is used
-	f, err := os.CreateTemp(c.config.ArtifactDir, "docker-compose.yml")
+	f, err := os.CreateTemp(c.artifactDir(), "docker-compose.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +183,11 @@ func (c *postgresAcceptanceCompose) WaitForContainerReady(t *testing.T, ctx cont
 }
 
 func (c postgresAcceptanceCompose) TerminateCompose(t *testing.T, ctx context.Context, kill bool) {
-	shared.TerminateDockerComposeProject(t, ctx, c.project, c.config.ArtifactDir, kill)
+	shared.TerminateDockerComposeProject(t, ctx, c.project, c.artifactDir(), kill)
+}
+
+func (c postgresAcceptanceCompose) artifactDir() string {
+	return filepath.Join(c.config.ArtifactDir, c.project)
 }
 
 func (c postgresAcceptanceCompose) Image() string {
