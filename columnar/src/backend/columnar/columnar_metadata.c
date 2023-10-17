@@ -1091,44 +1091,28 @@ FindNextStripeForParallelWorker(Relation relation,
 	StripeMetadata *foundStripeMetadata = NULL;
 
 	uint64 storageId = ColumnarStorageGetStorageId(relation, false);
-	ScanKeyData scanKey;
+	ScanKeyData scanKey[2];
 
-	ScanKeyInit(&scanKey, Anum_columnar_stripe_storageid,
+	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
 				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
+
+	ScanKeyInit(&scanKey[1], Anum_columnar_stripe_stripe,
+				BTGreaterEqualStrategyNumber, F_INT8GE, UInt64GetDatum(nextStripeId));
 
 	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
 
-	Relation index = index_open(ColumnarStripeFirstRowNumberIndexRelationId(),
+	Relation index = index_open(ColumnarStripePKeyIndexRelationId(),
 								AccessShareLock);
 
 	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarStripes, index,
-															snapshot, 1,
-															&scanKey);
+															snapshot, 2,
+															scanKey);
 
-	while(true)
+	HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, ForwardScanDirection);
+	if (HeapTupleIsValid(heapTuple))
 	{
-		HeapTuple heapTuple = systable_getnext_ordered(scanDescriptor, ForwardScanDirection);
-
-		if (HeapTupleIsValid(heapTuple))
-		{
-			foundStripeMetadata = BuildStripeMetadata(columnarStripes, heapTuple);
-
-			if (foundStripeMetadata->id == nextStripeId)
-				break;
-
-			if (foundStripeMetadata->id > nextStripeId)
-			{
-				*nextHigherStripeId = foundStripeMetadata->id;
-				break;
-			}
-
-			pfree(foundStripeMetadata);
-		}
-		else
-		{
-			foundStripeMetadata = NULL;
-			break;
-		}
+		foundStripeMetadata = BuildStripeMetadata(columnarStripes, heapTuple);
+		*nextHigherStripeId = foundStripeMetadata->id;
 	}
 
 	systable_endscan_ordered(scanDescriptor);
