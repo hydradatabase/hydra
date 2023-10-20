@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 1.0.1
+
+* updated pgvector to 0.5.1, allowing [use of HNSW indexes][pgvector-HNSW].
+  Users of pgvector should run `ALTER EXTENSION pgvector UPDATE` in any
+  database where the extension is installed. ([#171][])
+* stop resetting to default columnar on Hydra Cloud (spilo). This will allow
+  the user to change the default. ([#173][])
+* improve handling of stripe assignment to workers to reduce spinlock
+  contention, which can cause a crash ([#170][])
+* change default `qual_pushdown_correlation_threshold` from 0.9 to 0.4. This
+  addresses a performance regression we observed in some clickbench queries.
+  ([#159][])
+
+[#173]: https://github.com/hydradatabase/hydra/pull/173
+[#171]: https://github.com/hydradatabase/hydra/pull/171
+[#170]: https://github.com/hydradatabase/hydra/pull/170
+[#159]: https://github.com/hydradatabase/hydra/pull/159
+[pgvector-HNSW]: https://github.com/pgvector/pgvector#hnsw
+
 ## 1.0.0
 
 No changes since 1.0.0-rc2.
