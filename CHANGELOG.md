@@ -3,7 +3,7 @@
 ## 1.0.1
 
 * updated pgvector to 0.5.1, allowing [use of HNSW indexes][pgvector-HNSW].
-  Users of pgvector should run `ALTER EXTENSION pgvector UPDATE` in any
+  Users of pgvector should run `ALTER EXTENSION vector UPDATE` in any
   database where the extension is installed. ([#171][])
 * stop resetting to default columnar on Hydra Cloud (spilo). This will allow
   the user to change the default. ([#173][])
