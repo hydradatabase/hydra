@@ -111,4 +111,17 @@ EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(length(b::text)
 
 DROP TABLE t_mixed;
 
+-- github#180
+-- Vectorized aggregate does't accept filter on columns
+
+CREATE TABLE t_filter(a INT) USING columnar;
+
+INSERT INTO t_filter SELECT g FROM GENERATE_SERIES(0,100) g;
+
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(a) FILTER (WHERE a > 90) FROM t_filter;
+
+SELECT COUNT(a) FILTER (WHERE a > 90) FROM t_filter;
+
+DROP TABLE t_filter;
+
 SET client_min_messages TO default;

@@ -242,4 +242,26 @@ EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(length(b::text)
 (5 rows)
 
 DROP TABLE t_mixed;
+-- github#180
+-- Vectorized aggregate does't accept filter on columns
+CREATE TABLE t_filter(a INT) USING columnar;
+INSERT INTO t_filter SELECT g FROM GENERATE_SERIES(0,100) g;
+DEBUG:  Flushing Stripe of size 101
+EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(a) FILTER (WHERE a > 90) FROM t_filter;
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Aggregate
+   Output: count(a) FILTER (WHERE (a > 90))
+   ->  Custom Scan (ColumnarScan) on public.t_filter
+         Output: a
+         Columnar Projected Columns: a
+(5 rows)
+
+SELECT COUNT(a) FILTER (WHERE a > 90) FROM t_filter;
+ count 
+-------
+    10
+(1 row)
+
+DROP TABLE t_filter;
 SET client_min_messages TO default;

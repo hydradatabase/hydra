@@ -131,6 +131,11 @@ ExpressionMutator(Node *node, void *context)
 			elog(ERROR, "Vectorized aggregate with DISTINCT not supported.");
 		}
 
+		if (oldAggRefNode->aggfilter)
+		{
+			elog(ERROR, "Vectorized aggregate with FILTER not supported");
+		}
+
 		newAggRefNode->args = (List *)
 			expression_tree_mutator((Node *) oldAggRefNode->args, AggRefArgsExpressionMutator, NULL);
 		
