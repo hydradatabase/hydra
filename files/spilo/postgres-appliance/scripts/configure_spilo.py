@@ -304,13 +304,13 @@ postgresql:
     {{/SSL_CRL_FILE}}
     ssl_cert_file: {{SSL_CERTIFICATE_FILE}}
     ssl_key_file: {{SSL_PRIVATE_KEY_FILE}}
-    shared_preload_libraries: 'bg_mon,pg_stat_statements,pgextwlist,pg_auth_mon,set_user,columnar,pg_cron'
+    shared_preload_libraries: 'bg_mon,pg_stat_statements,pgextwlist,pg_auth_mon,set_user,columnar,pg_cron,pg_hint_plan'
     bg_mon.listen_address: '{{BGMON_LISTEN_IP}}'
     bg_mon.history_buckets: 120
     pg_stat_statements.track_utility: 'off'
     extwlist.extensions: 'btree_gin,btree_gist,citext,extra_window_functions,first_last_agg,hll,\
 hstore,hypopg,intarray,ltree,pgcrypto,pgq,pgq_node,pg_ivm,pg_trgm,postgres_fdw,mysql_fdw,multicorn,\
-parquet_s3_fdw,vector,tablefunc,uuid-ossp'
+parquet_s3_fdw,vector,tablefunc,uuid-ossp,pg_hint_plan'
     extwlist.custom_path: /scripts
     cron.use_background_workers: 'on'
   pg_hba:
