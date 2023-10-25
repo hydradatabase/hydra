@@ -375,6 +375,7 @@ extern bytea * ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
 								MemoryContext ctx,
 								uint64 stripeFirstRowNumber, int rowCount);
 extern Datum create_table_row_mask(PG_FUNCTION_ARGS);
+extern EState * create_estate_for_relation(Relation rel);
 
 /* columnar_planner_hook.c */
 extern void columnar_planner_init(void);

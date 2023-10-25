@@ -33,6 +33,7 @@
 #include "commands/progress.h"
 #include "commands/vacuum.h"
 #include "commands/extension.h"
+#include "commands/trigger.h"
 #include "executor/executor.h"
 #include "funcapi.h"
 #include "nodes/makefuncs.h"
@@ -898,6 +899,33 @@ columnar_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 
 		uint64 writtenRowNumber = ColumnarWriteRow(writeState, values,
 												   tupleSlot->tts_isnull);
+
+		EState *estate = create_estate_for_relation(relation);
+
+#if PG_VERSION_NUM >= PG_VERSION_14
+		ResultRelInfo *resultRelInfo = makeNode(ResultRelInfo);
+		InitResultRelInfo(resultRelInfo, relation, 1, NULL, 0);
+#else
+		ResultRelInfo *resultRelInfo = estate->es_result_relation_info;
+#endif
+
+		ExecOpenIndices(resultRelInfo, false);
+
+		if (relation->rd_att->constr)
+			ExecConstraints(resultRelInfo, tupleSlot, estate);
+
+		ExecCloseIndices(resultRelInfo);
+
+		AfterTriggerEndQuery(estate);
+#if PG_VERSION_NUM >= PG_VERSION_14
+		ExecCloseResultRelations(estate);
+		ExecCloseRangeTableRelations(estate);
+#else
+		ExecCleanUpTriggerState(estate);
+#endif
+		ExecResetTupleTable(estate->es_tupleTable, false);
+		FreeExecutorState(estate);
+
 		tupleSlot->tts_tid = row_number_to_tid(writtenRowNumber);
 
 		MemoryContextReset(ColumnarWritePerTupleContext(writeState));

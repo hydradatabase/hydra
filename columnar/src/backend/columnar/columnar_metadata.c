@@ -132,7 +132,6 @@ static void InsertTupleAndEnforceConstraints(ModifyState *state, Datum *values,
 											 bool *nulls);
 static void DeleteTupleAndEnforceConstraints(ModifyState *state, HeapTuple heapTuple);
 static void FinishModifyRelation(ModifyState *state);
-static EState * create_estate_for_relation(Relation rel);
 static bytea * DatumToBytea(Datum value, Form_pg_attribute attrForm);
 static Datum ByteaToDatum(bytea *bytes, Form_pg_attribute attrForm);
 static bool WriteColumnarOptions(Oid regclass, ColumnarOptions *options, bool overwrite);
@@ -2079,7 +2078,7 @@ FinishModifyRelation(ModifyState *state)
  *
  * This is based on similar code in copy.c
  */
-static EState *
+EState *
 create_estate_for_relation(Relation rel)
 {
 	EState *estate = CreateExecutorState();
