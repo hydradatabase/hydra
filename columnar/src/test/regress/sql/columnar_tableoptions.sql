@@ -144,9 +144,9 @@ SELECT columnar.alter_columnar_table_set('table_options', compression_level => 2
 
 -- verify cannot set out of range stripe_row_limit & chunk_group_row_limit options
 SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 999);
-SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 10000001);
+SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 100000001);
 SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 999);
-SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 100001);
+SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 100000001);
 SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 0);
 INSERT INTO table_options VALUES (1);
 
