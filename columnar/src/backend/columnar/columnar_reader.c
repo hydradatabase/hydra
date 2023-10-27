@@ -1423,6 +1423,14 @@ GetFunctionInfoOrNull(Oid typeId, Oid accessMethodId, int16 procedureId)
 	}
 
 	Oid operatorId = get_opfamily_proc(operatorFamilyId, typeId, typeId, procedureId);
+
+	/* No operator for typeId, search for operator class type*/
+	if (operatorId == InvalidOid)
+	{
+		Oid opcintype = get_opclass_input_type(operatorClassId);
+		operatorId = get_opfamily_proc(operatorFamilyId, opcintype, opcintype, procedureId);
+	}
+
 	if (operatorId != InvalidOid)
 	{
 		functionInfo = (FmgrInfo *) palloc0(sizeof(FmgrInfo));
@@ -1522,6 +1530,14 @@ MakeOpExpression(Var *variable, int16 strategyNumber)
 
 	/* Load the operator from system catalogs */
 	Oid operatorId = GetOperatorByType(typeId, accessMethodId, strategyNumber);
+
+	/* No operator for typeId, search for operator class type */
+	if (operatorId == InvalidOid)
+	{
+		Oid operatorClassId = GetDefaultOpClass(typeId, accessMethodId);
+		Oid opcintype = get_opclass_input_type(operatorClassId);
+		operatorId = GetOperatorByType(opcintype, accessMethodId, strategyNumber);
+	}
 
 	Const *constantValue = makeNullConst(typeId, typeModId, collationId);
 
