@@ -1,8 +1,13 @@
 --
 -- Testing data types without comparison operators
--- If a data type doesn't have comparison operators, we should store NULL for min/max values
+--
+-- If a data type doesn't have comparison operators:
+-- (1) we should check if type familiy has defined one
+-- (2) or we should store NULL for min/max values
+-- 
 -- Verify that (1) min/max entries in columnar.chunk is NULL as expected
--- (2) we can run queries which has equality conditions in WHERE clause for that column with correct results
+-- (2) min/max for types that have familiy comparison operator is use and values are set
+-- (3) we can run queries which has equality conditions in WHERE clause for that column with correct results
 --
 
 -- varchar
@@ -66,7 +71,7 @@ CREATE TYPE user_defined_color AS ENUM ('red', 'orange', 'yellow',
                                              'green', 'blue', 'purple');
 CREATE TABLE test_user_defined_color (a user_defined_color) USING columnar;
 INSERT INTO test_user_defined_color VALUES ('red');
-SELECT minimum_value, maximum_value FROM columnar.chunk;
+SELECT minimum_value IS NOT NULL AS min, maximum_value IS NOT NULL AS max FROM columnar.chunk;
 SELECT * FROM test_user_defined_color WHERE a = 'red';
 DROP TABLE test_user_defined_color;
 DROP TYPE user_defined_color;

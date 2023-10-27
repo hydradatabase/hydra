@@ -1,16 +1,21 @@
 --
 -- Testing data types without comparison operators
--- If a data type doesn't have comparison operators, we should store NULL for min/max values
+--
+-- If a data type doesn't have comparison operators:
+-- (1) we should check if type familiy has defined one
+-- (2) or we should store NULL for min/max values
+-- 
 -- Verify that (1) min/max entries in columnar.chunk is NULL as expected
--- (2) we can run queries which has equality conditions in WHERE clause for that column with correct results
+-- (2) min/max for types that have familiy comparison operator is use and values are set
+-- (3) we can run queries which has equality conditions in WHERE clause for that column with correct results
 --
 -- varchar
 CREATE TABLE test_varchar (a varchar) USING columnar;
 INSERT INTO test_varchar VALUES ('Hello');
 SELECT minimum_value, maximum_value FROM columnar.chunk;
- minimum_value | maximum_value 
----------------+---------------
-               | 
+    minimum_value     |    maximum_value     
+----------------------+----------------------
+ \x2400000048656c6c6f | \x2400000048656c6c6f
 (1 row)
 
 SELECT * FROM test_varchar WHERE a = 'Hello';
@@ -24,9 +29,9 @@ DROP TABLE test_varchar;
 CREATE TABLE test_cidr (a cidr) USING columnar;
 INSERT INTO test_cidr VALUES ('192.168.100.128/25');
 SELECT minimum_value, maximum_value FROM columnar.chunk;
- minimum_value | maximum_value 
----------------+---------------
-               | 
+     minimum_value      |     maximum_value      
+------------------------+------------------------
+ \x280000000219c0a86480 | \x280000000219c0a86480
 (1 row)
 
 SELECT * FROM test_cidr WHERE a = '192.168.100.128/25';
@@ -137,10 +142,10 @@ CREATE TYPE user_defined_color AS ENUM ('red', 'orange', 'yellow',
                                              'green', 'blue', 'purple');
 CREATE TABLE test_user_defined_color (a user_defined_color) USING columnar;
 INSERT INTO test_user_defined_color VALUES ('red');
-SELECT minimum_value, maximum_value FROM columnar.chunk;
- minimum_value | maximum_value 
----------------+---------------
-               | 
+SELECT minimum_value IS NOT NULL AS min, maximum_value IS NOT NULL AS max FROM columnar.chunk;
+ min | max 
+-----+-----
+ t   | t
 (1 row)
 
 SELECT * FROM test_user_defined_color WHERE a = 'red';
