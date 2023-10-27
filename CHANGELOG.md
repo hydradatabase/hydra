@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 1.0.2
+
+This version of Hydra Columnar requires `ALTER EXTENSION columnar
+UPDATE` after installation.
+
+* fix incorrect results when using an aggregate `FILTER` by not vectorizing
+  these aggregates ([#181][])
+* fix possible bypass of table constraints by forcing constraints to be checked
+  during multi-insert ([#182][])
+* fix possible table corruption when running `columnar.vacuum`
+  ([#190][])
+* support chunk filtering for types that have a family comparator, namely
+  `varchar` ([#184][])
+* allow higher values (up to 10M) for `chunk_group_row_limit` and
+  `stripe_row_limit` ([#186][])
+* fix txid wraparound ([#190][])
+
+[#181]: https://github.com/hydradatabase/hydra/pull/181
+[#182]: https://github.com/hydradatabase/hydra/pull/182
+[#184]: https://github.com/hydradatabase/hydra/pull/184
+[#190]: https://github.com/hydradatabase/hydra/pull/190
+[#186]: https://github.com/hydradatabase/hydra/pull/186
+[#190]: https://github.com/hydradatabase/hydra/pull/190
+
 ## 1.0.1
 
 * updated pgvector to 0.5.1, allowing [use of HNSW indexes][pgvector-HNSW].
