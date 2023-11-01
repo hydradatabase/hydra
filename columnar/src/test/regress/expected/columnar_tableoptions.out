@@ -257,19 +257,19 @@ HINT:  compression level must be between 1 and 19
 -- verify cannot set out of range stripe_row_limit & chunk_group_row_limit options
 SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 999);
 ERROR:  stripe row count limit out of range
-HINT:  stripe row count limit must be between 1000 and 10000000
-SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 10000001);
+HINT:  stripe row count limit must be between 1000 and 100000000
+SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 100000001);
 ERROR:  stripe row count limit out of range
-HINT:  stripe row count limit must be between 1000 and 10000000
+HINT:  stripe row count limit must be between 1000 and 100000000
 SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 999);
 ERROR:  chunk group row count limit out of range
-HINT:  chunk group row count limit must be between 1000 and 100000
-SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 100001);
+HINT:  chunk group row count limit must be between 1000 and 100000000
+SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 100000001);
 ERROR:  chunk group row count limit out of range
-HINT:  chunk group row count limit must be between 1000 and 100000
+HINT:  chunk group row count limit must be between 1000 and 100000000
 SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit => 0);
 ERROR:  chunk group row count limit out of range
-HINT:  chunk group row count limit must be between 1000 and 100000
+HINT:  chunk group row count limit must be between 1000 and 100000000
 INSERT INTO table_options VALUES (1);
 -- verify options are removed when table is dropped
 DROP TABLE table_options;
