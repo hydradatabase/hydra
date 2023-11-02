@@ -3040,6 +3040,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	MemoryContext oldcontext = CurrentMemoryContext;
 	uint32 stripeCount = PG_GETARG_UINT32(1);
 	uint32 progress = 0;
+	bool completelyDone = false;
 	struct sigaction action;
 
 	/*
@@ -3104,6 +3105,8 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	ListCell *lc = NULL;
 
 	int stripeMetadataIndex = 0;
+
+	elog(DEBUG3, "Beginning combination of stripes");
 
 	/*
 	 * Get a list of all stripes that can be combined into larger stripes.
@@ -3188,7 +3191,6 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		int32 rowCount = 0;
 
-
 		while (rowCount < vacuumCandidate->activeRows && ColumnarReadNextRow(readState, values, nulls, NULL))
 		{
 			ColumnarWriteRow(writeState, values, nulls);
@@ -3237,6 +3239,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		if (stripeCount && progress >= stripeCount)
 		{
+			completelyDone = true;
 			break;
 		}
 
@@ -3249,11 +3252,25 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	 */
 	ColumnarEndWrite(writeState);
 
+	elog(DEBUG3, "Combined %d stripes", progress);
+
+	if (completelyDone)
+	{
+		relation_close(rel, NoLock);
+		TruncateColumnar(rel, DEBUG3);
+		UnlockRelation(rel, ExclusiveLock);
+		PG_RETURN_UINT32(progress);
+	}
+
+	elog(DEBUG3, "Beginning reorganization");
 	/*
 	 * Continually iterate through the holes, finding where we can place
 	 * old stripes.
 	 */
 	bool done = false;
+
+	uint32 relocationProgress = 0;
+
 	while (!done)
 	{
 		MemoryContext rewriteContext = AllocSetContextCreate(CurrentMemoryContext,
@@ -3263,8 +3280,10 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		/* Check if a signal has been sent, if so close out and deal with it. */
 		if (need_to_bail)
 		{
-			UnlockRelation(rel, ExclusiveLock);
 			relation_close(rel, NoLock);
+			TruncateColumnar(rel, DEBUG3);
+			UnlockRelation(rel, ExclusiveLock);
+			ForceSyncCommit();
 
 			need_to_bail = 0;
 			/* Reset the signal handlers back to their original state. */
@@ -3296,13 +3315,12 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		 */
 		List *holes = HolesForRelation(rel);
 
-		if (list_length(holes) == 0 || (stripeCount && progress >= stripeCount))
+		if (list_length(holes) == 0)
 		{
 			done = true;
 			continue;
 		}
 
-		int relocationCount = 0;
 		/*
 		 * Iterate through the holes, moving later slices into the holes.
 		 */
@@ -3338,13 +3356,11 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 					/* Update the stripe metadata for the moved stripe. */
 					RewriteStripeMetadataRowWithNewValues(rel, stripe->id, stripe->dataLength, hole->fileOffset, stripe->rowCount, stripe->chunkCount);
 
-					relocationCount++;
+					relocationProgress++;
 
 					pfree(data);
 
-					progress++;
-
-					if (stripeCount && progress >= stripeCount)
+					if (relocationProgress >= 1)
 					{
 						done = true;
 					}
@@ -3354,7 +3370,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 			}
 
 
-			if (relocationCount == 0 || (stripeCount && progress >= stripeCount))
+			if (relocationProgress >= 1)
 			{
 				done = true;
 			}
@@ -3366,6 +3382,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		MemoryContextDelete(rewriteContext);
 	}
 
+	elog(DEBUG3, "Ending reorganization");
 
 	relation_close(rel, NoLock);
 
@@ -3380,7 +3397,7 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	sigaction(SIGABRT, &abt_action, NULL);
 	sigaction(SIGKILL, &kil_action, NULL);
 
-	PG_RETURN_UINT32(progress);
+	PG_RETURN_UINT32(progress + relocationProgress);
 }
 
 /*
