@@ -15,6 +15,7 @@
 #include "access/tsmapi.h"
 #include "storage/lockdefs.h"
 #include "utils/palloc.h"
+#include "utils/snapmgr.h"
 #if PG_VERSION_NUM >= 130000
 #include "access/detoast.h"
 #else
@@ -862,7 +863,38 @@ columnar_tuple_insert_speculative(Relation relation, TupleTableSlot *slot,
 								  CommandId cid, int options,
 								  BulkInsertState bistate, uint32 specToken)
 {
-	elog(ERROR, "columnar_tuple_insert_speculative not implemented");
+	previousCacheEnabledState = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
+
+	/*
+	 * columnar_init_write_state allocates the write state in a longer
+	 * lasting context, so no need to worry about it.
+	 */
+	ColumnarWriteState *writeState = columnar_init_write_state(relation,
+															   RelationGetDescr(relation),
+																 slot->tts_tableOid,
+															   GetCurrentSubTransactionId());
+	MemoryContext oldContext = MemoryContextSwitchTo(ColumnarWritePerTupleContext(
+														 writeState));
+
+	ColumnarCheckLogicalReplication(relation);
+
+	slot_getallattrs(slot);
+
+	Datum *values = detoast_values(slot->tts_tupleDescriptor,
+								   slot->tts_values, slot->tts_isnull);
+
+	uint64 storageId = LookupStorageId(relation->rd_node);
+
+	uint64 writtenRowNumber = ColumnarWriteRow(writeState, values, slot->tts_isnull);
+	UpdateRowMask(relation->rd_node, storageId,  NULL, writtenRowNumber);
+
+	slot->tts_tid = row_number_to_tid(writtenRowNumber);
+
+	MemoryContextSwitchTo(oldContext);
+	MemoryContextReset(ColumnarWritePerTupleContext(writeState));
+
+	pgstat_count_heap_insert(relation, 1);
 }
 
 
@@ -870,7 +902,15 @@ static void
 columnar_tuple_complete_speculative(Relation relation, TupleTableSlot *slot,
 									uint32 specToken, bool succeeded)
 {
-	elog(ERROR, "columnar_tuple_complete_speculative not implemented");
+	uint64 rowNumber = tid_to_row_number(slot->tts_tid);
+
+	uint64 storageId = LookupStorageId(relation->rd_node);
+
+	/* Set lock for relation until transaction ends */
+	DirectFunctionCall1(pg_advisory_xact_lock_int8,
+						Int64GetDatum((int64) storageId));
+
+	columnar_enable_page_cache = previousCacheEnabledState;
 }
 
 
@@ -992,7 +1032,35 @@ columnar_tuple_lock(Relation relation, ItemPointer tid, Snapshot snapshot,
 					LockWaitPolicy wait_policy, uint8 flags,
 					TM_FailureData *tmfd)
 {
-	elog(ERROR, "columnar_tuple_lock not implemented");
+	uint64 rowNumber = tid_to_row_number(*tid);
+	ColumnarReadState *readState = NULL;
+
+	int natts = relation->rd_att->natts;
+	Bitmapset *attr_needed = bms_add_range(NULL, 0, natts - 1);
+
+	List *scanQual = NIL;
+
+	bool randomAccess = true;
+
+	readState = init_columnar_read_state(relation,
+										slot->tts_tupleDescriptor,
+										attr_needed, scanQual,
+										CurrentMemoryContext, // to be checked
+										GetTransactionSnapshot(), randomAccess,
+										NULL);
+
+	ColumnarReadRowByRowNumber(readState, rowNumber,
+							   slot->tts_values, slot->tts_isnull);
+
+	slot->tts_tableOid = RelationGetRelid(relation);
+	slot->tts_tid = *tid;
+
+	if (TTS_EMPTY(slot))
+	{
+		ExecStoreVirtualTuple(slot);
+	}
+
+	return TM_Ok;
 }
 
 
