@@ -937,6 +937,17 @@ UpdateRowMask(RelFileNode relfilenode, uint64 storageId,
 
 			rowMask = rowMaskEntry->mask;
 		}
+		else
+		{
+			/*
+			* If the heap tuple is invalid, that likely means that we have
+			* encountered a speculative insert.
+			*/
+			systable_endscan_ordered(scanDescriptor);
+			index_close(index, AccessShareLock);
+			table_close(columnarRowMask, AccessShareLock);
+			return false;
+		}
 
 		systable_endscan_ordered(scanDescriptor);
 		index_close(index, AccessShareLock);

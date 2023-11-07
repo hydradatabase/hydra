@@ -1,0 +1,58 @@
+CREATE TABLE upsert_test (
+  i INT,
+  t TEXT
+) USING columnar;
+CREATE UNIQUE INDEX ON upsert_test (t);
+INSERT INTO upsert_test (i, t) VALUES (1, 'hello');
+INSERT INTO upsert_test (i, t) VALUES (2, 'world');
+-- should work, then roll back
+BEGIN;
+INSERT INTO upsert_test (t) VALUES ( 'hello' ) ON CONFLICT (t) DO UPDATE SET t = 'foo';
+SELECT * FROM upsert_test;
+ i |   t   
+---+-------
+ 2 | world
+ 1 | foo
+(2 rows)
+
+ROLLBACK;
+SELECT * FROM upsert_test;
+ i |   t   
+---+-------
+ 1 | hello
+ 2 | world
+(2 rows)
+
+-- should take affect immediately
+INSERT INTO upsert_test (t) VALUES ( 'hello' ) ON CONFLICT (t) DO UPDATE SET t = 'bar';
+SELECT * FROM upsert_test;
+ i |   t   
+---+-------
+ 2 | world
+ 1 | bar
+(2 rows)
+
+-- should work as expected
+BEGIN;
+INSERT INTO upsert_test (t) VALUES ( 'world' ) ON CONFLICT (t) DO UPDATE SET t = 'foo';
+SELECT * FROM upsert_test;
+ i |  t  
+---+-----
+ 1 | bar
+ 2 | foo
+(2 rows)
+
+COMMIT;
+-- should also work as expected, a select can mask a bug
+DELETE FROM upsert_test;
+BEGIN;
+INSERT INTO upsert_test (i, t) VALUES (1, 'hello');
+INSERT INTO upsert_test (t) VALUES ( 'hello' ) ON CONFLICT (t) DO UPDATE SET t = 'bar';
+COMMIT;
+SELECT * FROM upsert_test;
+ i |  t  
+---+-----
+ 1 | bar
+(1 row)
+
+DROP TABLE upsert_test;
