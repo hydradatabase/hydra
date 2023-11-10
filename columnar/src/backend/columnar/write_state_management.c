@@ -148,7 +148,12 @@ columnar_init_write_state(Relation relation, TupleDesc tupdesc,
 		MemoryContextRegisterResetCallback(WriteStateContext, &cleanupCallback);
 	}
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+	WriteStateMapEntry *hashEntry = hash_search(WriteStateMap, &relation->rd_locator.relNumber,
+#else
 	WriteStateMapEntry *hashEntry = hash_search(WriteStateMap, &relation->rd_node.relNode,
+#endif
+
 												HASH_ENTER, &found);
 	if (!found)
 	{
@@ -191,7 +196,12 @@ columnar_init_write_state(Relation relation, TupleDesc tupdesc,
 	ReadColumnarOptions(tupSlotRelationId, &columnarOptions);
 
 	SubXidWriteState *stackEntry = palloc0(sizeof(SubXidWriteState));
+#if PG_VERSION_NUM >= PG_VERSION_16
+	stackEntry->writeState = ColumnarBeginWrite(relation->rd_locator,
+#else
 	stackEntry->writeState = ColumnarBeginWrite(relation->rd_node,
+#endif
+
 												columnarOptions,
 												tupdesc);
 	stackEntry->subXid = currentSubXid;

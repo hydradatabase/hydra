@@ -11,8 +11,21 @@
 #ifndef PG_VERSION_COMPAT_H
 #define PG_VERSION_COMPAT_H
 
+#include "postgres.h"
 #include "pg_version_constants.h"
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+#define RelationPhysicalIdentifier_compat(a) ((a)->rd_locator)
+#define RelationTablespace_compat(a) (a.spcOid)
+#define RelationPhysicalIdentifierNumber_compat(a) (a.relNumber)
+#define tuplesort_getdatum_compat(a, b, c, d, e, f) tuplesort_getdatum(a, b, c, d, e, f)
+#else
+#define RelationPhysicalIdentifier_compat(a) ((a)->rd_node)
+#define RelationTablespace_compat(a) (a.spcNode)
+#define RelationPhysicalIdentifierNumber_compat(a) (a.relNode)
+#define RelidByRelfilenumber(a, b) RelidByRelfilenode(a, b)
+#define tuplesort_getdatum_compat(a, b, c, d, e, f) tuplesort_getdatum(a, b, d, e, f)
+#endif
 #if PG_VERSION_NUM >= PG_VERSION_14
 #define AlterTableStmtObjType_compat(a) ((a)->objtype)
 #define getObjectTypeDescription_compat(a, b) getObjectTypeDescription(a, b)

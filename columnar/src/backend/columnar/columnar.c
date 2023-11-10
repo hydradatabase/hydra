@@ -47,7 +47,7 @@ bool columnar_enable_parallel_execution = true;
 int columnar_min_parallel_processes = 8;
 bool columnar_enable_vectorization = true;
 bool columnar_enable_dml = true;
-bool columnar_enable_page_cache = true;
+bool columnar_enable_page_cache = false;
 int columnar_page_cache_size = 200U;
 
 static const struct config_enum_entry columnar_compression_options[] =
@@ -132,7 +132,7 @@ columnar_guc_init()
 							 &columnar_enable_parallel_execution,
 							 true,
 							 PGC_USERSET,
-							 GUC_NO_SHOW_ALL,
+							 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE,
 							 NULL, 
 							 NULL, 
 							 NULL);
@@ -156,7 +156,7 @@ columnar_guc_init()
 							 &columnar_enable_vectorization,
 							 true,
 							 PGC_USERSET,
-							 GUC_NO_SHOW_ALL,
+							 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE,
 							 NULL, 
 							 NULL, 
 							 NULL);
@@ -167,7 +167,7 @@ columnar_guc_init()
 							&columnar_enable_dml,
 							true,
 							PGC_USERSET,
-							GUC_NO_SHOW_ALL,
+							GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE,
 							NULL, 
 							NULL, 
 							NULL);

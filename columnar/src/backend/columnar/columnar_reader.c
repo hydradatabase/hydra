@@ -247,9 +247,13 @@ ColumnarBeginRead(Relation relation, TupleDesc tupleDescriptor,
 			* Flush any pending in-memory changes to row_mask metadata
 			* for next scan.
 			*/
+#if PG_VERSION_NUM >= PG_VERSION_16
+			RowMaskFlushWriteStateForRelfilenode(readState->relation->rd_locator.relNumber,
+												 GetCurrentSubTransactionId());
+#else
 			RowMaskFlushWriteStateForRelfilenode(readState->relation->rd_node.relNode,
 												 GetCurrentSubTransactionId());
-
+#endif
 
 			/*
 			* When doing random access (i.e.: index scan), we don't need to flush
@@ -298,9 +302,13 @@ ColumnarReadFlushPendingWrites(ColumnarReadState *readState)
 {
 	Assert(!readState->snapshotRegisteredByUs);
 
-	Oid relfilenode = readState->relation->rd_node.relNode;
+#if PG_VERSION_NUM >= PG_VERSION_16
+	Oid relfilelocator = readState->relation->rd_locator.relNumber;
+#else
+	Oid relfilelocator = readState->relation->rd_node.relNode;
+#endif
 
-	FlushWriteStateWithNewSnapshot(relfilenode, &readState->snapshot,
+	FlushWriteStateWithNewSnapshot(relfilelocator, &readState->snapshot,
 								   &readState->snapshotRegisteredByUs);
 }
 
@@ -579,10 +587,15 @@ ReadStripeRowByRowNumber(ColumnarReadState *readState,
 
 		if (columnar_enable_dml)
 		{
+#if PG_VERSION_NUM >= PG_VERSION_16
+			RowMaskWriteStateEntry *rowMaskEntry = 
+				RowMaskFindWriteState(stripeReadState->relation->rd_locator.relNumber,
+									  GetCurrentSubTransactionId(), rowNumber);
+#else
 			RowMaskWriteStateEntry *rowMaskEntry = 
 				RowMaskFindWriteState(stripeReadState->relation->rd_node.relNode,
 									  GetCurrentSubTransactionId(), rowNumber);
-
+#endif
 			if (rowMaskEntry != NULL)
 			{
 				stripeReadState->chunkGroupReadState->rowMask = rowMaskEntry->mask;
@@ -590,12 +603,21 @@ ReadStripeRowByRowNumber(ColumnarReadState *readState,
 			}
 			else if (stripeReadState->chunkGroupReadState->chunkGroupDeletedRows > 0)
 			{
+#if PG_VERSION_NUM >= PG_VERSION_16
+				stripeReadState->chunkGroupReadState->rowMask =
+					ReadChunkRowMask(stripeReadState->relation->rd_locator,
+										readState->snapshot,
+										stripeReadState->stripeReadContext,
+										chunkFirstRowNumber,
+										stripeReadState->chunkGroupReadState->rowCount);
+#else
 				stripeReadState->chunkGroupReadState->rowMask =
 					ReadChunkRowMask(stripeReadState->relation->rd_node,
 										readState->snapshot,
 										stripeReadState->stripeReadContext,
 										chunkFirstRowNumber,
 										stripeReadState->chunkGroupReadState->rowCount);
+#endif
 				stripeReadState->chunkGroupReadState->rowMaskCached = false;
 			}
 		}
@@ -935,13 +957,21 @@ ReadStripeNextRow(StripeReadState *stripeReadState, Datum *columnValues,
 				uint64 chunkFirstRowNumber = 
 					stripeFirstRowNumber + 
 					stripeReadState->chunkGroupReadState->chunkStripeRowOffset;
-
+#if PG_VERSION_NUM >= PG_VERSION_16
+				stripeReadState->chunkGroupReadState->rowMask = 
+					ReadChunkRowMask(stripeReadState->relation->rd_locator,
+									 snapshot,
+									 stripeReadState->stripeReadContext,
+									 chunkFirstRowNumber,
+									 stripeReadState->chunkGroupReadState->rowCount);
+#else
 				stripeReadState->chunkGroupReadState->rowMask = 
 					ReadChunkRowMask(stripeReadState->relation->rd_node,
 									 snapshot,
 									 stripeReadState->stripeReadContext,
 									 chunkFirstRowNumber,
 									 stripeReadState->chunkGroupReadState->rowCount);
+#endif
 				stripeReadState->chunkGroupReadState->rowMaskCached = false;
 			}
 			else
@@ -1165,6 +1195,33 @@ FreeChunkData(ChunkData *chunkData)
 	pfree(chunkData);
 }
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+/* Copied from postgres 15 source, since it was removed from 16. */
+static bool
+MemoryContextContains(MemoryContext context, void *pointer)
+{
+        MemoryContext ptr_context;
+
+        /*
+         * NB: Can't use GetMemoryChunkContext() here - that performs assertions
+         * that aren't acceptable here since we might be passed memory not
+         * allocated by any memory context.
+         *
+         * Try to detect bogus pointers handed to us, poorly though we can.
+         * Presumably, a pointer that isn't MAXALIGNED isn't pointing at an
+         * allocated chunk.
+         */
+        if (pointer == NULL || pointer != (void *) MAXALIGN(pointer))
+                return false;
+
+        /*
+         * OK, it's probably safe to look at the context.
+         */
+        ptr_context = *(MemoryContext *) (((char *) pointer) - sizeof(void *));
+
+        return ptr_context == context;
+}
+#endif
 
 /* FreeChunkValueArrayBuffer relase valueBufferArray memory. */
 void FreeChunkBufferValueArray(ChunkData *chunkData)
@@ -1193,7 +1250,11 @@ ColumnarTableRowCount(Relation relation)
 {
 	ListCell *stripeMetadataCell = NULL;
 	uint64 totalRowCount = 0;
+#if PG_VERSION_NUM >= PG_VERSION_16
+	List *stripeList = StripesForRelfilenode(relation->rd_locator, ForwardScanDirection);
+#else
 	List *stripeList = StripesForRelfilenode(relation->rd_node, ForwardScanDirection);
+#endif
 
 	foreach(stripeMetadataCell, stripeList)
 	{
@@ -1221,12 +1282,19 @@ LoadFilteredStripeBuffers(Relation relation, StripeMetadata *stripeMetadata,
 
 	bool *projectedColumnMask = ProjectedColumnMask(columnCount, projectedColumnList);
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+	StripeSkipList *stripeSkipList = ReadStripeSkipList(relation->rd_locator,
+														stripeMetadata->id,
+														tupleDescriptor,
+														stripeMetadata->chunkCount,
+														snapshot);
+#else
 	StripeSkipList *stripeSkipList = ReadStripeSkipList(relation->rd_node,
 														stripeMetadata->id,
 														tupleDescriptor,
 														stripeMetadata->chunkCount,
 														snapshot);
-
+#endif
 	bool *selectedChunkMask = SelectedChunkMask(stripeSkipList, whereClauseList,
 												whereClauseVars, chunkGroupsFiltered);
 
@@ -1797,7 +1865,7 @@ DeserializeDatumArray(StringInfo datumBuffer, bool *existsArray, uint32 datumCou
 										   datumTypeLength);
 		currentDatumDataOffset = att_addlength_datum(currentDatumDataOffset,
 													 datumTypeLength,
-													 currentDatumDataPointer);
+													 datumArray[datumIndex]);
 		currentDatumDataOffset = att_align_nominal(currentDatumDataOffset,
 												   datumTypeAlign);
 
@@ -2051,13 +2119,21 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 			if (columnar_enable_dml &&
 				stripeReadState->chunkGroupReadState->chunkGroupDeletedRows != 0)
 			{
+#if PG_VERSION_NUM >= PG_VERSION_16
+				stripeReadState->chunkGroupReadState->rowMask =
+					ReadChunkRowMask(stripeReadState->relation->rd_locator,
+									 snapshot,
+									 stripeReadState->stripeReadContext,
+									 chunkFirstRowNumber,
+									 stripeReadState->chunkGroupReadState->rowCount);
+#else
 				stripeReadState->chunkGroupReadState->rowMask =
 					ReadChunkRowMask(stripeReadState->relation->rd_node,
 									 snapshot,
 									 stripeReadState->stripeReadContext,
 									 chunkFirstRowNumber,
 									 stripeReadState->chunkGroupReadState->rowCount);
-
+#endif
 			}
 			else
 			{

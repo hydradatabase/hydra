@@ -878,10 +878,19 @@ advance_transition_function(AggState *aggstate,
 	 */
 	if (!pertrans->transtypeByVal &&
 		DatumGetPointer(newVal) != DatumGetPointer(pergroupstate->transValue))
+
+#if PG_VERSION_NUM >= PG_VERSION_16
+		newVal = ExecAggCopyTransValue(aggstate, pertrans,
+									   newVal, fcinfo->isnull,
+									   pergroupstate->transValue,
+									   pergroupstate->transValueIsNull);
+#else
 		newVal = ExecAggTransReparent(aggstate, pertrans,
 									  newVal, fcinfo->isnull,
 									  pergroupstate->transValue,
 									  pergroupstate->transValueIsNull);
+#endif
+
 
 	pergroupstate->transValue = newVal;
 	pergroupstate->transValueIsNull = fcinfo->isnull;
@@ -963,8 +972,13 @@ process_ordered_aggregate_single(AggState *aggstate,
 	 * pfree them when they are no longer needed.
 	 */
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+	while (tuplesort_getdatum(pertrans->sortstates[aggstate->current_set],
+							  true, false, newVal, isNull, &newAbbrevVal))
+#else
 	while (tuplesort_getdatum(pertrans->sortstates[aggstate->current_set],
 							  true, newVal, isNull, &newAbbrevVal))
+#endif
 	{
 		/*
 		 * Clear and select the working context for evaluation of the equality
@@ -1197,11 +1211,20 @@ finalize_aggregate(AggState *aggstate,
 	}
 	else
 	{
+#if PG_VERSION_NUM >= PG_VERSION_16
+		*resultVal =
+			MakeExpandedObjectReadOnly(pergroupstate->transValue,
+									   pergroupstate->transValueIsNull,
+									   pertrans->transtypeLen);
+		*resultIsNull = pergroupstate->transValueIsNull;
+#else
 		/* Don't need MakeExpandedObjectReadOnly; datumCopy will copy it */
 		*resultVal = pergroupstate->transValue;
 		*resultIsNull = pergroupstate->transValueIsNull;
+#endif
 	}
 
+#if PG_VERSION_NUM < PG_VERSION_16
 	/*
 	 * If result is pass-by-ref, make sure it is in the right context.
 	 */
@@ -1211,6 +1234,7 @@ finalize_aggregate(AggState *aggstate,
 		*resultVal = datumCopy(*resultVal,
 							   peragg->resulttypeByVal,
 							   peragg->resulttypeLen);
+#endif
 
 	MemoryContextSwitchTo(oldContext);
 }
@@ -1261,18 +1285,30 @@ finalize_partialaggregate(AggState *aggstate,
 	}
 	else
 	{
+#if PG_VERSION_NUM >= PG_VERSION_16
+		*resultVal =
+			MakeExpandedObjectReadOnly(pergroupstate->transValue,
+									   pergroupstate->transValueIsNull,
+									   pertrans->transtypeLen);
+		*resultIsNull = pergroupstate->transValueIsNull;
+#else
 		/* Don't need MakeExpandedObjectReadOnly; datumCopy will copy it */
 		*resultVal = pergroupstate->transValue;
 		*resultIsNull = pergroupstate->transValueIsNull;
+#endif
 	}
 
-	/* If result is pass-by-ref, make sure it is in the right context. */
+#if PG_VERSION_NUM < PG_VERSION_16
+	/*
+	 * If result is pass-by-ref, make sure it is in the right context.
+	 */
 	if (!peragg->resulttypeByVal && !*resultIsNull &&
 		!MemoryContextContains(CurrentMemoryContext,
 							   DatumGetPointer(*resultVal)))
 		*resultVal = datumCopy(*resultVal,
 							   peragg->resulttypeByVal,
 							   peragg->resulttypeLen);
+#endif
 
 	MemoryContextSwitchTo(oldContext);
 }
@@ -1720,7 +1756,12 @@ find_hash_columns(AggState *aggstate)
 		}
 
 		/* and add the remaining columns */
+#if PG_VERSION_NUM >= PG_VERSION_16
+		i = -1;
+		while ((i = bms_next_member(colnos, i)) >= 0)
+#else
 		while ((i = bms_first_member(colnos)) >= 0)
+#endif
 		{
 			perhash->hashGrpColIdxInput[perhash->numhashGrpCols] = i;
 			perhash->numhashGrpCols++;
@@ -3997,8 +4038,13 @@ VExecInitAgg(Agg *node, EState *estate, int eflags)
 		aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
 
 		/* Check permission to call aggregate function */
+#if PG_VERSION_NUM >= PG_VERSION_16
+		aclresult = object_aclcheck(ProcedureRelationId, aggref->aggfnoid, GetUserId(),
+									ACL_EXECUTE);
+#else
 		aclresult = pg_proc_aclcheck(aggref->aggfnoid, GetUserId(),
 									 ACL_EXECUTE);
+#endif
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_AGGREGATE,
 						   get_func_name(aggref->aggfnoid));
@@ -4064,8 +4110,13 @@ VExecInitAgg(Agg *node, EState *estate, int eflags)
 
 			if (OidIsValid(finalfn_oid))
 			{
+#if PG_VERSION_NUM >= PG_VERSION_16
+				aclresult = object_aclcheck(ProcedureRelationId, finalfn_oid, aggOwner,
+											ACL_EXECUTE);
+#else
 				aclresult = pg_proc_aclcheck(finalfn_oid, aggOwner,
 											 ACL_EXECUTE);
+#endif
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(finalfn_oid));
@@ -4073,8 +4124,13 @@ VExecInitAgg(Agg *node, EState *estate, int eflags)
 			}
 			if (OidIsValid(serialfn_oid))
 			{
+#if PG_VERSION_NUM >= PG_VERSION_16
+				aclresult = object_aclcheck(ProcedureRelationId, serialfn_oid, aggOwner,
+											ACL_EXECUTE);
+#else
 				aclresult = pg_proc_aclcheck(serialfn_oid, aggOwner,
 											 ACL_EXECUTE);
+#endif
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(serialfn_oid));
@@ -4082,8 +4138,13 @@ VExecInitAgg(Agg *node, EState *estate, int eflags)
 			}
 			if (OidIsValid(deserialfn_oid))
 			{
+#if PG_VERSION_NUM >= PG_VERSION_16
+				aclresult = object_aclcheck(ProcedureRelationId, deserialfn_oid, aggOwner,
+											ACL_EXECUTE);
+#else
 				aclresult = pg_proc_aclcheck(deserialfn_oid, aggOwner,
 											 ACL_EXECUTE);
+#endif
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(deserialfn_oid));
@@ -4176,6 +4237,8 @@ VExecInitAgg(Agg *node, EState *estate, int eflags)
 #if PG_VERSION_NUM < PG_VERSION_15
 			aclresult = pg_proc_aclcheck(transfn_oid, aggOwner,
 										 ACL_EXECUTE);
+#elif PG_VERSION_NUM >= PG_VERSION_16
+			aclresult = object_aclcheck(ProcedureRelationId, transfn_oid, aggOwner, ACL_EXECUTE);
 #else
 			aclresult = pg_proc_aclcheck(transfn_oid, aggOwner, ACL_EXECUTE);
 #endif

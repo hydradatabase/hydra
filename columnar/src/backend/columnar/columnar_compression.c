@@ -14,6 +14,8 @@
 #include "postgres.h"
 
 #include "citus_version.h"
+#include "pg_version_compat.h"
+
 #include "common/pg_lzcompress.h"
 #include "lib/stringinfo.h"
 
@@ -27,6 +29,9 @@
 #include <zstd.h>
 #endif
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+#include "varatt.h"
+#endif
 /*
  *	The information at the start of the compressed data. This decription is taken
  *	from pg_lzcompress in pre-9.5 version of PostgreSQL.

@@ -51,8 +51,8 @@ typedef struct EmptyStripeReservation
 	uint64 stripeFirstRowNumber;
 } EmptyStripeReservation;
 
-extern List * StripesForRelfilenode(RelFileNode relfilenode, ScanDirection scanDirection);
-extern uint32 DeletedRowsForStripe(RelFileNode relfilenode,
+extern List * StripesForRelfilenode(RelFileLocator relfilelocator, ScanDirection scanDirection);
+extern uint32 DeletedRowsForStripe(RelFileLocator relfilelocator,
 								   uint32 chunkCount,
 								   uint64 stripeId);
 extern void ColumnarStorageUpdateIfNeeded(Relation rel, bool isUpgrade);

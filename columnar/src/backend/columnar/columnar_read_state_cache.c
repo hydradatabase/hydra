@@ -27,7 +27,7 @@
 #include "columnar/columnar_tableam.h"
 
 /*
- * Mapping from relfilenode to RowMaskCacheMapEntry. This keeps deleted rows for
+ * Mapping from relfilelocator to RowMaskCacheMapEntry. This keeps deleted rows for
  * each relation.
  */
 static HTAB *ColumnarReadStateMap = NULL;
@@ -53,7 +53,7 @@ typedef struct SubXidWriteState
 typedef struct ColumnarReadStateMapEntry
 {
 	/* key of the entry */
-	Oid relfilenode;
+	Oid relfilelocator;
 
 	/*
 	* Stack of SubXidWriteState where first element is top of the stack. When
@@ -109,8 +109,13 @@ InitColumnarReadStateCache(Relation relation, SubTransactionId currentSubXid)
 										   &cleanupCallback);
 	}
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+	ColumnarReadStateMapEntry *hashEntry =
+		hash_search(ColumnarReadStateMap, &relation->rd_locator.relNumber, HASH_ENTER, &found);
+#else
 	ColumnarReadStateMapEntry *hashEntry =
 		hash_search(ColumnarReadStateMap, &relation->rd_node.relNode, HASH_ENTER, &found);
+#endif
 
 	if (!found)
 	{
@@ -155,8 +160,13 @@ FindReadStateCache(Relation relation, SubTransactionId currentSubXid)
 
 	bool found;
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+	ColumnarReadStateMapEntry *hashEntry =
+		hash_search(ColumnarReadStateMap, &relation->rd_locator.relNumber, HASH_FIND, &found);
+#else
 	ColumnarReadStateMapEntry *hashEntry =
 		hash_search(ColumnarReadStateMap, &relation->rd_node.relNode, HASH_FIND, &found);
+#endif
 
 	/* No cache for table found*/
 	if (!found)
