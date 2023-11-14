@@ -9,7 +9,7 @@ extensions:
   - name: "parquet_s3_fdw"
     version: "1.0.0+5298b7f"
   - name: "pg_ivm"
-    version: "1.5.1"
+    version: "1.7.0"
   - name: "pgvector"
     version: "0.5.1"
   - name: "pg_hint_plan-14"

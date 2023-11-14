@@ -5,7 +5,7 @@ extensions:
   - name: "mysql_fdw"
     version: "2.9.1"
   - name: "pg_ivm"
-    version: "1.5.1"
+    version: "1.7.0"
   - name: "pgvector"
     version: "0.5.1"
   - name: "pg_hint_plan-16"
