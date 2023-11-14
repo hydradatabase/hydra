@@ -118,3 +118,11 @@ target "columnar_15" {
     POSTGRES_BASE_VERSION = 15
   }
 }
+
+target "columnar_16" {
+  inherits = ["columnar"]
+
+  args = {
+    POSTGRES_BASE_VERSION = 16
+  }
+}
