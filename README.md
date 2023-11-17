@@ -1,8 +1,4 @@
-<div align="center">
-
 [![Hydra - the open source data warehouse](https://github.com/hydradatabase/hydra/blob/main/.images/header.png)](https://hydra.so)
-
-</div>
 
 # 🐘🤘 Hydra
 
