@@ -41,6 +41,22 @@ docker_build_local_spilo: TARGET = spilo
 # into the local docker
 docker_build_local_spilo: docker_build_local
 
+.PHONY: docker_push_local
+docker_push_local:
+	POSTGRES_BASE_VERSION=$(POSTGRES_BASE_VERSION) docker buildx bake --set *.platform=$(PLATFORM) --set *.tags=$(IMAGE) --pull --push $(TARGET)
+
+POSTGRES_IMAGE ?= ghcr.io/hydradatabase/hydra:dev
+.PHONY: docker_push_postgres
+docker_push_postgres: TARGET = postgres
+docker_push_postgres: IMAGE = $(POSTGRES_IMAGE)
+docker_push_postgres: docker_push_local
+
+SPILO_IMAGE ?= $(ECR_REGISTRY)/spilo:dev
+.PHONY: docker_push_spilo
+docker_push_spilo: TARGET = spilo
+docker_push_spilo: IMAGE = $(SPILO_IMAGE)
+docker_push_spilo: docker_push_local
+
 .PHONY: docker_check_columnar
 docker_check_columnar:
 	docker buildx bake --set *.platform=$(PLATFORM) --set columnar.target=checker columnar_13 columnar_14
