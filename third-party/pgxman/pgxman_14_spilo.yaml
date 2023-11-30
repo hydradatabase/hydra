@@ -4,16 +4,12 @@ postgres:
 extensions:
   - name: "multicorn"
     version: "2.4+b68b75c"
-    options:
-      - -o
-      - Dpkg::Options::=--force-overwrite
+    overwrite: true
   - name: "mysql_fdw"
     version: "2.9.1"
   - name: "parquet_s3_fdw"
     version: "1.0.0+5298b7f"
-    options:
-      - -o
-      - Dpkg::Options::=--force-overwrite
+    overwrite: true
   - name: "pg_ivm"
     version: "1.5.1"
   - name: "pgvector"
