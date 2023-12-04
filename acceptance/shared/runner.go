@@ -38,10 +38,7 @@ func RunAcceptanceTests(t *testing.T, ctx context.Context, cm DockerComposeManag
 	})
 
 	pool := cm.PGPool()
-	ver, err := QueryPGVersion(ctx, pool)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ver := QueryPGVersion(t, ctx, pool)
 
 	cases := append(AcceptanceCases(), additionalCases...)
 	for _, c := range cases {
@@ -76,10 +73,7 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm DockerComposeManager)
 			c := c
 
 			pool := cm.PGPool()
-			ver, err := QueryPGVersion(ctx, pool)
-			if err != nil {
-				t.Fatal(err)
-			}
+			ver := QueryPGVersion(t, ctx, pool)
 
 			t.Run(c.Name, func(t *testing.T) {
 				checkSkipTest(t, c, ver)
@@ -107,10 +101,7 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm DockerComposeManager)
 			c := c
 
 			pool := cm.PGPool()
-			ver, err := QueryPGVersion(ctx, pool)
-			if err != nil {
-				t.Fatal(err)
-			}
+			ver := QueryPGVersion(t, ctx, pool)
 
 			t.Run(c.Name, func(t *testing.T) {
 				checkSkipTest(t, c, ver)

@@ -12,11 +12,10 @@ import (
 )
 
 const (
-	PGVersionUnknown PGVersion = "unknown"
-	PGVersion13      PGVersion = "13"
-	PGVersion14      PGVersion = "14"
-	PGVersion15      PGVersion = "15"
-	PGVersion16      PGVersion = "16"
+	PGVersion13 PGVersion = "13"
+	PGVersion14 PGVersion = "14"
+	PGVersion15 PGVersion = "15"
+	PGVersion16 PGVersion = "16"
 )
 
 type PGVersion string
