@@ -492,6 +492,7 @@ OPTIONS (
 	dirname 's3://%s/parquet'
 );
 			`, awsRegion, awsAccessKey, awsSecretKey, awsS3Bucket),
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "validate parquet_s3_fdw happy path",
@@ -499,6 +500,7 @@ OPTIONS (
 			SQL: `
 SELECT count(*) FROM userdata_3;
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 			Validate: func(t *testing.T, row pgx.Row) {
 				var count int
 				if err := row.Scan(&count); err != nil {
