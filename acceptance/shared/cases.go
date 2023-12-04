@@ -11,20 +11,31 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const (
+	PGVersion13 PGVersion = "13"
+	PGVersion14 PGVersion = "14"
+	PGVersion15 PGVersion = "15"
+	PGVersion16 PGVersion = "16"
+)
+
+type PGVersion string
+
 // A Case describes an acceptance test case. If a Validate function is provided
 // then the test will call that function and expect it to handle test failues.
 // Otherwise the case will fail if pool.Exec fails on the SQL.
 type Case struct {
-	Name     string                          // name of the test
-	SQL      string                          // SQL to run during the test
-	Validate func(t *testing.T, row pgx.Row) // optional validation function
-	Skip     bool                            // whether this case should be skipped
+	Name             string                          // name of the test
+	SQL              string                          // SQL to run during the test
+	Validate         func(t *testing.T, row pgx.Row) // optional validation function
+	Skip             bool                            // whether this case should be skipped
+	TargetPGVersions []PGVersion                     // target PG version
 }
 
 // AcceptanceCases describe the shared acceptance criteria for any Hydra-based
 // images.
 func AcceptanceCases() []Case {
 	cases := []Case{
+		// columnar
 		{
 			Name: "columnar ext available",
 			SQL: `
@@ -125,6 +136,7 @@ SELECT columnar.alter_columnar_table_set(
     stripe_row_limit => 10000);
 			`,
 		},
+		// mysql_fdw
 		{
 			Name: "mysql_fdw available",
 			SQL: `
@@ -218,11 +230,13 @@ SELECT * FROM warehouse ORDER BY warehouse_id LIMIT 1;
 				}
 			},
 		},
+		// multicorn
 		{
 			Name: "multicorn ext available",
 			SQL: `
 SELECT count(1) FROM pg_available_extensions WHERE name = 'multicorn';
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 			Validate: func(t *testing.T, row pgx.Row) {
 				var count int
 				if err := row.Scan(&count); err != nil {
@@ -239,6 +253,7 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'multicorn';
 			SQL: `
 CREATE EXTENSION multicorn;
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "multicorn ext enabled",
@@ -255,6 +270,7 @@ SELECT count(1) FROM pg_extension WHERE extname = 'multicorn';
 					t.Errorf("columnar ext should exist")
 				}
 			},
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "create multicorn s3 ext foreign table",
@@ -274,6 +290,7 @@ create foreign table s3 (
   filename 'test.csv'
 );
 		`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "create multicorn gspreadsheet ext foreign table",
@@ -290,7 +307,9 @@ CREATE FOREIGN TABLE test_spreadsheet (
   serviceaccount '{}'
 );
 		`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
+		// parquest_s3_fdw
 		{
 			Name: "parquet_s3_fdw available",
 			SQL: `
@@ -306,12 +325,14 @@ SELECT count(1) FROM pg_available_extensions WHERE name = 'parquet_s3_fdw';
 					t.Errorf("parquet_s3_fdw ext should exist")
 				}
 			},
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "enable parquet_s3_fdw ext",
 			SQL: `
 CREATE EXTENSION parquet_s3_fdw;
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "create parquet_s3_fdw foreign table with no aws creds",
@@ -326,12 +347,14 @@ OPTIONS (
 	dirname 's3://FAKE'
 );
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "parquet_s3_fdw foreign table with no aws creds raises error",
 			SQL: `
 SELECT count(*) FROM userdata_1;
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 			Validate: func(t *testing.T, row pgx.Row) {
 				err := row.Scan()
 				if err == nil {
@@ -356,12 +379,14 @@ OPTIONS (
 	dirname 's3://FAKE'
 );
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "parquet_s3_fdw foreign table with empty aws creds raises error",
 			SQL: `
 SELECT count(*) FROM userdata_2;
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 			Validate: func(t *testing.T, row pgx.Row) {
 				err := row.Scan()
 				if err == nil {
@@ -373,6 +398,7 @@ SELECT count(*) FROM userdata_2;
 				}
 			},
 		},
+		// pgvector
 		{
 			Name: "pg_vector available",
 			SQL: `
@@ -466,6 +492,7 @@ OPTIONS (
 	dirname 's3://%s/parquet'
 );
 			`, awsRegion, awsAccessKey, awsSecretKey, awsS3Bucket),
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 		},
 		{
 			Name: "validate parquet_s3_fdw happy path",
@@ -473,6 +500,7 @@ OPTIONS (
 			SQL: `
 SELECT count(*) FROM userdata_3;
 			`,
+			TargetPGVersions: []PGVersion{PGVersion13, PGVersion14, PGVersion15},
 			Validate: func(t *testing.T, row pgx.Row) {
 				var count int
 				if err := row.Scan(&count); err != nil {
