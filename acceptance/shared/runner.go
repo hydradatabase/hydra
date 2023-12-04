@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -37,15 +38,16 @@ func RunAcceptanceTests(t *testing.T, ctx context.Context, cm DockerComposeManag
 	})
 
 	pool := cm.PGPool()
+	ver, err := QueryPGVersion(ctx, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cases := append(AcceptanceCases(), additionalCases...)
-
 	for _, c := range cases {
 		c := c
 		t.Run(c.Name, func(t *testing.T) {
-			if c.Skip {
-				t.Skip("Test skipped")
-			}
+			checkSkipTest(t, c, ver)
 
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
@@ -72,9 +74,16 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm DockerComposeManager)
 
 		for _, c := range BeforeUpgradeCases {
 			c := c
+
 			pool := cm.PGPool()
+			ver, err := QueryPGVersion(ctx, pool)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			t.Run(c.Name, func(t *testing.T) {
+				checkSkipTest(t, c, ver)
+
 				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
 
@@ -96,9 +105,16 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm DockerComposeManager)
 
 		for _, c := range AfterUpgradeCases {
 			c := c
+
 			pool := cm.PGPool()
+			ver, err := QueryPGVersion(ctx, pool)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			t.Run(c.Name, func(t *testing.T) {
+				checkSkipTest(t, c, ver)
+
 				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
 
@@ -112,4 +128,14 @@ func RunUpgradeTests(t *testing.T, ctx context.Context, cm DockerComposeManager)
 			})
 		}
 	})
+}
+
+func checkSkipTest(t *testing.T, c Case, ver PGVersion) {
+	if c.Skip {
+		t.Skip("Test skipped")
+	}
+
+	if len(c.TargetPGVersions) > 0 && !slices.Contains(c.TargetPGVersions, ver) {
+		t.Skip("Skipping test due to unsupported PG version")
+	}
 }
