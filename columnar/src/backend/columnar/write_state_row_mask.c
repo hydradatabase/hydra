@@ -29,7 +29,7 @@ static RowMaskWriteStateEntry *InitRowMaskEntry(uint64 storageId,
 static void RowMaskFlushPendingWriteState(List *rowMaskWriteStateList);
 
 /*
- * Mapping from relfilenode to RowMaskCacheMapEntry. This keeps deleted rows for
+ * Mapping from relfilelocator to RowMaskCacheMapEntry. This keeps deleted rows for
  * each relation.
  */
 static HTAB *RowMaskWriteStateMap = NULL;
@@ -56,7 +56,7 @@ typedef struct SubXidWriteState
 typedef struct RowMaskWriteStateMapEntry
 {
 	/* key of the entry */
-	Oid relfilenode;
+	Oid relfilelocator;
 
 	/*
 	* If a table is dropped, we set dropped to true and set dropSubXid to the
@@ -89,7 +89,7 @@ CleanupWriteStateMap(void *arg)
 }
 
 RowMaskWriteStateEntry *
-RowMaskInitWriteState(Oid relfilenode,
+RowMaskInitWriteState(Oid relfilelocator,
 					  uint64 storageId,
 					  SubTransactionId currentSubXid,
 					  bytea *rowMask)
@@ -124,7 +124,7 @@ RowMaskInitWriteState(Oid relfilenode,
 	}
 
 	RowMaskWriteStateMapEntry *hashEntry =
-		hash_search(RowMaskWriteStateMap, &relfilenode, HASH_ENTER, &found);
+		hash_search(RowMaskWriteStateMap, &relfilelocator, HASH_ENTER, &found);
 
 	if (!found)
 	{
@@ -195,9 +195,9 @@ RowMaskFlushPendingWriteState(List *rowMaskWriteStateList)
 
 
 /*
- * Flushes pending writes for given relfilenode in the given subtransaction.
+ * Flushes pending writes for given relfilelocator in the given subtransaction.
  */
-void RowMaskFlushWriteStateForRelfilenode(Oid relfilenode,
+void RowMaskFlushWriteStateForRelfilenode(Oid relfilelocator,
 										  SubTransactionId currentSubXid) {
 	if (RowMaskWriteStateMap == NULL)
 	{
@@ -205,7 +205,7 @@ void RowMaskFlushWriteStateForRelfilenode(Oid relfilenode,
 	}
 
 	RowMaskWriteStateMapEntry *entry =
-		hash_search(RowMaskWriteStateMap, &relfilenode, HASH_FIND, NULL);
+		hash_search(RowMaskWriteStateMap, &relfilelocator, HASH_FIND, NULL);
 
 	Assert(!entry || !entry->dropped);
 
@@ -223,7 +223,7 @@ void RowMaskFlushWriteStateForRelfilenode(Oid relfilenode,
 
 
 RowMaskWriteStateEntry *
-RowMaskFindWriteState(Oid relfilenode, SubTransactionId currentSubXid,
+RowMaskFindWriteState(Oid relfilelocator, SubTransactionId currentSubXid,
 					  uint64 rowId)
 {
 	/* Empty Cache */
@@ -235,7 +235,7 @@ RowMaskFindWriteState(Oid relfilenode, SubTransactionId currentSubXid,
 	bool found;
 
 	RowMaskWriteStateMapEntry *hashEntry =
-		hash_search(RowMaskWriteStateMap, &relfilenode, HASH_FIND, &found);
+		hash_search(RowMaskWriteStateMap, &relfilelocator, HASH_FIND, &found);
 
 	/* No cache for table found*/
 	if (!found)
@@ -341,7 +341,7 @@ RowMaskPopWriteStateForAllRels(SubTransactionId currentSubXid,
 
 
 void
-RowMaskMarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid)
+RowMaskMarkRelfilenodeDropped(Oid relfilelocator, SubTransactionId currentSubXid)
 {
 	if (RowMaskWriteStateMap == NULL)
 	{
@@ -349,7 +349,7 @@ RowMaskMarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid)
 	}
 
 	RowMaskWriteStateMapEntry *entry =
-		hash_search(RowMaskWriteStateMap, &relfilenode, HASH_FIND, NULL);
+		hash_search(RowMaskWriteStateMap, &relfilelocator, HASH_FIND, NULL);
 	
 	if (!entry || entry->dropped)
 	{
@@ -362,17 +362,17 @@ RowMaskMarkRelfilenodeDropped(Oid relfilenode, SubTransactionId currentSubXid)
 
 
 void
-RowMaskNonTransactionDrop(Oid relfilenode)
+RowMaskNonTransactionDrop(Oid relfilelocator)
 {
 	if (RowMaskWriteStateMap)
 	{
-		hash_search(RowMaskWriteStateMap, &relfilenode, HASH_REMOVE, false);
+		hash_search(RowMaskWriteStateMap, &relfilelocator, HASH_REMOVE, false);
 	}
 }
 
 
 bool
-RowMaskPendingWritesInUpperTransactions(Oid relfilenode, SubTransactionId currentSubXid)
+RowMaskPendingWritesInUpperTransactions(Oid relfilelocator, SubTransactionId currentSubXid)
 {
 	if (RowMaskWriteStateMap == NULL)
 	{
@@ -380,7 +380,7 @@ RowMaskPendingWritesInUpperTransactions(Oid relfilenode, SubTransactionId curren
 	}
 
 	RowMaskWriteStateMapEntry *entry =
-		hash_search(RowMaskWriteStateMap, &relfilenode, HASH_FIND, NULL);
+		hash_search(RowMaskWriteStateMap, &relfilelocator, HASH_FIND, NULL);
 
 	if (entry && entry->writeStateStack != NULL)
 	{

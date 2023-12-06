@@ -408,7 +408,6 @@ BEGIN;
   -- by postgres and throws an error. For this reason, here we don't expect
   -- following commnad to fail since we prevent using parallel workers for
   -- columnar tables.
-  SET LOCAL force_parallel_mode = regress;
   SET LOCAL min_parallel_table_scan_size = 1;
   SET LOCAL parallel_tuple_cost = 0;
   SET LOCAL max_parallel_workers = 4;

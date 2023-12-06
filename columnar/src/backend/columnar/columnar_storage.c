@@ -167,8 +167,13 @@ ColumnarStorageInit(SMgrRelation srel, uint64 storageId)
 			 nblocks);
 	}
 
+
 	/* create two pages */
+#if PG_VERSION_NUM >= PG_VERSION_16
+	PGIOAlignedBlock block;
+#else
 	PGAlignedBlock block;
+#endif
 	Page page = block.data;
 
 	/* write metapage */
@@ -186,17 +191,28 @@ ColumnarStorageInit(SMgrRelation srel, uint64 storageId)
 	memcpy_s(page + phdr->pd_lower, phdr->pd_upper - phdr->pd_lower,
 			 (char *) &metapage, sizeof(ColumnarMetapage));
 	phdr->pd_lower += sizeof(ColumnarMetapage);
-
+#if PG_VERSION_NUM >= PG_VERSION_16
+	log_newpage(&srel->smgr_rlocator.locator, MAIN_FORKNUM,
+				COLUMNAR_METAPAGE_BLOCKNO, page, true);
+#else
 	log_newpage(&srel->smgr_rnode.node, MAIN_FORKNUM,
 				COLUMNAR_METAPAGE_BLOCKNO, page, true);
+#endif
+
 	PageSetChecksumInplace(page, COLUMNAR_METAPAGE_BLOCKNO);
 	smgrextend(srel, MAIN_FORKNUM, COLUMNAR_METAPAGE_BLOCKNO, page, true);
 
 	/* write empty page */
 	PageInit(page, BLCKSZ, 0);
 
+#if PG_VERSION_NUM >= PG_VERSION_16
+	log_newpage(&srel->smgr_rlocator.locator, MAIN_FORKNUM,
+				COLUMNAR_EMPTY_BLOCKNO, page, true);
+#else
 	log_newpage(&srel->smgr_rnode.node, MAIN_FORKNUM,
 				COLUMNAR_EMPTY_BLOCKNO, page, true);
+#endif
+
 	PageSetChecksumInplace(page, COLUMNAR_EMPTY_BLOCKNO);
 	smgrextend(srel, MAIN_FORKNUM, COLUMNAR_EMPTY_BLOCKNO, page, true);
 
@@ -357,7 +373,11 @@ ColumnarStorageIsCurrent(Relation rel)
 {
 	if (unlikely(rel->rd_smgr == NULL))
 	{
+#if PG_VERSION_NUM >= PG_VERSION_16
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_locator, rel->rd_backend));
+#else
 		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+#endif
 	}
 
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
@@ -446,7 +466,11 @@ ColumnarStorageReserveData(Relation rel, uint64 amount)
 	/* extend with new pages */
 	if (unlikely(rel->rd_smgr == NULL))
 	{
+#if PG_VERSION_NUM >= PG_VERSION_16
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_locator, rel->rd_backend));
+#else
 		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+#endif
 	}
 
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
@@ -558,7 +582,11 @@ ColumnarStorageTruncate(Relation rel, uint64 newDataReservation)
 
 	if (unlikely(rel->rd_smgr == NULL))
 	{
+#if PG_VERSION_NUM >= PG_VERSION_16
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_locator, rel->rd_backend));
+#else
 		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+#endif
 	}
 
 	BlockNumber old_rel_pages = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);
@@ -642,7 +670,11 @@ ColumnarMetapageRead(Relation rel, bool force)
 {
 	if (unlikely(rel->rd_smgr == NULL))
 	{
+#if PG_VERSION_NUM >= PG_VERSION_16
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_locator, rel->rd_backend));
+#else
 		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+#endif
 	}
 
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);

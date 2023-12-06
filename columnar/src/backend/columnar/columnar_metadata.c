@@ -49,6 +49,9 @@
 #include "miscadmin.h"
 #include "nodes/execnodes.h"
 #include "lib/stringinfo.h"
+#if PG_VERSION_NUM >= PG_VERSION_16
+#include "parser/parse_relation.h"
+#endif
 #include "port.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
@@ -59,8 +62,12 @@
 #include "utils/memutils.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
+#if PG_VERSION_NUM >= PG_VERSION_16
+#include "storage/relfilelocator.h"
+#include "utils/relfilenumbermap.h"
+#else
 #include "utils/relfilenodemap.h"
-
+#endif
 
 typedef struct
 {
@@ -464,14 +471,14 @@ ReadColumnarOptions(Oid regclass, ColumnarOptions *options)
  * of columnar.chunk.
  */
 void
-SaveStripeSkipList(RelFileNode relfilenode, uint64 stripe, StripeSkipList *chunkList,
+SaveStripeSkipList(RelFileLocator relfilelocator, uint64 stripe, StripeSkipList *chunkList,
 				   TupleDesc tupleDescriptor)
 {
 	uint32 columnIndex = 0;
 	uint32 chunkIndex = 0;
 	uint32 columnCount = chunkList->columnCount;
 
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 	Oid columnarChunkOid = ColumnarChunkRelationId();
 	Relation columnarChunk = table_open(columnarChunkOid, RowExclusiveLock);
 	ModifyState *modifyState = StartModifyRelation(columnarChunk);
@@ -530,10 +537,10 @@ SaveStripeSkipList(RelFileNode relfilenode, uint64 stripe, StripeSkipList *chunk
  * SaveChunkGroups saves the metadata for given chunk groups in columnar.chunk_group.
  */
 void
-SaveChunkGroups(RelFileNode relfilenode, uint64 stripe,
+SaveChunkGroups(RelFileLocator relfilelocator, uint64 stripe,
 				List *chunkGroupRowCounts)
 {
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 	Oid columnarChunkGroupOid = ColumnarChunkGroupRelationId();
 	Relation columnarChunkGroup = table_open(columnarChunkGroupOid, RowExclusiveLock);
 	ModifyState *modifyState = StartModifyRelation(columnarChunkGroup);
@@ -673,7 +680,7 @@ SaveEmptyRowMask(uint64 storageId, uint64 stripeId,
  * ReadStripeSkipList fetches chunk metadata for a given stripe.
  */
 StripeSkipList *
-ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe, TupleDesc tupleDescriptor,
+ReadStripeSkipList(RelFileLocator relfilelocator, uint64 stripe, TupleDesc tupleDescriptor,
 				   uint32 chunkCount, Snapshot snapshot)
 {
 	int32 columnIndex = 0;
@@ -683,7 +690,7 @@ ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe, TupleDesc tupleDescri
 	uint32 columnCount = tupleDescriptor->natts;
 	ScanKeyData scanKey[2];
 
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	Oid columnarChunkOid = ColumnarChunkRelationId();
 	Relation columnarChunk = table_open(columnarChunkOid, AccessShareLock);
@@ -692,7 +699,7 @@ ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe, TupleDesc tupleDescri
 	ScanKeyInit(&scanKey[0], Anum_columnar_chunk_storageid,
 				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
 	ScanKeyInit(&scanKey[1], Anum_columnar_chunk_stripe,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(stripe));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(stripe));
 
 	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarChunk, index,
 															snapshot, 2, scanKey);
@@ -798,14 +805,14 @@ ReadStripeSkipList(RelFileNode relfilenode, uint64 stripe, TupleDesc tupleDescri
  * ReadChunkRowMask fetches chunk row mask for columnar relation.
  */
 bytea *
-ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
+ReadChunkRowMask(RelFileLocator relfilelocator, Snapshot snapshot,
 				 MemoryContext cxt,
 				 uint64 stripeFirstRowNumber, int rowCount)
 {
 	HeapTuple heapTuple = NULL;
 	ScanKeyData scanKey[3];
 
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	Oid columnarRowMaskOid = ColumnarRowMaskRelationId();
 	Relation columnarRowMask = table_open(columnarRowMaskOid, AccessShareLock);
@@ -860,13 +867,18 @@ ReadChunkRowMask(RelFileNode relfilenode, Snapshot snapshot,
 
 
 bool
-UpdateRowMask(RelFileNode relfilenode, uint64 storageId,
+UpdateRowMask(RelFileLocator relfilelocator, uint64 storageId,
 			  Snapshot snapshot, uint64 rowNumber)
 {
 	bytea *rowMask = NULL;
 
+#if PG_VERSION_NUM >= PG_VERSION_16
 	RowMaskWriteStateEntry *rowMaskEntry = 
-		RowMaskFindWriteState(relfilenode.relNode, GetCurrentSubTransactionId(), rowNumber);
+		RowMaskFindWriteState(relfilelocator.relNumber, GetCurrentSubTransactionId(), rowNumber);
+#else
+	RowMaskWriteStateEntry *rowMaskEntry = 
+		RowMaskFindWriteState(relfilelocator.relNode, GetCurrentSubTransactionId(), rowNumber);
+#endif
 
 	if (rowMaskEntry == NULL)
 	{
@@ -896,14 +908,21 @@ UpdateRowMask(RelFileNode relfilenode, uint64 storageId,
 		{
 			bool isnull;
 
-			Pointer mask = DatumGetPointer(
+			Datum mask =
 					fastgetattr(rowMaskHeapTuple, Anum_columnar_row_mask_mask,
-								tupleDescriptor, &isnull));
+								tupleDescriptor, &isnull);
 		
-			rowMaskEntry = RowMaskInitWriteState(relfilenode.relNode,
+#if PG_VERSION_NUM >= PG_VERSION_16
+			rowMaskEntry = RowMaskInitWriteState(relfilelocator.relNumber,
 												 storageId,
 												 GetCurrentSubTransactionId(),
 												 DatumGetByteaP(mask));
+#else
+			rowMaskEntry = RowMaskInitWriteState(relfilelocator.relNode,
+												 storageId,
+												 GetCurrentSubTransactionId(),
+												 DatumGetByteaP(mask));
+#endif
 			/* 
 			 * Populate row mask cache with values from heap table
 			 */
@@ -1009,7 +1028,7 @@ void FlushRowMaskCache(RowMaskWriteStateEntry *rowMaskEntry)
 
 		// Update deleted row count
 		update[Anum_columnar_row_mask_deleted_rows - 1] = true;
-		values[Anum_columnar_row_mask_deleted_rows - 1] = PointerGetDatum(rowMaskEntry->deletedRows);
+		values[Anum_columnar_row_mask_deleted_rows - 1] = rowMaskEntry->deletedRows;
 
 		// Update mask byte array
 		update[Anum_columnar_row_mask_mask - 1] = true;
@@ -1183,7 +1202,7 @@ StripeMetadataLookupRowNumber(Relation relation, uint64 rowNumber, Snapshot snap
 	uint64 storageId = ColumnarStorageGetStorageId(relation, false);
 	ScanKeyData scanKey[2];
 	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(storageId));
 
 	StrategyNumber strategyNumber = InvalidStrategy;
 	RegProcedure procedure = InvalidOid;
@@ -1309,7 +1328,7 @@ FindStripeWithHighestRowNumber(Relation relation, Snapshot snapshot)
 	uint64 storageId = ColumnarStorageGetStorageId(relation, false);
 	ScanKeyData scanKey[1];
 	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(storageId));
 
 	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
 	Relation index = index_open(ColumnarStripeFirstRowNumberIndexRelationId(),
@@ -1349,7 +1368,7 @@ ReadChunkGroupRowCounts(uint64 storageId, uint64 stripe, uint32 chunkGroupCount,
 	ScanKeyInit(&scanKey[0], Anum_columnar_chunkgroup_storageid,
 				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
 	ScanKeyInit(&scanKey[1], Anum_columnar_chunkgroup_stripe,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(stripe));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(stripe));
 
 	SysScanDesc scanDescriptor =
 		systable_beginscan_ordered(columnarChunkGroup, index, snapshot, 2, scanKey);
@@ -1418,7 +1437,7 @@ UpdateChunkGroupDeletedRows(uint64 storageId, uint64 stripe,
 	ScanKeyInit(&scanKey[0], Anum_columnar_chunkgroup_storageid,
 				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
 	ScanKeyInit(&scanKey[1], Anum_columnar_chunkgroup_stripe,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(stripe));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(stripe));
 	ScanKeyInit(&scanKey[2], Anum_columnar_chunkgroup_chunk,
 				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(chunkGroupId));
 
@@ -1501,12 +1520,12 @@ InsertEmptyStripeMetadataRow(uint64 storageId, uint64 stripeId, uint32 columnCou
 
 /*
  * StripesForRelfilenode returns a list of StripeMetadata for stripes
- * of the given relfilenode.
+ * of the given relfilelocator.
  */
 List *
-StripesForRelfilenode(RelFileNode relfilenode, ScanDirection scanDirection)
+StripesForRelfilenode(RelFileLocator relfilelocator, ScanDirection scanDirection)
 {
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	return ReadDataFileStripeList(storageId, GetTransactionSnapshot(), scanDirection);
 }
@@ -1514,12 +1533,12 @@ StripesForRelfilenode(RelFileNode relfilenode, ScanDirection scanDirection)
 
 /*
  * DeletedRowsForStripe returns number of deleted rows for stripe
- * of the given relfilenode.
+ * of the given relfilelocator.
  */
 uint32
-DeletedRowsForStripe(RelFileNode relfilenode, uint32 chunkCount, uint64 stripeId)
+DeletedRowsForStripe(RelFileLocator relfilelocator, uint32 chunkCount, uint64 stripeId)
 {
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	uint32 *chunkGroupRowCounts;
 	uint32 *chunkGroupDeletedRows;
@@ -1545,16 +1564,16 @@ DeletedRowsForStripe(RelFileNode relfilenode, uint32 chunkCount, uint64 stripeId
 
 /*
  * GetHighestUsedAddress returns the highest used address for the given
- * relfilenode across all active and inactive transactions.
+ * relfilelocator across all active and inactive transactions.
  *
  * This is used by truncate stage of VACUUM, and VACUUM can be called
  * for empty tables. So this doesn't throw errors for empty tables and
  * returns 0.
  */
 uint64
-GetHighestUsedAddress(RelFileNode relfilenode)
+GetHighestUsedAddress(RelFileLocator relfilelocator)
 {
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	uint64 highestUsedAddress = 0;
 	uint64 highestUsedId = 0;
@@ -1566,7 +1585,7 @@ GetHighestUsedAddress(RelFileNode relfilenode)
 
 /*
  * GetHighestUsedAddressAndId returns the highest used address and id for
- * the given relfilenode across all active and inactive transactions.
+ * the given relfilelocator across all active and inactive transactions.
  */
 static void
 GetHighestUsedAddressAndId(uint64 storageId,
@@ -1669,9 +1688,9 @@ UpdateStripeMetadataRow(uint64 storageId, uint64 stripeId, bool *update,
 
 	ScanKeyData scanKey[2];
 	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(storageId));
 	ScanKeyInit(&scanKey[1], Anum_columnar_stripe_stripe,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(stripeId));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(stripeId));
 
 	Oid columnarStripesOid = ColumnarStripeRelationId();
 
@@ -1739,7 +1758,7 @@ ReadDataFileStripeList(uint64 storageId, Snapshot snapshot, ScanDirection scanDi
 	HeapTuple heapTuple;
 
 	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(storageId));
 
 	Oid columnarStripesOid = ColumnarStripeRelationId();
 
@@ -1818,11 +1837,11 @@ BuildStripeMetadata(Relation columnarStripes, HeapTuple heapTuple)
 
 
 /*
- * DeleteMetadataRows removes the rows with given relfilenode from columnar
+ * DeleteMetadataRows removes the rows with given relfilelocator from columnar
  * metadata tables.
  */
 void
-DeleteMetadataRows(RelFileNode relfilenode)
+DeleteMetadataRows(RelFileLocator relfilelocator)
 {
 	/*
 	 * During a restore for binary upgrade, metadata tables and indexes may or
@@ -1833,7 +1852,7 @@ DeleteMetadataRows(RelFileNode relfilenode)
 		return;
 	}
 
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	DeleteStorageFromColumnarMetadataTable(ColumnarStripeRelationId(),
 										   Anum_columnar_stripe_storageid,
@@ -1855,11 +1874,11 @@ DeleteMetadataRows(RelFileNode relfilenode)
 
 
 /*
- * DeleteMetadataRowsForStripeId removes the rows with given relfilenode and 
+ * DeleteMetadataRowsForStripeId removes the rows with given relfilelocator and 
  * stripe id from columnar metadata tables.
  */
 void
-DeleteMetadataRowsForStripeId(RelFileNode relfilenode, uint64 stripeId)
+DeleteMetadataRowsForStripeId(RelFileLocator relfilelocator, uint64 stripeId)
 {
 	/*
 	 * During a restore for binary upgrade, metadata tables and indexes may or
@@ -1870,7 +1889,7 @@ DeleteMetadataRowsForStripeId(RelFileNode relfilenode, uint64 stripeId)
 		return;
 	}
 
-	uint64 storageId = LookupStorageId(relfilenode);
+	uint64 storageId = LookupStorageId(relfilelocator);
 
 	DeleteStripeFromColumnarMetadataTable(
 		ColumnarStripeRelationId(),
@@ -2099,7 +2118,13 @@ create_estate_for_relation(Relation rel)
 	rte->relid = RelationGetRelid(rel);
 	rte->relkind = rel->rd_rel->relkind;
 	rte->rellockmode = AccessShareLock;
+#if PG_VERSION_NUM >= PG_VERSION_16
+	List *perminfos = NIL;
+	addRTEPermissionInfo(&perminfos, rte);
+	ExecInitRangeTable(estate, list_make1(rte), perminfos);
+#else
 	ExecInitRangeTable(estate, list_make1(rte));
+#endif
 
 #if PG_VERSION_NUM < PG_VERSION_14
 	ResultRelInfo *resultRelInfo = makeNode(ResultRelInfo);
@@ -2338,14 +2363,15 @@ ColumnarNamespaceId(void)
 
 
 /*
- * LookupStorageId reads storage metapage to find the storage ID for the given relfilenode. It returns
+ * LookupStorageId reads storage metapage to find the storage ID for the given relfilelocator. It returns
  * false if the relation doesn't have a meta page yet.
  */
 uint64
-LookupStorageId(RelFileNode relfilenode)
+LookupStorageId(RelFileLocator relfilelocator)
 {
-	Oid relationId = RelidByRelfilenode(relfilenode.spcNode,
-										relfilenode.relNode);
+	Oid relationId = RelidByRelfilenumber(RelationTablespace_compat(relfilelocator),
+										  RelationPhysicalIdentifierNumber_compat(
+											  relfilelocator));
 
 	Relation relation = relation_open(relationId, AccessShareLock);
 	uint64 storageId = ColumnarStorageGetStorageId(relation, false);
@@ -2410,7 +2436,7 @@ create_table_row_mask(PG_FUNCTION_ARGS)
 	StripeMetadata *stripeMetadata = NULL;
 
 	ScanKeyInit(&scanKey[0], Anum_columnar_stripe_storageid,
-				BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(storageId));
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(storageId));
 
 	Relation columnarStripes = table_open(ColumnarStripeRelationId(), AccessShareLock);
 	
@@ -2480,7 +2506,11 @@ ColumnarStorageUpdateIfNeeded(Relation rel, bool isUpgrade)
 	 */
 	if (unlikely(rel->rd_smgr == NULL))
 	{
+	#if PG_VERSION_NUM >= PG_VERSION_16
+		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_locator, rel->rd_backend));
+	#else
 		smgrsetowner(&(rel->rd_smgr), smgropen(rel->rd_node, rel->rd_backend));
+	#endif
 	}
 
 	BlockNumber nblocks = smgrnblocks(rel->rd_smgr, MAIN_FORKNUM);

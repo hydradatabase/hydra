@@ -20,7 +20,6 @@ select count(*), min(i), max(i), avg(i) from fallback_scan;
 -- Negative test: try to force a parallel plan with at least two
 -- workers, but columnar should reject it and use a non-parallel scan.
 --
-set force_parallel_mode = regress;
 set min_parallel_table_scan_size = 1;
 set parallel_tuple_cost = 0;
 set max_parallel_workers = 4;
@@ -28,7 +27,6 @@ set max_parallel_workers_per_gather = 4;
 explain (costs off) select count(*), min(i), max(i), avg(i) from fallback_scan;
 select count(*), min(i), max(i), avg(i) from fallback_scan;
 
-set force_parallel_mode to default;
 set min_parallel_table_scan_size to default;
 set parallel_tuple_cost to default;
 set max_parallel_workers to default;

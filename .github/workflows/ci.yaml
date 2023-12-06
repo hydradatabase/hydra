@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        postgres: ["13", "14", "15"]
+        postgres: ["13", "14", "15", "16"]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        postgres: ["13", "14", "15"]
+        postgres: ["13", "14", "15", "16"]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -208,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        postgres: ["13", "14", "15"]
+        postgres: ["13", "14", "15", "16"]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

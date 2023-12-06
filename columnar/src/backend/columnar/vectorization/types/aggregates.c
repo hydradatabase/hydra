@@ -322,7 +322,7 @@ vint8acc(PG_FUNCTION_ARGS)
 
 	MemoryContextSwitchTo(oldContext);
 
-	PG_RETURN_NUMERIC(state);
+	PG_RETURN_POINTER(state);
 }
 
 PG_FUNCTION_INFO_V1(vint8sum);
