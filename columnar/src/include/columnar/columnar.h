@@ -263,6 +263,7 @@ extern bool columnar_enable_vectorization;
 extern bool columnar_enable_dml;
 extern bool columnar_enable_page_cache;
 extern int columnar_page_cache_size;
+extern bool columnar_index_scan;
 
 
 /* called when the user changes options on the given relation */

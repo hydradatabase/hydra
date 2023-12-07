@@ -49,6 +49,7 @@ bool columnar_enable_vectorization = true;
 bool columnar_enable_dml = true;
 bool columnar_enable_page_cache = false;
 int columnar_page_cache_size = 200U;
+bool columnar_index_scan = false;
 
 static const struct config_enum_entry columnar_compression_options[] =
 {
@@ -195,6 +196,17 @@ columnar_guc_init()
 							NULL,
 							NULL,
 							NULL);
+
+	DefineCustomBoolVariable("columnar.enable_columnar_index_scan",
+							 gettext_noop("Enables custom columnar index scan"),
+							 NULL,
+							 &columnar_index_scan,
+							 false,
+							 PGC_USERSET,
+							 GUC_NO_SHOW_ALL,
+							 NULL, 
+							 NULL, 
+							 NULL);
 }
 
 

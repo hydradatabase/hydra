@@ -188,7 +188,6 @@ static List * set_deparse_context_planstate(List *dpcontext, Node *node,
 
 /* other helpers */
 static List * ColumnarVarNeeded(ColumnarScanState *columnarScanState);
-static Bitmapset * ColumnarAttrNeeded(ScanState *ss, List *customList);
 static bool IsCreateTableAs(const char *query);
 
 /* saved hook value in case of unload */
@@ -618,9 +617,13 @@ CostColumnarIndexPath(PlannerInfo *root, RelOptInfo *rel, Oid relationId,
 	 * instead of overwriting total cost, we "add" ours to the cost estimated
 	 * by indexAM since we should consider index traversal related costs too.
 	 */
-	Cost columnarIndexScanCost = ColumnarIndexScanAdditionalCost(root, rel, relationId,
-																 indexPath);
-	indexPath->path.total_cost += columnarIndexScanCost;
+	
+	if (!columnar_index_scan)
+	{
+		Cost columnarIndexScanCost = ColumnarIndexScanAdditionalCost(root, rel, relationId,
+																	indexPath);
+		indexPath->path.total_cost += columnarIndexScanCost;
+	}
 
 	ereport(DEBUG4, (errmsg("columnar table index scan costs re-estimated "
 							"by columnarAM (including indexAM costs): "
@@ -2095,7 +2098,7 @@ ColumnarScan_BeginCustomScan(CustomScanState *cscanstate, EState *estate, int ef
  * Throws an error if finds a Var referencing to an attribute not supported
  * by ColumnarScan.
  */
-static Bitmapset *
+Bitmapset *
 ColumnarAttrNeeded(ScanState *ss, List *customList)
 {
 	TupleTableSlot *slot = ss->ss_ScanTupleSlot;

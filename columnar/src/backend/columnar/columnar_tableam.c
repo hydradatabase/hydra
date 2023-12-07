@@ -111,6 +111,9 @@ typedef struct IndexFetchColumnarData
 {
 	IndexFetchTableData cs_base;
 	ColumnarReadState *cs_readState;
+	Bitmapset *attr_needed;
+	List *stripeMetadataList;
+	bool is_select_query; /* CustomIndexScan only gets planned with SELECT query */
 
 	/*
 	 * We initialize cs_readState lazily in the first columnar_index_fetch_tuple
@@ -508,7 +511,37 @@ columnar_index_fetch_begin(Relation rel)
 	IndexFetchColumnarData *scan = palloc0(sizeof(IndexFetchColumnarData));
 	scan->cs_base.rel = rel;
 	scan->cs_readState = NULL;
+	scan->stripeMetadataList = NIL;
 	scan->scanContext = scanContext;
+	scan->is_select_query = false;
+
+	MemoryContextSwitchTo(oldContext);
+
+	return &scan->cs_base;
+}
+
+IndexFetchTableData *
+columnar_index_fetch_begin_extended(Relation rel, Bitmapset *attr_needed)
+{
+	Oid relfilenode = rel->rd_node.relNode;
+	if (PendingWritesInUpperTransactions(relfilenode, GetCurrentSubTransactionId()))
+	{
+		/* XXX: maybe we can just flush the data and continue */
+		elog(ERROR, "cannot read from index when there is unflushed data in "
+					"upper transactions");
+	}
+
+	MemoryContext scanContext = CreateColumnarScanMemoryContext();
+	MemoryContext oldContext = MemoryContextSwitchTo(scanContext);
+
+	IndexFetchColumnarData *scan = palloc0(sizeof(IndexFetchColumnarData));
+	scan->cs_base.rel = rel;
+	scan->cs_readState = NULL;
+	scan->stripeMetadataList = NIL;
+	scan->scanContext = scanContext;
+
+	scan->attr_needed = bms_copy(attr_needed);
+	scan->is_select_query = true;
 
 	MemoryContextSwitchTo(oldContext);
 
@@ -535,11 +568,47 @@ columnar_index_fetch_end(IndexFetchTableData *sscan)
 		scan->cs_readState = NULL;
 	}
 
+	bms_free(scan->attr_needed);
+
 	/* clean up any caches. */
 	if (columnar_enable_page_cache == true)
 	{
 		ColumnarResetCache();
 	}
+}
+
+static StripeMetadata *
+FindStripeMetadataFromListBinarySearch(IndexFetchColumnarData *scan, uint64 rowNumber)
+{
+	ListCell *lc = NULL;
+
+	int high = scan->stripeMetadataList->length - 1;
+	int low = 0;
+
+	while(low <= high)
+	{
+		int mid = low + (high - low) / 2;
+
+		lc = list_nth_cell(scan->stripeMetadataList, mid);
+
+		StripeMetadata *stripeMetadata = lc->ptr_value;
+
+		if (rowNumber >= stripeMetadata->firstRowNumber &&
+			rowNumber < stripeMetadata->firstRowNumber + stripeMetadata->rowCount)
+		{
+			return stripeMetadata;
+		}
+
+		if (stripeMetadata->firstRowNumber > rowNumber)
+		{
+			high = mid - 1;
+		}
+		else
+		{
+			low = mid + 1;
+		}
+	}
+	return NULL;
 }
 
 
@@ -573,25 +642,38 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 	/* initialize read state for the first row */
 	if (scan->cs_readState == NULL)
 	{
-		/* we need all columns */
-		int natts = columnarRelation->rd_att->natts;
-		Bitmapset *attr_needed = bms_add_range(NULL, 0, natts - 1);
-
 		/* no quals for index scan */
 		List *scanQual = NIL;
+
+		if (bms_is_empty(scan->attr_needed))
+		{
+			/* we need all columns */
+			int natts = columnarRelation->rd_att->natts;
+			bms_free(scan->attr_needed);
+			scan->attr_needed = bms_add_range(NULL, 0, natts - 1);
+		}
 
 		bool randomAccess = true;
 		scan->cs_readState = init_columnar_read_state(columnarRelation,
 													  slot->tts_tupleDescriptor,
-													  attr_needed, scanQual,
+													  scan->attr_needed, scanQual,
 													  scan->scanContext,
 													  snapshot, randomAccess,
 													  NULL);
+		if (scan->is_select_query)
+			scan->stripeMetadataList =
+				StripesForRelfilenode(columnarRelation->rd_node, ForwardScanDirection);
 	}
 
 	uint64 rowNumber = tid_to_row_number(*tid);
-	StripeMetadata *stripeMetadata =
-		FindStripeWithMatchingFirstRowNumber(columnarRelation, rowNumber, snapshot);
+
+	StripeMetadata *stripeMetadata = NULL;
+	
+	if (scan->is_select_query)
+		stripeMetadata = FindStripeMetadataFromListBinarySearch(scan, rowNumber);
+	else
+		stripeMetadata = FindStripeWithMatchingFirstRowNumber(columnarRelation, rowNumber, snapshot);
+	
 	if (!stripeMetadata)
 	{
 		/* it is certain that tuple with rowNumber doesn't exist */
@@ -599,6 +681,7 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 	}
 
 	StripeWriteStateEnum stripeWriteState = StripeWriteState(stripeMetadata);
+
 	if (stripeWriteState == STRIPE_WRITE_FLUSHED &&
 		!ColumnarReadRowByRowNumber(scan->cs_readState, rowNumber,
 									slot->tts_values, slot->tts_isnull))
@@ -688,7 +771,8 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 		Assert(stripeWriteState == STRIPE_WRITE_FLUSHED);
 	}
 
-	pfree(stripeMetadata);
+	if (!scan->is_select_query)
+		pfree(stripeMetadata);
 	slot->tts_tableOid = RelationGetRelid(columnarRelation);
 	slot->tts_tid = *tid;
 	ExecStoreVirtualTuple(slot);
