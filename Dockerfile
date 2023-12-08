@@ -2,9 +2,6 @@
 
 FROM postgres_base
 
-# workaround for https://github.com/docker-library/postgres/issues/1112
-RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
-
 RUN set -eux; \
   apt-get update; \
   apt-get install -y --no-install-recommends \
