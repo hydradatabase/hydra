@@ -523,7 +523,11 @@ columnar_index_fetch_begin(Relation rel)
 IndexFetchTableData *
 columnar_index_fetch_begin_extended(Relation rel, Bitmapset *attr_needed)
 {
+#if PG_VERSION_NUM >= PG_VERSION_16
+	Oid relfilenode = rel->rd_locator.relNumber;
+#else
 	Oid relfilenode = rel->rd_node.relNode;
+#endif
 	if (PendingWritesInUpperTransactions(relfilenode, GetCurrentSubTransactionId()))
 	{
 		/* XXX: maybe we can just flush the data and continue */
@@ -661,8 +665,14 @@ columnar_index_fetch_tuple(struct IndexFetchTableData *sscan,
 													  snapshot, randomAccess,
 													  NULL);
 		if (scan->is_select_query)
+#if PG_VERSION_NUM >= PG_VERSION_16
+			scan->stripeMetadataList =
+				StripesForRelfilenode(columnarRelation->rd_locator, ForwardScanDirection);
+#else
 			scan->stripeMetadataList =
 				StripesForRelfilenode(columnarRelation->rd_node, ForwardScanDirection);
+#endif
+
 	}
 
 	uint64 rowNumber = tid_to_row_number(*tid);
