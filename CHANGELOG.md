@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 1.1.0
+
+* added support for upserts and other `ON CONFLICT` clauses for `INSERT`
+  queries ([#174][])
+* added a custom index-backed scan ([#205][]). This scan is disabled by default as it
+  may adversely affect performance. To enable this scan, use:
+  `SET columnar.enable_columnar_index_scan = true;`
+* added Postgres 16 support ([#200][])
+  * parquet_s3_fdw and multicorn-based FDWs are not yet supported in PG 16. These
+    extensions are included only on PG 13-15 builds.
+* update pg_ivm to 1.7.0 ([#200][])
+* update pgsql-http to 1.6.0 ([#200][])
+
+[#174]: https://github.com/hydradatabase/hydra/pull/174
+[#205]: https://github.com/hydradatabase/hydra/pull/205
+[#200]: https://github.com/hydradatabase/hydra/pull/200
+
 ## 1.0.2
 
 This version of Hydra Columnar requires `ALTER EXTENSION columnar
