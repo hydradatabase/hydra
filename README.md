@@ -1,4 +1,4 @@
-[![Hydra - the open source data warehouse](https://github.com/hydradatabase/hydra/blob/main/.images/header.png)](https://hydra.so)
+[![Hydra - the open source data warehouse](https://raw.githubusercontent.com/hydradatabase/hydra/main/.images/header.png)](https://hydra.so)
 
 # 🐘🤘 Hydra
 
@@ -15,13 +15,13 @@ Alternatively, you can run Hydra [locally](#run-locally).
 Benchmarks were run on a c6a.4xlarge (16 vCPU, 32 GB RAM) with 500 GB of GP2 storage.
 Results in seconds, smaller is better.
 
-![Hydra - the open source data warehouse](https://github.com/hydradatabase/hydra/blob/main/.images/ReadmeBenchmarks.png)
+![Hydra - the open source data warehouse](https://raw.githubusercontent.com/hydradatabase/hydra/main/.images/ReadmeBenchmarks.png)
 
 [Review Clickbench](https://tinyurl.com/clickbench) for comprehensive results and the list of 42 queries tested.
 
 This benchmark represents typical workload in the following areas: clickstream and traffic analysis, web analytics, machine-generated data, structured logs, and events data.
 
-![Hydra - the open source data warehouse](https://github.com/hydradatabase/hydra/blob/main/.images/FasterthanPG.png)
+![Hydra - the open source data warehouse](https://raw.githubusercontent.com/hydradatabase/hydra/main/.images/FasterthanPG.png)
 
 ### For our continuous benchmark results, see [BENCHMARKS](https://github.com/hydradatabase/hydra/blob/main/BENCHMARKS.md).
 
