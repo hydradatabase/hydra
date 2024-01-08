@@ -27,6 +27,7 @@
 #include "storage/smgr.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
+#include "utils/palloc.h"
 #include "utils/rel.h"
 
 #if PG_VERSION_NUM >= PG_VERSION_16
@@ -148,7 +149,6 @@ ColumnarBeginWrite(RelFileLocator relfilelocator,
 	return writeState;
 }
 
-
 /*
  * ColumnarWriteRow adds a row to the columnar table. If the stripe is not initialized,
  * we create structures to hold stripe data and skip list. Then, we serialize and
@@ -170,6 +170,58 @@ ColumnarWriteRow(ColumnarWriteState *writeState, Datum *columnValues, bool *colu
 	const uint32 chunkRowCount = options->chunkRowCount;
 	ChunkData *chunkData = writeState->chunkData;
 	MemoryContext oldContext = MemoryContextSwitchTo(writeState->stripeWriteContext);
+
+	uint32 chunkIndex;
+	uint32 chunkRowIndex;
+
+	if (stripeBuffers)
+	{
+		chunkIndex = stripeBuffers->rowCount / chunkRowCount;
+		chunkRowIndex = stripeBuffers->rowCount % chunkRowCount;
+		/*
+		* For each column, we first need to check to see if the next row will fit
+		* inside the chunk buffer.  If it does not fit, then we need to serialize
+		* the stripe and make a new stripe for insertion.
+		*/
+		bool fits = true;
+
+		for (columnIndex = 0; columnIndex < columnCount; columnIndex++)
+		{
+
+			/* Check for nulls, skip if null. */
+			if (columnNulls[columnIndex])
+			{
+				continue;
+			}
+
+			Form_pg_attribute attributeForm =
+				TupleDescAttr(writeState->tupleDescriptor, columnIndex);
+
+			int columnTypeLength = attributeForm->attlen;
+			char columnTypeAlign = attributeForm->attalign;
+
+			uint32 datumLength = att_addlength_datum(0, columnTypeLength, columnValues[columnIndex]);
+			uint32 datumLengthAligned = att_align_nominal(datumLength, columnTypeAlign);
+
+			/* Check to see if we are within the 1 gigabyte value. */
+			if ((long) chunkData->valueBufferArray[columnIndex]->len + (long) datumLengthAligned > 1024000000)
+			{
+				fits = false;
+				break;
+			}
+		}
+
+		if (!fits)
+		{
+			/* Flush the stripe. */
+			ColumnarFlushPendingWrites(writeState);
+
+			/* Then set up for new stripeBuffers. */
+			stripeBuffers = NULL;
+
+			chunkData->rowCount = 0;
+		}
+	}
 
 	if (stripeBuffers == NULL)
 	{
@@ -204,8 +256,9 @@ ColumnarWriteRow(ColumnarWriteState *writeState, Datum *columnValues, bool *colu
 		}
 	}
 
-	uint32 chunkIndex = stripeBuffers->rowCount / chunkRowCount;
-	uint32 chunkRowIndex = stripeBuffers->rowCount % chunkRowCount;
+	chunkIndex = stripeBuffers->rowCount / chunkRowCount;
+	chunkRowIndex = stripeBuffers->rowCount % chunkRowCount;
+
 
 	for (columnIndex = 0; columnIndex < columnCount; columnIndex++)
 	{
@@ -642,6 +695,7 @@ SerializeChunkData(ColumnarWriteState *writeState, uint32 chunkIndex, uint32 row
 		bool compressed = CompressBuffer(serializedValueBuffer, compressionBuffer,
 										 requestedCompressionType,
 										 compressionLevel);
+
 		if (compressed)
 		{
 			serializedValueBuffer = compressionBuffer;

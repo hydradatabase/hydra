@@ -1402,7 +1402,8 @@ ReadChunkGroupRowCounts(uint64 storageId, uint64 stripe, uint32 chunkGroupCount,
 
 		if (tupleChunkGroupIndex > chunkGroupCount)
 		{
-			elog(ERROR, "Tuple chunk group higher than chunk group count");
+			elog(WARNING, "Tuple chunk group higher than chunk group count: %d, %d (storage_id = %ld, stripe_id = %ld)", tupleChunkGroupIndex, chunkGroupCount, UInt64GetDatum(storageId), Int64GetDatum(stripe));
+			tupleChunkGroupIndex = chunkGroupCount;
 		}
 
 		(*chunkGroupRowCounts)[tupleChunkGroupIndex] =
