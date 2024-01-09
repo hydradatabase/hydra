@@ -1459,6 +1459,8 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 
 	uint32 lastStripeDeletedRows = 0;
 
+	Size totalDecompressedStripeLength = 0;
+
 	foreach(lc, stripeMetadataList)
 	{
 		StripeMetadata * stripeMetadata = lfirst(lc);
@@ -1466,11 +1468,20 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 		lastStripeDeletedRows = DeletedRowsForStripe(rel->rd_locator,
 													 stripeMetadata->chunkCount,
 													 stripeMetadata->id);
+		totalDecompressedStripeLength += 
+			DecompressedLengthForStripe(rel->rd_locator, stripeMetadata->id);
 #else
 		lastStripeDeletedRows = DeletedRowsForStripe(rel->rd_node,
 													 stripeMetadata->chunkCount,
 													 stripeMetadata->id);
+		totalDecompressedStripeLength += 
+			DecompressedLengthForStripe(rel->rd_node, stripeMetadata->id);
 #endif
+
+		if (totalDecompressedStripeLength >= 1024000000)
+		{
+			break;
+		}
 
 		uint64 stripeRowCount = stripeMetadata->rowCount - lastStripeDeletedRows;
 
@@ -1651,7 +1662,10 @@ columnar_vacuum_rel(Relation rel, VacuumParams *params,
 	/* this should have been resolved by vacuum.c until now */
 	Assert(params->truncate != VACOPTVALUE_UNSPECIFIED);
 
-	LogRelationStats(rel, elevel);
+	if (params->options & VACOPT_VERBOSE)
+	{
+		LogRelationStats(rel, elevel);
+	}
 
 	/*
 	 * We don't have updates, deletes, or concurrent updates, so all we
@@ -1789,6 +1803,12 @@ LogRelationStats(Relation rel, int elevel)
 	List *stripeList = StripesForRelfilenode(relfilelocator, ForwardScanDirection);
 	int stripeCount = list_length(stripeList);
 
+	MemoryContext relation_stats_ctx =
+		AllocSetContextCreate(CurrentMemoryContext, "Vacuum Relation Stats Context",
+							  ALLOCSET_SMALL_SIZES);
+
+	MemoryContext oldcontext = MemoryContextSwitchTo(relation_stats_ctx);
+
 	foreach(stripeMetadataCell, stripeList)
 	{
 		StripeMetadata *stripe = lfirst(stripeMetadataCell);
@@ -1827,7 +1847,11 @@ LogRelationStats(Relation rel, int elevel)
 
 		tupleCount += stripe->rowCount;
 		totalStripeLength += stripe->dataLength;
+
+		MemoryContextReset(relation_stats_ctx);
 	}
+
+	MemoryContextSwitchTo(oldcontext);
 
 	if (unlikely(rel->rd_smgr == NULL))
 	{
