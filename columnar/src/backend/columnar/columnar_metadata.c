@@ -1402,7 +1402,8 @@ ReadChunkGroupRowCounts(uint64 storageId, uint64 stripe, uint32 chunkGroupCount,
 
 		if (tupleChunkGroupIndex > chunkGroupCount)
 		{
-			elog(ERROR, "Tuple chunk group higher than chunk group count");
+			elog(WARNING, "Tuple chunk group higher than chunk group count: %d, %d (storage_id = %ld, stripe_id = %ld)", tupleChunkGroupIndex, chunkGroupCount, UInt64GetDatum(storageId), Int64GetDatum(stripe));
+			tupleChunkGroupIndex = chunkGroupCount;
 		}
 
 		(*chunkGroupRowCounts)[tupleChunkGroupIndex] =
@@ -1559,6 +1560,52 @@ DeletedRowsForStripe(RelFileLocator relfilelocator, uint32 chunkCount, uint64 st
 	pfree(chunkGroupDeletedRows);
 
 	return deletedRows;
+}
+
+/*
+ * DecompressedLengthForStripe returns total size of all decompressed rows and chunk
+ * for given stripe
+ */
+Size
+DecompressedLengthForStripe(RelFileLocator relfilelocator, uint64 stripeId)
+{
+	HeapTuple heapTuple = NULL;
+	ScanKeyData scanKey[2];
+
+	uint64 storageId = LookupStorageId(relfilelocator);
+
+	Oid columnarChunkOid = ColumnarChunkRelationId();
+	Relation columnarChunk = table_open(columnarChunkOid, AccessShareLock);
+	Relation index = index_open(ColumnarChunkIndexRelationId(), AccessShareLock);
+
+	ScanKeyInit(&scanKey[0], Anum_columnar_chunk_storageid,
+				BTEqualStrategyNumber, F_OIDEQ, UInt64GetDatum(storageId));
+	ScanKeyInit(&scanKey[1], Anum_columnar_chunk_stripe,
+				BTEqualStrategyNumber, F_OIDEQ, Int64GetDatum(stripeId));
+
+	SysScanDesc scanDescriptor = systable_beginscan_ordered(columnarChunk, index,
+															GetTransactionSnapshot(), 2, scanKey);
+
+	Size decompressedChunkSize = 0;
+
+	while (HeapTupleIsValid(heapTuple = systable_getnext_ordered(scanDescriptor,
+																 ForwardScanDirection)))
+	{
+		Datum datumArray[Natts_columnar_chunk];
+		bool isNullArray[Natts_columnar_chunk];
+
+		heap_deform_tuple(heapTuple, RelationGetDescr(columnarChunk), datumArray,
+						  isNullArray);
+
+		decompressedChunkSize +=
+			DatumGetInt64(datumArray[Anum_columnar_chunk_value_decompressed_size - 1]);
+	}
+
+	systable_endscan_ordered(scanDescriptor);
+	index_close(index, AccessShareLock);
+	table_close(columnarChunk, AccessShareLock);
+
+	return decompressedChunkSize;
 }
 
 
