@@ -243,3 +243,13 @@ SELECT COUNT(*) = (:columnar_chunk_group_rows / 2) FROM columnar.chunk_group WHE
 SELECT COUNT(*) = (:columnar_row_mask_rows / 2) FROM columnar.row_mask WHERE storage_id = :t_oid;
 
 DROP TABLE t;
+
+-- Verify that we can vacuum humongous fields
+CREATE TABLE t (id SERIAL, data TEXT) USING columnar;
+INSERT INTO t SELECT 1, repeat('a', 1000000000);
+INSERT INTO t SELECT 2, repeat('b', 1000000000);
+INSERT INTO t SELECT 3, repeat('c', 1000000000);
+
+VACUUM t;
+
+DROP TABLE t;
