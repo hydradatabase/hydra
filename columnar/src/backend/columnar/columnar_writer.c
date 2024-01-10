@@ -259,7 +259,6 @@ ColumnarWriteRow(ColumnarWriteState *writeState, Datum *columnValues, bool *colu
 	chunkIndex = stripeBuffers->rowCount / chunkRowCount;
 	chunkRowIndex = stripeBuffers->rowCount % chunkRowCount;
 
-
 	for (columnIndex = 0; columnIndex < columnCount; columnIndex++)
 	{
 		ColumnChunkSkipNode **chunkSkipNodeArray = stripeSkipList->chunkSkipNodeArray;
@@ -282,6 +281,15 @@ ColumnarWriteRow(ColumnarWriteState *writeState, Datum *columnValues, bool *colu
 			char columnTypeAlign = attributeForm->attalign;
 
 			chunkData->existsArray[columnIndex][chunkRowIndex] = true;
+
+			uint32 datumLength = att_addlength_datum(0, columnTypeLength, columnValues[columnIndex]);
+			uint32 datumLengthAligned = att_align_nominal(datumLength, columnTypeAlign);
+
+			if (datumLengthAligned >= (256UL << 20))
+			{
+				elog(ERROR, "Error with insert on column \'%s\'. Inserting %d bytes, exceeding 256MB",
+							 attributeForm->attname.data, datumLength);
+			}
 
 			SerializeSingleDatum(chunkData->valueBufferArray[columnIndex],
 								 columnValues[columnIndex], columnTypeByValue,

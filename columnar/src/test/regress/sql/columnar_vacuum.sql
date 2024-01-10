@@ -246,10 +246,26 @@ DROP TABLE t;
 
 -- Verify that we can vacuum humongous fields
 CREATE TABLE t (id SERIAL, data TEXT) USING columnar;
-INSERT INTO t SELECT 1, repeat('a', 1000000000);
-INSERT INTO t SELECT 2, repeat('b', 1000000000);
-INSERT INTO t SELECT 3, repeat('c', 1000000000);
+
+SELECT columnar_test_helpers.columnar_relation_storageid(pg_class.oid) AS t_oid FROM pg_class WHERE relname='t' \gset
+
+INSERT INTO t SELECT 1, repeat('a', 255000000);
+INSERT INTO t SELECT 2, repeat('b', 255000000);
+INSERT INTO t SELECT 3, repeat('c', 255000000);
+INSERT INTO t SELECT 4, repeat('d', 255000000);
+INSERT INTO t SELECT 5, repeat('e', 255000000);
+INSERT INTO t SELECT 6, repeat('f', 255000000);
+
+SELECT COUNT(*) = 6 FROM columnar.stripe WHERE storage_id = :t_oid;
 
 VACUUM t;
+
+SELECT COUNT(*) = 3 FROM columnar.stripe WHERE storage_id = :t_oid;
+
+INSERT INTO t SELECT 7, repeat('g', 255000000);
+
+VACUUM t;
+
+SELECT COUNT(*) = 4 FROM columnar.stripe WHERE storage_id = :t_oid;
 
 DROP TABLE t;
