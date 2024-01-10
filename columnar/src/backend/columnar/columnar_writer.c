@@ -627,15 +627,13 @@ SerializeSingleDatum(StringInfo datumBuffer, Datum datum, bool datumTypeByValue,
 		}
 		else
 		{
-			memcpy_s(currentDatumDataPointer, datumBuffer->maxlen - datumBuffer->len,
-					 DatumGetPointer(datum), datumTypeLength);
+			memcpy(currentDatumDataPointer, DatumGetPointer(datum), datumTypeLength);
 		}
 	}
 	else
 	{
 		Assert(!datumTypeByValue);
-		memcpy_s(currentDatumDataPointer, datumBuffer->maxlen - datumBuffer->len,
-				 DatumGetPointer(datum), datumLength);
+		memcpy(currentDatumDataPointer, DatumGetPointer(datum), datumLength);
 	}
 
 	datumBuffer->len += datumLengthAligned;
@@ -790,7 +788,7 @@ DatumCopy(Datum datum, bool datumTypeByValue, int datumTypeLength)
 	{
 		uint32 datumLength = att_addlength_datum(0, datumTypeLength, datum);
 		char *datumData = palloc0(datumLength);
-		memcpy_s(datumData, datumLength, DatumGetPointer(datum), datumLength);
+		memcpy(datumData, DatumGetPointer(datum), datumLength);
 
 		datumCopy = PointerGetDatum(datumData);
 	}
@@ -813,8 +811,7 @@ CopyStringInfo(StringInfo sourceString)
 		targetString->data = palloc0(sourceString->len);
 		targetString->len = sourceString->len;
 		targetString->maxlen = sourceString->len;
-		memcpy_s(targetString->data, sourceString->len,
-				 sourceString->data, sourceString->len);
+		memcpy(targetString->data, sourceString->data, sourceString->len);
 	}
 
 	return targetString;

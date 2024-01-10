@@ -2208,20 +2208,16 @@ DatumToBytea(Datum value, Form_pg_attribute attrForm)
 		{
 			Datum tmp;
 			store_att_byval(&tmp, value, attrForm->attlen);
-
-			memcpy_s(VARDATA(result), datumLength + VARHDRSZ,
-					 &tmp, attrForm->attlen);
+			memcpy(VARDATA(result), &tmp, attrForm->attlen);
 		}
 		else
 		{
-			memcpy_s(VARDATA(result), datumLength + VARHDRSZ,
-					 DatumGetPointer(value), attrForm->attlen);
+			memcpy(VARDATA(result), DatumGetPointer(value), attrForm->attlen);
 		}
 	}
 	else
 	{
-		memcpy_s(VARDATA(result), datumLength + VARHDRSZ,
-				 DatumGetPointer(value), datumLength);
+		memcpy(VARDATA(result), DatumGetPointer(value), datumLength);
 	}
 
 	return result;
@@ -2240,7 +2236,7 @@ ByteaToDatum(bytea *bytes, Form_pg_attribute attrForm)
 	 * after the byteaDatum is freed.
 	 */
 	char *binaryDataCopy = palloc0(VARSIZE_ANY_EXHDR(bytes));
-	memcpy_s(binaryDataCopy, VARSIZE_ANY_EXHDR(bytes),
+	memcpy(binaryDataCopy, /*VARSIZE_ANY_EXHDR(bytes),*/
 			 VARDATA_ANY(bytes), VARSIZE_ANY_EXHDR(bytes));
 
 	return fetch_att(binaryDataCopy, attrForm->attbyval, attrForm->attlen);

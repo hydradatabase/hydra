@@ -213,3 +213,9 @@ RESET search_path;
 SET client_min_messages TO WARNING;
 DROP SCHEMA columnar_insert CASCADE;
 
+--- HYD-760
+
+CREATE TABLE t_text(t text) USING columnar;
+INSERT INTO t_text SELECT repeat('a', 100000) FROM generate_series(1, 500000) a;
+SELECT length(t), count(length(t)) FROM t_text GROUP BY length(t);
+DROP TABLE t_text;
