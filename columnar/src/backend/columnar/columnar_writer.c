@@ -259,7 +259,6 @@ ColumnarWriteRow(ColumnarWriteState *writeState, Datum *columnValues, bool *colu
 	chunkIndex = stripeBuffers->rowCount / chunkRowCount;
 	chunkRowIndex = stripeBuffers->rowCount % chunkRowCount;
 
-
 	for (columnIndex = 0; columnIndex < columnCount; columnIndex++)
 	{
 		ColumnChunkSkipNode **chunkSkipNodeArray = stripeSkipList->chunkSkipNodeArray;
@@ -282,6 +281,15 @@ ColumnarWriteRow(ColumnarWriteState *writeState, Datum *columnValues, bool *colu
 			char columnTypeAlign = attributeForm->attalign;
 
 			chunkData->existsArray[columnIndex][chunkRowIndex] = true;
+
+			uint32 datumLength = att_addlength_datum(0, columnTypeLength, columnValues[columnIndex]);
+			uint32 datumLengthAligned = att_align_nominal(datumLength, columnTypeAlign);
+
+			if (datumLengthAligned >= (256UL << 20))
+			{
+				elog(ERROR, "Error with insert on column \'%s\'. Inserting %d bytes, exceeding 256MB",
+							 attributeForm->attname.data, datumLength);
+			}
 
 			SerializeSingleDatum(chunkData->valueBufferArray[columnIndex],
 								 columnValues[columnIndex], columnTypeByValue,
@@ -627,15 +635,13 @@ SerializeSingleDatum(StringInfo datumBuffer, Datum datum, bool datumTypeByValue,
 		}
 		else
 		{
-			memcpy_s(currentDatumDataPointer, datumBuffer->maxlen - datumBuffer->len,
-					 DatumGetPointer(datum), datumTypeLength);
+			memcpy(currentDatumDataPointer, DatumGetPointer(datum), datumTypeLength);
 		}
 	}
 	else
 	{
 		Assert(!datumTypeByValue);
-		memcpy_s(currentDatumDataPointer, datumBuffer->maxlen - datumBuffer->len,
-				 DatumGetPointer(datum), datumLength);
+		memcpy(currentDatumDataPointer, DatumGetPointer(datum), datumLength);
 	}
 
 	datumBuffer->len += datumLengthAligned;
@@ -790,7 +796,7 @@ DatumCopy(Datum datum, bool datumTypeByValue, int datumTypeLength)
 	{
 		uint32 datumLength = att_addlength_datum(0, datumTypeLength, datum);
 		char *datumData = palloc0(datumLength);
-		memcpy_s(datumData, datumLength, DatumGetPointer(datum), datumLength);
+		memcpy(datumData, DatumGetPointer(datum), datumLength);
 
 		datumCopy = PointerGetDatum(datumData);
 	}
@@ -813,8 +819,7 @@ CopyStringInfo(StringInfo sourceString)
 		targetString->data = palloc0(sourceString->len);
 		targetString->len = sourceString->len;
 		targetString->maxlen = sourceString->len;
-		memcpy_s(targetString->data, sourceString->len,
-				 sourceString->data, sourceString->len);
+		memcpy(targetString->data, sourceString->data, sourceString->len);
 	}
 
 	return targetString;
