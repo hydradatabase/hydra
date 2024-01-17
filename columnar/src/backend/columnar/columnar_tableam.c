@@ -276,7 +276,6 @@ columnar_beginscan_extended(Relation relation, Snapshot snapshot,
 	return ((TableScanDesc) scan);
 }
 
-
 /*
  * CreateColumnarScanMemoryContext creates a memory context to store
  * ColumnarReadStare in it.
@@ -333,6 +332,8 @@ columnar_endscan(TableScanDesc sscan)
 	{
 		ColumnarResetCache();
 	}
+
+	MemoryContextDelete(scan->scanContext);
 
 	columnar_enable_page_cache = previousCacheEnabledState;
 }
@@ -579,6 +580,8 @@ columnar_index_fetch_end(IndexFetchTableData *sscan)
 	{
 		ColumnarResetCache();
 	}
+
+	MemoryContextDelete(scan->scanContext);
 }
 
 static StripeMetadata *
@@ -1020,7 +1023,6 @@ columnar_tuple_complete_speculative(Relation relation, TupleTableSlot *slot,
 	columnar_enable_page_cache = previousCacheEnabledState;
 }
 
-
 static void
 columnar_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 					  CommandId cid, int options, BulkInsertState bistate)
@@ -1075,7 +1077,7 @@ columnar_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 
 		tupleSlot->tts_tid = row_number_to_tid(writtenRowNumber);
 
-		MemoryContextReset(ColumnarWritePerTupleContext(writeState));
+		MemoryContextResetAndDeleteChildren(ColumnarWritePerTupleContext(writeState));
 	}
 
 	MemoryContextSwitchTo(oldContext);
@@ -1384,6 +1386,7 @@ columnar_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 
 	ColumnarEndWrite(writeState);
 	ColumnarEndRead(readState);
+	MemoryContextDelete(scanContext);
 }
 
 
@@ -1599,6 +1602,7 @@ TruncateAndCombineColumnarStripes(Relation rel, int elevel)
 
 	ColumnarEndWrite(writeState);
 	ColumnarEndRead(readState);
+	MemoryContextDelete(scanContext);
 
 	for (int i = 0; i < startingStripeListPosition; i++)
 	{
