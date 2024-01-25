@@ -3,7 +3,7 @@ postgres:
   version: "14"
 extensions:
   - name: "multicorn"
-    version: "2.4+b68b75c"
+    version: "2.4.0+b68b75c"
     overwrite: true
   - name: "mysql_fdw"
     version: "2.9.1"
@@ -11,7 +11,7 @@ extensions:
     version: "1.0.0+5298b7f"
     overwrite: true
   - name: "pg_ivm"
-    version: "1.5.1"
+    version: "1.7.0"
   - name: "pgvector"
     version: "0.5.1"
   - name: "pg_hint_plan-14"
