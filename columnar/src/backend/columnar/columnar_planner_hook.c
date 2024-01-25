@@ -212,6 +212,10 @@ PlanTreeMutator(Plan *node, void *context)
 
 				customScan->custom_private = lappend(customScan->custom_private, vectorizedAggregateExecution);
 			}
+			else
+			{
+				elog(ERROR, "Custom Scan type is not ColumnarScan.");
+			}
 
 			break;
 		}
