@@ -3,7 +3,7 @@ postgres:
   version: "15"
 extensions:
   - name: "multicorn"
-    version: "2.4+b68b75c"
+    version: "2.4.0+b68b75c"
   - name: "mysql_fdw"
     version: "2.9.1"
   - name: "parquet_s3_fdw"
