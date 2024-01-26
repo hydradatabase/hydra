@@ -12,5 +12,5 @@ extensions:
     version: "1.7.0"
   - name: "pgvector"
     version: "0.5.1"
-  - name: "pg_hint_plan-13"
-    version: "1.3.8-1"
+  - name: "pg_hint_plan"
+    version: "1.3.9"
