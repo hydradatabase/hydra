@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.1.1
+
+* fix uncapped memory growth when importing data via logical replication ([#226][])
+* fix handling of large data columns (e.g. text or json) causing overflow of 1GB
+  chunk size ([#220][])
+* restrict the maximum singular datum size to 256MB to ensure that the maximum
+  datum size of 1GB is not exceeded in columnar metadata ([#222][])
+* do not insert vectorization node into the plan if columnar scan isn't being used
+  ([#228][])
+
+[#226]: https://github.com/hydradatabase/hydra/pull/226
+[#220]: https://github.com/hydradatabase/hydra/pull/220
+[#222]: https://github.com/hydradatabase/hydra/pull/222
+[#228]: https://github.com/hydradatabase/hydra/pull/228
+
 ## 1.1.0
 
 * added support for upserts and other `ON CONFLICT` clauses for `INSERT`
