@@ -1,0 +1,1 @@
+#include "udfs/alter_table_set_access_method/11.1-11.sql"
