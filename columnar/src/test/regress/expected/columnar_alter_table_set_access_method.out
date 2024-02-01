@@ -429,3 +429,119 @@ SELECT COUNT(1) FROM pg_class WHERE relname = 't' AND relam = (SELECT oid FROM p
 (1 row)
 
 DROP TABLE t;
+-- 10. Check case sensitivity
+CREATE TABLE "tBl" (
+  c1 CIRCLE,
+  "C2" TEXT,
+  i int4[],
+  p point,
+  a int,
+  EXCLUDE USING gist
+    (c1 WITH &&, ("C2"::circle) WITH &&)
+    WHERE (circle_center(c1) <> '(0,0)'),
+  EXCLUDE USING btree
+    (a WITH =)
+	INCLUDE(p)
+	WHERE ("C2" < 'astring')
+);
+CREATE INDEX "TBL_GIN" ON "tBl" USING gin (i);
+CREATE INDEX tbl_gist ON "tBl" USING gist(p);
+CREATE INDEX tbl_brin ON "tBl" USING brin (a) WITH (pages_per_range = 1);
+CREATE INDEX tbl_hash ON "tBl" USING hash ("C2");
+ALTER TABLE "tBl" ADD CONSTRAINT tbl_unique UNIQUE ("C2");
+CREATE UNIQUE INDEX tbl_btree ON "tBl" USING btree (a);
+ALTER TABLE "tBl" ADD CONSTRAINT tbl_pkey PRIMARY KEY USING INDEX tbl_btree;
+NOTICE:  ALTER TABLE / ADD CONSTRAINT USING INDEX will rename index "tbl_btree" to "tbl_pkey"
+SELECT indexname, indexdef FROM pg_indexes
+WHERE tablename = 'tBl'
+ORDER BY indexname;
+   indexname    |                                                          indexdef                                                           
+----------------+-----------------------------------------------------------------------------------------------------------------------------
+ TBL_GIN        | CREATE INDEX "TBL_GIN" ON public."tBl" USING gin (i)
+ tBl_a_p_excl   | CREATE INDEX "tBl_a_p_excl" ON public."tBl" USING btree (a) INCLUDE (p) WHERE ("C2" < 'astring'::text)
+ tBl_c1_C2_excl | CREATE INDEX "tBl_c1_C2_excl" ON public."tBl" USING gist (c1, (("C2")::circle)) WHERE (circle_center(c1) <> '(0,0)'::point)
+ tbl_brin       | CREATE INDEX tbl_brin ON public."tBl" USING brin (a) WITH (pages_per_range='1')
+ tbl_gist       | CREATE INDEX tbl_gist ON public."tBl" USING gist (p)
+ tbl_hash       | CREATE INDEX tbl_hash ON public."tBl" USING hash ("C2")
+ tbl_pkey       | CREATE UNIQUE INDEX tbl_pkey ON public."tBl" USING btree (a)
+ tbl_unique     | CREATE UNIQUE INDEX tbl_unique ON public."tBl" USING btree ("C2")
+(8 rows)
+
+SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = '"tBl"'::regclass;
+                                          pg_get_constraintdef                                           
+---------------------------------------------------------------------------------------------------------
+ EXCLUDE USING gist (c1 WITH &&, (("C2")::circle) WITH &&) WHERE ((circle_center(c1) <> '(0,0)'::point))
+ EXCLUDE USING btree (a WITH =) INCLUDE (p) WHERE (("C2" < 'astring'::text))
+ UNIQUE ("C2")
+ PRIMARY KEY (a)
+(4 rows)
+
+SELECT columnar.alter_table_set_access_method('"tBl"', 'columnar');
+WARNING:  Index `CREATE INDEX tbl_brin ON public."tBl" USING brin (a) WITH (pages_per_range='1')` cannot be created.
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'tBl' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'tBl' ORDER BY indexname;
+  indexname   
+--------------
+ TBL_GIN
+ tbl_a_p_excl
+ tbl_gist
+ tbl_hash
+ tbl_pkey
+ tbl_unique
+(6 rows)
+
+SELECT conname FROM pg_constraint
+WHERE conrelid = '"tBl"'::regclass
+ORDER BY conname;
+   conname    
+--------------
+ tbl_a_p_excl
+ tbl_pkey
+ tbl_unique
+(3 rows)
+
+-- Convert back to 'heap'
+SELECT columnar.alter_table_set_access_method('"tBl"', 'heap');
+ alter_table_set_access_method 
+-------------------------------
+ t
+(1 row)
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'tBl' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+ count 
+-------
+     1
+(1 row)
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'tBl' ORDER BY indexname;
+  indexname   
+--------------
+ TBL_GIN
+ tbl_a_p_excl
+ tbl_gist
+ tbl_hash
+ tbl_pkey
+ tbl_unique
+(6 rows)
+
+SELECT conname FROM pg_constraint
+WHERE conrelid = '"tBl"'::regclass
+ORDER BY conname;
+   conname    
+--------------
+ tbl_a_p_excl
+ tbl_pkey
+ tbl_unique
+(3 rows)
+
+DROP TABLE "tBl";

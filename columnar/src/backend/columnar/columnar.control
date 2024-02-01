@@ -1,4 +1,4 @@
 comment = 'Hydra Columnar extension'
-default_version = '11.1-10'
+default_version = '11.1-11'
 module_pathname = '$libdir/columnar'
 relocatable = false
