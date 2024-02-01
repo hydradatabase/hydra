@@ -2162,8 +2162,8 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 			if (*newVectorSize == 0)
 				continue;
 		}
-
-		stripeReadState->currentRow += stripeReadState->chunkGroupReadState->rowCount;
+		else
+			stripeReadState->currentRow += stripeReadState->chunkGroupReadState->rowCount;
 
 		return true;
 	}

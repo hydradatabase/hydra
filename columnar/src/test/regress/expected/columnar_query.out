@@ -310,3 +310,21 @@ SELECT * FROM t WHERE a >= 90;
 (11 rows)
 
 DROP TABLE t;
+--
+-- [columnar] Test chunk_group_row_limit
+--
+CREATE TABLE t(a INT) USING columnar;
+SELECT columnar.alter_columnar_table_set('t', chunk_group_row_limit => '11000');
+ alter_columnar_table_set 
+--------------------------
+ 
+(1 row)
+
+INSERT INTO t SELECT a FROM generate_series(0,50000) AS a;
+SELECT count(*) FROM t;
+ count 
+-------
+ 50001
+(1 row)
+
+DROP TABLE t;

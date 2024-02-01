@@ -160,3 +160,18 @@ SELECT * FROM t WHERE a >= 90;
 SELECT * FROM t WHERE a >= 90;
 
 DROP TABLE t;
+
+
+--
+-- [columnar] Test chunk_group_row_limit
+--
+
+CREATE TABLE t(a INT) USING columnar;
+
+SELECT columnar.alter_columnar_table_set('t', chunk_group_row_limit => '11000');
+
+INSERT INTO t SELECT a FROM generate_series(0,50000) AS a;
+
+SELECT count(*) FROM t;
+
+DROP TABLE t;
