@@ -319,12 +319,9 @@ ColumnarAddCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId,
 	}
 
 	ColumnarCacheEntry *entry = ColumnarFindInCache(relId, stripeId, chunkId, columnId);
-	bool found = false;
 
 	if (entry != NULL)
 	{
-		found = true;
-
 		/* Free up any existing stored data, everything else will be overwritten. */
 		StringInfo str = entry->store;
 		if (str->data)
@@ -347,11 +344,8 @@ ColumnarAddCacheEntry(uint64 relId, uint64 stripeId, uint64 chunkId,
 		entry->creationTime = entry->lastAccessTime = time(NULL);
 		entry->readCount = 0;
 
-		/* Add the entry into the list if it is not already there. */
-		if (!found)
-		{
-			dlist_push_tail(head, &(entry->list_node));
-		}
+		/* Add the entry into the list. */
+		dlist_push_tail(head, &(entry->list_node));
 	}
 
 	uint64 size = ((StringInfo) data)->len;
