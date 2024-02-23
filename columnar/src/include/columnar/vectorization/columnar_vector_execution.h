@@ -22,6 +22,7 @@ extern List * CreateVectorizedExprList(List *exprList);
 extern List * ConstructVectorizedQualList(TupleTableSlot *slot, List *vectorizedQual);
 extern bool * ExecuteVectorizedQual(TupleTableSlot *slot,
 									List *vectorizedQualList,
-									BoolExprType boolType);
+									BoolExprType boolType,
+									ExprContext *econtext);
 
 #endif

@@ -2380,7 +2380,7 @@ CustomExecScan(ColumnarScanState *columnarScanState,
 				bool *resultQual = 
 					ExecuteVectorizedQual(slot,
 										columnarScanState->vectorization.constructedVectorizedQualList,
-										AND_EXPR);
+										AND_EXPR, econtext);
 
 				memcpy(vectorSlot->keep, resultQual, COLUMNAR_VECTOR_COLUMN_SIZE);
 			}
