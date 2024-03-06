@@ -328,3 +328,31 @@ SELECT count(*) FROM t;
 (1 row)
 
 DROP TABLE t;
+--
+-- [columnar] Bug #244
+--
+CREATE TABLE t(a INT, b TEXT) USING columnar;
+SELECT columnar.alter_columnar_table_set('t', chunk_group_row_limit => '11000');
+ alter_columnar_table_set 
+--------------------------
+ 
+(1 row)
+
+INSERT INTO t SELECT a, md5(b::text) FROM generate_series(0,50000) AS t1(a)
+JOIN LATERAL generate_series(1, 10) AS t2(b) ON (true);
+SELECT b, count(*) FROM t WHERE a > 50 AND b <> '' GROUP BY b;
+                b                 | count 
+----------------------------------+-------
+ 1679091c5a880faf6fb5e6087eb1b2dc | 49950
+ 45c48cce2e2d7fbdea1afc51c7c6ad26 | 49950
+ 8f14e45fceea167a5a36dedd4bea2543 | 49950
+ a87ff679a2f3e71d9181a67b7542122c | 49950
+ c4ca4238a0b923820dcc509a6f75849b | 49950
+ c81e728d9d4c2f636f067f89cc14862c | 49950
+ c9f0f895fb98ab9159f51fd0297e236d | 49950
+ d3d9446802a44259755d38e6d163e820 | 49950
+ e4da3b7fbbce2345d7772b0674a318d5 | 49950
+ eccbc87e4b5ce2fe28308fd9f2a7baf3 | 49950
+(10 rows)
+
+DROP TABLE t;
