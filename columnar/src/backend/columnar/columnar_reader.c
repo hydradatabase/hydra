@@ -2154,13 +2154,19 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 									  rowNumber,
 									  chunkFirstRowNumber))
 		{
-			/* if this chunk group is exhausted, fetch the next one and loop */
-			EndChunkGroupRead(stripeReadState->chunkGroupReadState);
-			stripeReadState->chunkGroupReadState = NULL;
-			stripeReadState->chunkGroupIndex++;
-
+			/*
+			 * if *newVectorSize is non-zero, it means there might be some data in
+			 * chunkGroupReadState->chunkGroupData referenced by VectorColumn.  In
+			 * this case, do NOT release ChunkGroupReadState.
+			 */
 			if (*newVectorSize == 0)
+			{
+				/* if this chunk group is exhausted, fetch the next one and loop */
+				EndChunkGroupRead(stripeReadState->chunkGroupReadState);
+				stripeReadState->chunkGroupReadState = NULL;
+				stripeReadState->chunkGroupIndex++;
 				continue;
+			}
 		}
 		else
 			stripeReadState->currentRow += stripeReadState->chunkGroupReadState->rowCount;
