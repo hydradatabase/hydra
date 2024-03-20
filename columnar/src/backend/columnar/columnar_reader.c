@@ -2171,9 +2171,11 @@ ReadStripeNextVector(StripeReadState *stripeReadState, Datum *columnValues,
 		else
 			stripeReadState->currentRow += stripeReadState->chunkGroupReadState->rowCount;
 
+		pfree(columnValueOffset);
 		return true;
 	}
 
+	pfree(columnValueOffset);
 	return false;
 }
 

@@ -390,16 +390,21 @@ vectorizedOr(bool *left, bool *right, int dimension)
 }
 
 static bool *
-executeVectorizedExpr(VectorQual *vectorQual)
+executeVectorizedExpr(VectorQual *vectorQual, ExprContext *econtext)
 {
+	MemoryContext oldContext;
+
+	oldContext = MemoryContextSwitchTo(econtext->ecxt_per_tuple_memory);
 	VectorColumn *res = 
 		(VectorColumn *) vectorQual->u.expr.fmgrInfo->fn_addr(vectorQual->u.expr.fcInfo);
+	MemoryContextSwitchTo(oldContext);
 
 	return (bool *) res->value;
 }
 
 bool * 
-ExecuteVectorizedQual(TupleTableSlot *slot, List *vectorizedQualList, BoolExprType boolType)
+ExecuteVectorizedQual(TupleTableSlot *slot, List *vectorizedQualList,
+			BoolExprType boolType, ExprContext *econtext)
 {
 	VectorTupleTableSlot *vectorSlot = (VectorTupleTableSlot *) slot;
 	ListCell *lc;
@@ -416,18 +421,22 @@ ExecuteVectorizedQual(TupleTableSlot *slot, List *vectorizedQualList, BoolExprTy
 		{
 			case VECTOR_QUAL_EXPR:
 			{
-				qualResult = executeVectorizedExpr(vectorQual);
+				qualResult = executeVectorizedExpr(vectorQual, econtext);
 				break;
 			}
 			case VECTOR_QUAL_BOOL_EXPR:
 			{
 				if (vectorQual->u.boolExpr.boolExprType == AND_EXPR)
 				{
-					qualResult = ExecuteVectorizedQual(slot, vectorQual->u.boolExpr.vectorQualExprList, AND_EXPR);
+					qualResult = ExecuteVectorizedQual(slot,
+										vectorQual->u.boolExpr.vectorQualExprList,
+										AND_EXPR, econtext);
 				}
 				else if (vectorQual->u.boolExpr.boolExprType == OR_EXPR)
 				{
-					qualResult = ExecuteVectorizedQual(slot, vectorQual->u.boolExpr.vectorQualExprList, OR_EXPR);
+					qualResult = ExecuteVectorizedQual(slot,
+										vectorQual->u.boolExpr.vectorQualExprList,
+										OR_EXPR, econtext);
 				}
 				break;
 			}
