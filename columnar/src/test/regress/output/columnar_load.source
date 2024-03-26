@@ -24,7 +24,7 @@ select
 
 -- COPY into compressed table
 COPY contestant_compressed FROM '@abs_srcdir@/data/contestants.1.csv' WITH CSV;
--- COPY into uncompressed table from program
+-- COPY into compressed table from program
 COPY contestant_compressed FROM PROGRAM 'cat @abs_srcdir@/data/contestants.2.csv'
 	WITH CSV;
 select
