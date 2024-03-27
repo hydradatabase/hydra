@@ -365,12 +365,16 @@ ColumnarStorageGetReservedOffset(Relation rel, bool force)
 
 
 /*
- * ColumnarStorageIsCurrent - return true if metapage exists and is not
+ * ColumnarStorageIsCurrent - return true if metapage exists and is
  * the current version.
  */
 bool
 ColumnarStorageIsCurrent(Relation rel)
 {
+	/*
+	 * RelationGetSmgr was added in 15, but only backported to 13.10 and 14.07
+	 * leaving other versions requiring something like this.
+	 */
 	if (unlikely(rel->rd_smgr == NULL))
 	{
 #if PG_VERSION_NUM >= PG_VERSION_16
