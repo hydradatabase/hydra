@@ -472,3 +472,20 @@ SELECT COUNT(*) = 4 FROM columnar.stripe WHERE storage_id = :t_oid;
 (1 row)
 
 DROP TABLE t;
+CREATE TABLE cache_test (i INT) USING columnar;
+INSERT INTO cache_test SELECT generate_series(1, 100, 1);
+SET columnar.enable_column_cache = 't';
+SELECT columnar.vacuum('cache_test');
+ vacuum 
+--------
+      0
+(1 row)
+
+-- should be true
+SHOW columnar.enable_column_cache;
+ columnar.enable_column_cache 
+------------------------------
+ on
+(1 row)
+
+DROP TABLE cache_test;

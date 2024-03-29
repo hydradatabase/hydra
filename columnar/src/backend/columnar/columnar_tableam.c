@@ -1650,6 +1650,10 @@ static void
 columnar_vacuum_rel(Relation rel, VacuumParams *params,
 					BufferAccessStrategy bstrategy)
 {
+	/* Capture the cache state and disable it for a vacuum. */
+	bool old_cache_mode = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
+
 	pgstat_progress_start_command(PROGRESS_COMMAND_VACUUM,
  									RelationGetRelid(rel));
 
@@ -1779,6 +1783,9 @@ columnar_vacuum_rel(Relation rel, VacuumParams *params,
 							Max(new_live_tuples, 0),
 							0);
 	pgstat_progress_end_command();
+
+	/* Reenable the cache state. */
+	columnar_enable_page_cache = old_cache_mode;
 }
 
 
@@ -2074,6 +2081,10 @@ columnar_scan_analyze_next_tuple(TableScanDesc scan, TransactionId OldestXmin,
 								 double *liverows, double *deadrows,
 								 TupleTableSlot *slot)
 {
+	/* Capture the cache state and disable it for a vacuum. */
+	bool old_cache_mode = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
+
 	/*
 	 * Currently we don't do anything smart to reduce number of rows returned
 	 * for ANALYZE. The TableAM API's ANALYZE functions are designed for page
@@ -2088,8 +2099,15 @@ columnar_scan_analyze_next_tuple(TableScanDesc scan, TransactionId OldestXmin,
 	if (columnar_getnextslot(scan, ForwardScanDirection, slot))
 	{
 		(*liverows)++;
+
+		/* Reset cache to previous state. */
+		columnar_enable_page_cache = old_cache_mode;
+
 		return true;
 	}
+
+	/* Reset cache to previous state. */
+	columnar_enable_page_cache = old_cache_mode;
 
 	return false;
 }
@@ -2125,6 +2143,10 @@ columnar_index_build_range_scan(Relation columnarRelation,
 		 */
 		elog(ERROR, "parallel scans on columnar are not supported");
 	}
+
+	/* Disable the page cache for the index build. */
+	bool old_cache_mode = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
 
 	/*
 	 * In a normal index build, we use SnapshotAny to retrieve all tuples. In
@@ -2198,6 +2220,9 @@ columnar_index_build_range_scan(Relation columnarRelation,
 	FreeExecutorState(estate);
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_PredicateState = NULL;
+
+	/* Reset the cache mode. */
+	columnar_enable_page_cache = old_cache_mode;
 
 	return reltuples;
 }
@@ -3481,6 +3506,10 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	bool completelyDone = false;
 	struct sigaction action;
 
+	/* Capture the cache state and disable it for a vacuum. */
+	bool old_cache_mode = columnar_enable_page_cache;
+	columnar_enable_page_cache = false;
+
 	/*
 	 * Set up signal handlers for any incoming signals during the vacuum,
 	 * killing during a write could cause corruption.  Give us time to
@@ -3512,6 +3541,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 
 		MemoryContextSwitchTo(oldcontext);
 
+		/* Reset cache to previous state. */
+		columnar_enable_page_cache = old_cache_mode;
+
 		PG_RETURN_VOID();
 	}
 
@@ -3540,6 +3572,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		RelationClose(rel);
 
 		MemoryContextSwitchTo(oldcontext);
+
+		/* Reset cache to previous state. */
+		columnar_enable_page_cache = old_cache_mode;
 
 		PG_RETURN_VOID();
 	}
@@ -3691,6 +3726,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 				kil_action.sa_handler(SIGKILL);
 			}
 
+			/* Reset cache to previous state. */
+			columnar_enable_page_cache = old_cache_mode;
+
 			PG_RETURN_NULL();
 		}
 
@@ -3716,6 +3754,10 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 		relation_close(rel, NoLock);
 		TruncateColumnar(rel, DEBUG3);
 		UnlockRelation(rel, ExclusiveLock);
+
+		/* Reset cache to previous state. */
+		columnar_enable_page_cache = old_cache_mode;
+
 		PG_RETURN_UINT32(progress);
 	}
 
@@ -3763,6 +3805,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 			{
 				kil_action.sa_handler(SIGKILL);
 			}
+
+			/* Reset cache to previous state. */
+			columnar_enable_page_cache = old_cache_mode;
 
 			PG_RETURN_NULL();
 		}
@@ -3856,6 +3901,9 @@ vacuum_columnar_table(PG_FUNCTION_ARGS)
 	sigaction(SIGTERM, &trm_action, NULL);
 	sigaction(SIGABRT, &abt_action, NULL);
 	sigaction(SIGKILL, &kil_action, NULL);
+
+	/* Reset cache to previous state. */
+	columnar_enable_page_cache = old_cache_mode;
 
 	PG_RETURN_UINT32(progress + relocationProgress);
 }
