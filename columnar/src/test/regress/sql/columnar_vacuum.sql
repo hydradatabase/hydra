@@ -269,3 +269,14 @@ VACUUM t;
 SELECT COUNT(*) = 4 FROM columnar.stripe WHERE storage_id = :t_oid;
 
 DROP TABLE t;
+
+CREATE TABLE cache_test (i INT) USING columnar;
+INSERT INTO cache_test SELECT generate_series(1, 100, 1);
+
+SET columnar.enable_column_cache = 't';
+SELECT columnar.vacuum('cache_test');
+
+-- should be true
+SHOW columnar.enable_column_cache;
+
+DROP TABLE cache_test;

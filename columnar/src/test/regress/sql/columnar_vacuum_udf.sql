@@ -89,3 +89,19 @@ SELECT columnar.vacuum('t1');
 SELECT count(i1), count(i2), count(i3), count(i4) FROM t1;
 
 DROP TABLE t1;
+
+CREATE TABLE cache_test (i INT) USING columnar;
+INSERT INTO cache_test SELECT generate_series(1, 100, 1);
+
+SET columnar.enable_column_cache = 't';
+VACUUM cache_test;
+
+-- should be true
+SHOW columnar.enable_column_cache;
+
+ANALYZE cache_test;
+
+-- should be true
+SHOW columnar.enable_column_cache;
+
+DROP TABLE cache_test;

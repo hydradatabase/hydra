@@ -642,6 +642,18 @@ BEGIN;
   SELECT COUNT(*) FROM circles_and_stuff; -- should return 1
 ROLLBACK;
 
+CREATE TABLE test_cache (
+  i INT, t TEXT
+) USING columnar;
+INSERT INTO test_cache SELECT generate_series(1, 100, 1) AS i, generate_series(1, 100, 1)::TEXT AS t;
+
+SET columnar.enable_column_cache = 't';
+
+CREATE INDEX ON test_cache (i);
+-- should be true
+SHOW columnar.enable_column_cache;
+
+DROP TABLE test_cache;
 
 SET client_min_messages TO WARNING;
 DROP SCHEMA columnar_indexes CASCADE;
