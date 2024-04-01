@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 1.1.2
+
+* turn off column cache when building an index, vacuum, and analyze ([#250][])
+* fix memory leak when executing vectorized quals ([#242][])
+* do not release the chunk group state if there is data ([#245][])
+* fix case sensitivity bug in columnar.alter_table_set_access_method ([#237][])
+* fix a crash when chunk_group_row_limit is larger than 110000 ([#235][])
+* add extensions: wrappers, pgsodium, and supabase_vault (PG >=14) ([#236][])
+
+Thanks to @japinli for multiple bug fixes in this release!
+
+[#250]: https://github.com/hydradatabase/hydra/pull/250
+[#242]: https://github.com/hydradatabase/hydra/pull/242
+[#245]: https://github.com/hydradatabase/hydra/pull/245
+[#237]: https://github.com/hydradatabase/hydra/pull/237
+[#235]: https://github.com/hydradatabase/hydra/pull/235
+[#236]: https://github.com/hydradatabase/hydra/pull/236
+
 ## 1.1.1
 
 * fix uncapped memory growth when importing data via logical replication ([#226][])
