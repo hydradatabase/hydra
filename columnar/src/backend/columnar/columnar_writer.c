@@ -759,6 +759,9 @@ UpdateChunkSkipNodeMinMax(ColumnChunkSkipNode *chunkSkipNode, Datum columnValue,
 
 		if (minimumComparison < 0)
 		{
+			if (!columnTypeByValue)
+				pfree(DatumGetPointer(previousMinimum));
+
 			currentMinimum = DatumCopy(columnValue, columnTypeByValue, columnTypeLength);
 		}
 		else
@@ -768,6 +771,9 @@ UpdateChunkSkipNodeMinMax(ColumnChunkSkipNode *chunkSkipNode, Datum columnValue,
 
 		if (maximumComparison > 0)
 		{
+			if (!columnTypeByValue)
+				pfree(DatumGetPointer(previousMaximum));
+
 			currentMaximum = DatumCopy(columnValue, columnTypeByValue, columnTypeLength);
 		}
 		else
