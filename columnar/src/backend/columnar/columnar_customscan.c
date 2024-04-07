@@ -270,8 +270,8 @@ columnar_customscan_init()
 	/* register customscan specific GUC's */
 	DefineCustomBoolVariable(
 		"columnar.enable_custom_scan",
-		gettext_noop("Enables the use of a custom scan to push projections and quals "
-					 "into the storage layer."),
+		"Enables the use of a custom scan to push projections and quals "
+					 "into the storage layer.",
 		NULL,
 		&EnableColumnarCustomScan,
 		true,
@@ -280,8 +280,8 @@ columnar_customscan_init()
 		NULL, NULL, NULL);
 	DefineCustomBoolVariable(
 		"columnar.enable_qual_pushdown",
-		gettext_noop("Enables qual pushdown into columnar. This has no effect unless "
-					 "columnar.enable_custom_scan is true."),
+		"Enables qual pushdown into columnar. This has no effect unless "
+					 "columnar.enable_custom_scan is true.",
 		NULL,
 		&EnableColumnarQualPushdown,
 		true,
@@ -290,10 +290,10 @@ columnar_customscan_init()
 		NULL, NULL, NULL);
 	DefineCustomRealVariable(
 		"columnar.qual_pushdown_correlation_threshold",
-		gettext_noop("Correlation threshold to attempt to push a qual "
+		"Correlation threshold to attempt to push a qual "
 					 "referencing the given column. A value of 0 means "
 					 "attempt to push down all quals, even if the column "
-					 "is uncorrelated."),
+					 "is uncorrelated.",
 		NULL,
 		&ColumnarQualPushdownCorrelationThreshold,
 		0.4,
@@ -304,8 +304,8 @@ columnar_customscan_init()
 		NULL, NULL, NULL);
 	DefineCustomIntVariable(
 		"columnar.max_custom_scan_paths",
-		gettext_noop("Maximum number of custom scan paths to generate "
-					 "for a columnar table when planning."),
+		"Maximum number of custom scan paths to generate "
+					 "for a columnar table when planning.",
 		NULL,
 		&ColumnarMaxCustomScanPaths,
 		64,

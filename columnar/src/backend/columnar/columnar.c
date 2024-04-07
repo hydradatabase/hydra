@@ -128,7 +128,7 @@ columnar_guc_init()
 							NULL);
 
 	DefineCustomBoolVariable("columnar.enable_parallel_execution",
-							 gettext_noop("Enables parallel execution"),
+							 "Enables parallel execution",
 							 NULL,
 							 &columnar_enable_parallel_execution,
 							 true,
@@ -152,7 +152,7 @@ columnar_guc_init()
 							NULL);
 
 	DefineCustomBoolVariable("columnar.enable_vectorization",
-							 gettext_noop("Enables vectorized execution"),
+							 "Enables vectorized execution",
 							 NULL,
 							 &columnar_enable_vectorization,
 							 true,
@@ -163,7 +163,7 @@ columnar_guc_init()
 							 NULL);
 
 	DefineCustomBoolVariable("columnar.enable_dml",
-							gettext_noop("Enables DML"),
+							"Enables DML",
 							NULL,
 							&columnar_enable_dml,
 							true,
@@ -174,7 +174,7 @@ columnar_guc_init()
 							NULL);
 
 	DefineCustomBoolVariable("columnar.enable_column_cache",
-							gettext_noop("Enables column based caching"),
+							"Enables column based caching",
 							NULL,
 							&columnar_enable_page_cache,
 							false,
@@ -185,7 +185,7 @@ columnar_guc_init()
 							NULL);
 
 	DefineCustomIntVariable("columnar.column_cache_size",
-							gettext_noop("Size of the column based cache in megabytes"),
+							"Size of the column based cache in megabytes",
 							NULL,
 							&columnar_page_cache_size,
 							200U,
@@ -198,7 +198,7 @@ columnar_guc_init()
 							NULL);
 
 	DefineCustomBoolVariable("columnar.enable_columnar_index_scan",
-							 gettext_noop("Enables custom columnar index scan"),
+							 "Enables custom columnar index scan",
 							 NULL,
 							 &columnar_index_scan,
 							 false,
