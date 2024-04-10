@@ -65,7 +65,7 @@ CreateVectorTupleTableSlot(TupleDesc tupleDesc)
 		int16 columnTypeLen = get_typlen(columnTypeOid);
 
 		int16 vectorColumnTypeLen = 
-			columnTypeLen == -1 ?  sizeof(Datum) : get_typlen(columnTypeOid);
+			columnTypeLen == -1 ?  sizeof(Datum) : columnTypeLen;
 
 		/* 
 		 * We consider that type is passed by val also for cases where we have 
