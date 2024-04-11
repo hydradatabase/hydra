@@ -52,6 +52,7 @@ static Oid columnar_tableam_oid = InvalidOid;
 
 static PlannedStmt * ColumnarPlannerHook(Query *parse,  const char *query_string,
 										 int cursorOptions, ParamListInfo boundParams);
+static bool IsCreateTableAs(const char *query);
 
 #if PG_VERSION_NUM >= PG_VERSION_14
 static Plan * PlanTreeMutator(Plan *node, void *context);
@@ -337,6 +338,20 @@ ColumnarPlannerHook(Query *parse,
 	else
 		stmt = standard_planner(parse, query_string, cursorOptions, boundParams);
 
+	/*
+	 * In the case of a CREATE TABLE AS query, we are not able to successfully
+	 * drop out of a parallel insert situation.  This checks for a CMD_SELECT
+	 * and in that case examines the query string to see if it matches the
+	 * pattern of a CREATE TABLE AS.  If so, set the parallelism to 0 (off).
+	 */
+	if (parse->commandType == CMD_SELECT)
+	{
+		if (IsCreateTableAs(query_string))
+		{
+			stmt->parallelModeNeeded = 0;
+		}
+	}
+
 #if PG_VERSION_NUM >= PG_VERSION_14
 	if (!(columnar_enable_vectorization			/* Vectorization should be enabled */
 			|| columnar_index_scan)				/* or Columnar Index Scan */
@@ -393,6 +408,53 @@ ColumnarPlannerHook(Query *parse,
 	return stmt;
 }
 
+/*
+ * IsCreateTableAs
+ *
+ * Searches a lower case copy of the query string using strstr to check
+ * for the keywords CREATE, TABLE, and AS, in that order.  There can be
+ * false positives, but we try to minimize them.
+ */
+static bool
+IsCreateTableAs(const char *query)
+{
+	char *c, *t, *a;
+	char *haystack = (char *) palloc(strlen(query) + 1);
+	int16 i;
+
+	/* Create a lower case copy of the string. */
+	for (i = 0; i < strlen(query); i++)
+	{
+		haystack[i] = tolower(query[i]);
+	}
+
+	haystack[i] = '\0';
+
+	c = strstr(haystack, "create");
+	if (c == NULL)
+	{
+		pfree(haystack);
+		return false;
+	}
+
+	t = strstr(c + 6, "table");
+	if (t == NULL)
+	{
+		pfree(haystack);
+		return false;
+	}
+
+	a = strstr(t + 5, "as");
+	if (a == NULL)
+	{
+		pfree(haystack);
+		return false;
+	}
+
+	pfree(haystack);
+
+	return true;
+}
 
 void columnar_planner_init(void)
 {
