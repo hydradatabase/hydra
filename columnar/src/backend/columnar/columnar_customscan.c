@@ -859,7 +859,7 @@ ExprReferencesRelid(Expr *expr, Index relid)
  * i)   AND_EXPR:
  *      Take pushdownable args of AND expressions by ignoring the other args.
  * ii)  OR_EXPR:
- *      Ignore the whole OR expression if we cannot exract a pushdownable Expr
+ *      Ignore the whole OR expression if we cannot extract a pushdownable Expr
  *      from one of its args.
  * iii) NOT_EXPR:
  *      Simply ignore NOT expressions since we don't expect to see them before
@@ -949,7 +949,7 @@ ExtractPushdownClause(PlannerInfo *root, RelOptInfo *rel, Node *node)
 			ereport(ColumnarPlannerDebugLevel,
 					(errmsg("columnar planner: cannot push down clause: "
 							"none of the arguments were pushdownable, "
-							"due to the reason(s) given above ")));
+							"due to the reason(s) given above")));
 			return NULL;
 		}
 		else if (npushdownableArgs == 1)

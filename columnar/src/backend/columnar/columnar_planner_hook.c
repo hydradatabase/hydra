@@ -96,7 +96,7 @@ static Node *
 AggRefArgsExpressionMutator(Node *node, void *context)
 {
 	if (node == NULL)
-		return false;
+		return NULL;
 
 	Node *previousNode = (Node *) context;
 
@@ -108,16 +108,10 @@ AggRefArgsExpressionMutator(Node *node, void *context)
 		HeapTuple operatorTuple;
 
 		if (list_length(opExprNode->args) != 2)
-		{
 			elog(ERROR, "Aggregation vectorizaion works only on two arguments.");
-			return false;
-		}
 
 		if (CheckOpExprArgumentRules(opExprNode->args))
-		{
 			elog(ERROR, "Unsupported aggregate argument combination.");
-			return false;
-		}
 
 		operatorTuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(opExprNode->opno));
 		operatorForm = (Form_pg_operator) GETSTRUCT(operatorTuple);
@@ -126,9 +120,7 @@ AggRefArgsExpressionMutator(Node *node, void *context)
 
 		Oid vectorizedProcedureOid;
 		if (!GetVectorizedProcedureOid(procedureOid, &vectorizedProcedureOid))
-		{
 			elog(ERROR, "Vectorized aggregate not found.");
-		}
 
 		opExprNode->opfuncid = vectorizedProcedureOid;
 
@@ -137,10 +129,7 @@ AggRefArgsExpressionMutator(Node *node, void *context)
 
 	/* This should handle aggregates that have non var(column) as argument*/
 	if (previousNode != NULL && IsA(previousNode, TargetEntry) && !IsA(node, Var))
-	{
-		elog(ERROR, "Vectorized Aggregates accepts accepts only valid column argument");
-		return false;
-	}
+		elog(ERROR, "Vectorized Aggregates accept only valid column argument");
 
 	return expression_tree_mutator(node, AggRefArgsExpressionMutator, (void *) node);
 }
@@ -149,7 +138,7 @@ static Node *
 ExpressionMutator(Node *node, void *context)
 {
 	if (node == NULL)
-		return false;
+		return NULL;
 
 	if (IsA(node, Aggref))
 	{
