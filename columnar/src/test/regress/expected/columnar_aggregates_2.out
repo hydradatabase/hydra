@@ -215,7 +215,7 @@ DETAIL:  Unsupported aggregate argument combination.
 -- Vectorized Aggregates accepts only non-const values.
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(1) FROM t_mixed;
 DEBUG:  Query can't be vectorized. Falling back to original execution.
-DETAIL:  Vectorized Aggregates accepts accepts only valid column argument
+DETAIL:  Vectorized Aggregates accept only valid column argument
                                 QUERY PLAN                                
 --------------------------------------------------------------------------
  Aggregate
@@ -242,7 +242,7 @@ EXPLAIN (verbose, costs off, timing off, summary off) SELECT COUNT(DISTINCT a) F
 -- Vectorized aggregate doesn't accept function as argument
 EXPLAIN (verbose, costs off, timing off, summary off) SELECT SUM(length(b::text)) FROM t_mixed;
 DEBUG:  Query can't be vectorized. Falling back to original execution.
-DETAIL:  Vectorized Aggregates accepts accepts only valid column argument
+DETAIL:  Vectorized Aggregates accept only valid column argument
                      QUERY PLAN                     
 ----------------------------------------------------
  Aggregate
