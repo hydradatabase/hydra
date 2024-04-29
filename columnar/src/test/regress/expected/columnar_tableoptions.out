@@ -56,7 +56,7 @@ WHERE regclass = 'table_options'::regclass;
  table_options |                  2000 |           150000 |                 5 | pglz
 (1 row)
 
--- test changing the chunk_group_row_limit
+-- test changing the stripe_row_limit
 SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 4000);
  alter_columnar_table_set 
 --------------------------
@@ -273,7 +273,7 @@ HINT:  chunk group row count limit must be between 1000 and 100000000
 INSERT INTO table_options VALUES (1);
 -- verify options are removed when table is dropped
 DROP TABLE table_options;
--- we expect no entries in çstore.options for anything not found int pg_class
+-- we expect no entries in columnar.options for anything not found in pg_class
 SELECT * FROM columnar.options o WHERE o.regclass NOT IN (SELECT oid FROM pg_class);
  regclass | chunk_group_row_limit | stripe_row_limit | compression_level | compression 
 ----------+-----------------------+------------------+-------------------+-------------

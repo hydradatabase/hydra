@@ -26,7 +26,7 @@ $$
     END;
 $$ LANGUAGE PLPGSQL;
 
-set columnar.qual_pushdown_correlation = 0.0;
+set columnar.qual_pushdown_correlation_threshold = 0.0;
 
 -- Create and load data
 -- chunk_group_row_limit '1000', stripe_row_limit '2000'
@@ -38,7 +38,7 @@ CREATE TABLE test_chunk_filtering (a int)
 INSERT INTO test_chunk_filtering SELECT generate_series(1,10000);
 
 -- With vectorization and parallel execution enabled `filtered_row_count` 
--- will not provided correct `Rows Removed by Filter`disable these features for now.
+-- will not provided correct `Rows Removed by Filter` disable these features for now.
 
 set columnar.enable_vectorization to false;
 set columnar.enable_parallel_execution to false;
@@ -289,7 +289,7 @@ analyze coltest;
 select * from coltest where coltest = (1,1,1,1);
 
 -- test that expressions on uncorrelated attributes are not pushed down
-set columnar.qual_pushdown_correlation to default;
+set columnar.qual_pushdown_correlation_threshold to default;
 select * from coltest where x5 = 23484;
 
 -- test that expressions on volatile functions are not pushed down

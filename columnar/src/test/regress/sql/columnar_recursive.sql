@@ -8,7 +8,7 @@ $$ LANGUAGE SQL;
 
 --
 -- Following query will start a write to t1 before finishing
--- write to t1, so it tests that we handle recursive writes
+-- write to t2, so it tests that we handle recursive writes
 -- correctly.
 --
 INSERT INTO t2 SELECT i, f(i) FROM generate_series(1, 5) i;

@@ -78,7 +78,7 @@ SELECT * from columnar_truncate_test_regular;
 TRUNCATE TABLE columnar_truncate_test;
 SELECT * from columnar_truncate_test;
 
--- make sure TRUNATE deletes metadata for old relfilenode
+-- make sure TRUNCATE deletes metadata for old relfilenode
 SELECT :columnar_data_files_before_truncate - count(distinct storage_id) FROM columnar.stripe;
 
 -- test if truncation in the same transaction that created the table works properly

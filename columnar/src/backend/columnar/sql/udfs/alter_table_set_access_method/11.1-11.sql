@@ -57,7 +57,7 @@ BEGIN
         RETURN 0;
     END IF;
 
-    -- Case senstivitiy
+    -- Case sensitivity
 
     SELECT EXISTS (SELECT regexp_matches(tbl_name,'[A-Z]')) INTO is_case_sensitive;
 
