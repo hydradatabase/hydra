@@ -30,7 +30,7 @@ SELECT columnar.alter_columnar_table_set('table_options', chunk_group_row_limit 
 SELECT * FROM columnar.options
 WHERE regclass = 'table_options'::regclass;
 
--- test changing the chunk_group_row_limit
+-- test changing the stripe_row_limit
 SELECT columnar.alter_columnar_table_set('table_options', stripe_row_limit => 4000);
 
 -- show table_options settings
@@ -152,7 +152,7 @@ INSERT INTO table_options VALUES (1);
 
 -- verify options are removed when table is dropped
 DROP TABLE table_options;
--- we expect no entries in çstore.options for anything not found int pg_class
+-- we expect no entries in columnar.options for anything not found in pg_class
 SELECT * FROM columnar.options o WHERE o.regclass NOT IN (SELECT oid FROM pg_class);
 
 SET client_min_messages TO warning;

@@ -23,7 +23,7 @@ $$
         RETURN result;
     END;
 $$ LANGUAGE PLPGSQL;
-set columnar.qual_pushdown_correlation = 0.0;
+set columnar.qual_pushdown_correlation_threshold = 0.0;
 -- Create and load data
 -- chunk_group_row_limit '1000', stripe_row_limit '2000'
 set columnar.stripe_row_limit = 2000;
@@ -32,7 +32,7 @@ CREATE TABLE test_chunk_filtering (a int)
     USING columnar;
 INSERT INTO test_chunk_filtering SELECT generate_series(1,10000);
 -- With vectorization and parallel execution enabled `filtered_row_count` 
--- will not provided correct `Rows Removed by Filter`disable these features for now.
+-- will not provided correct `Rows Removed by Filter` disable these features for now.
 set columnar.enable_vectorization to false;
 set columnar.enable_parallel_execution to false;
 -- Verify that filtered_row_count is less than 1000 for the following queries
@@ -766,7 +766,7 @@ DETAIL:  unparameterized; 0 clauses pushed down
 (0 rows)
 
 -- test that expressions on uncorrelated attributes are not pushed down
-set columnar.qual_pushdown_correlation to default;
+set columnar.qual_pushdown_correlation_threshold to default;
 select * from coltest where x5 = 23484;
 NOTICE:  columnar planner: cannot push down clause: absolute correlation (0.006) of var attribute 5 is smaller than the value configured in "columnar.qual_pushdown_correlation_threshold" (0.900)
 NOTICE:  columnar planner: adding CustomScan path for coltest

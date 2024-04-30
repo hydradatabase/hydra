@@ -2,11 +2,11 @@
 -- Testing data types without comparison operators
 --
 -- If a data type doesn't have comparison operators:
--- (1) we should check if type familiy has defined one
+-- (1) we should check if type family has defined one
 -- (2) or we should store NULL for min/max values
 -- 
 -- Verify that (1) min/max entries in columnar.chunk is NULL as expected
--- (2) min/max for types that have familiy comparison operator is use and values are set
+-- (2) min/max for types that have family comparison operator is use and values are set
 -- (3) we can run queries which has equality conditions in WHERE clause for that column with correct results
 --
 
