@@ -995,7 +995,7 @@ def write_crontab(placeholders, overwrite):
         lines += [('{LOG_SHIP_SCHEDULE} nice -n 5 envdir "{LOG_ENV_DIR}"' +
                    ' /scripts/upload_pg_log_to_s3.py').format(**placeholders)]
 
-    lines += yaml.load(placeholders['CRONTAB'])
+    lines += yaml.safe_load(placeholders['CRONTAB'])
 
     if len(lines) > 1 or root_lines:
         setup_runit_cron(placeholders)
@@ -1051,10 +1051,11 @@ def main():
     placeholders = get_placeholders(provider)
     logging.info('Looks like you are running %s', provider)
 
-    config = yaml.load(pystache_render(TEMPLATE, placeholders))
+    config = yaml.safe_load(pystache_render(TEMPLATE, placeholders))
     config.update(get_dcs_config(config, placeholders))
 
-    user_config = yaml.load(os.environ.get('SPILO_CONFIGURATION', os.environ.get('PATRONI_CONFIGURATION', ''))) or {}
+    user_config = yaml.safe_load(os.environ.get('SPILO_CONFIGURATION',
+                                                os.environ.get('PATRONI_CONFIGURATION', ''))) or {}
     if not isinstance(user_config, dict):
         config_var_name = 'SPILO_CONFIGURATION' if 'SPILO_CONFIGURATION' in os.environ else 'PATRONI_CONFIGURATION'
         raise ValueError('{0} should contain a dict, yet it is a {1}'.format(config_var_name, type(user_config)))

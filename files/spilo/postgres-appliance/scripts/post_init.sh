@@ -2,6 +2,8 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
+export PGOPTIONS="-c synchronous_commit=local -c search_path=pg_catalog"
+
 PGVER=$(psql -d "$2" -XtAc "SELECT pg_catalog.current_setting('server_version_num')::int/10000")
 if [ "$PGVER" -ge 12 ]; then RESET_ARGS="oid, oid, bigint"; fi
 
@@ -92,20 +94,10 @@ BEGIN
     RETURN l_jobid;
 END;
 \$function\$;
-REVOKE EXECUTE ON FUNCTION cron.alter_job(bigint, text, text, text, text, boolean) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.alter_job(bigint, text, text, text, text, boolean) TO cron_admin;
-REVOKE EXECUTE ON FUNCTION cron.schedule(text, text) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.schedule(text, text) TO cron_admin;
-REVOKE EXECUTE ON FUNCTION cron.schedule(text, text, text) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.schedule(text, text, text) TO cron_admin;
-REVOKE EXECUTE ON FUNCTION cron.schedule_in_database(text, text, text) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.schedule_in_database(text, text, text) TO cron_admin;
-REVOKE EXECUTE ON FUNCTION cron.schedule_in_database(text, text, text, text, text, boolean) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.schedule_in_database(text, text, text, text, text, boolean) TO cron_admin;
-REVOKE EXECUTE ON FUNCTION cron.unschedule(bigint) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.unschedule(bigint) TO cron_admin;
-REVOKE EXECUTE ON FUNCTION cron.unschedule(name) FROM admin, public;
-GRANT EXECUTE ON FUNCTION cron.unschedule(name) TO cron_admin;
+
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA cron FROM admin, public;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA cron TO cron_admin;
+
 REVOKE USAGE ON SCHEMA cron FROM admin;
 GRANT USAGE ON SCHEMA cron TO cron_admin;
 
@@ -179,6 +171,10 @@ while IFS= read -r db_name; do
     if [ "$UPGRADE_TIMESCALEDB" = "t" ]; then
         echo "ALTER EXTENSION timescaledb UPDATE;"
     fi
+    UPGRADE_TIMESCALEDB_TOOLKIT=$(echo -e "SELECT NULL;\nSELECT default_version != installed_version FROM pg_catalog.pg_available_extensions WHERE name = 'timescaledb_toolkit'" | psql -tAX -d "${db_name}" 2> /dev/null | tail -n 1)
+    if [ "$UPGRADE_TIMESCALEDB_TOOLKIT" = "t" ]; then
+        echo "ALTER EXTENSION timescaledb_toolkit UPDATE;"
+    fi
     UPGRADE_POSTGIS=$(echo -e "SELECT COUNT(*) FROM pg_catalog.pg_extension WHERE extname = 'postgis'" | psql -tAX -d "${db_name}" 2> /dev/null | tail -n 1)
     if [ "$UPGRADE_POSTGIS" = "1" ]; then
         # public.postgis_lib_version() is available only if postgis extension is created
@@ -207,4 +203,4 @@ GRANT EXECUTE ON FUNCTION public.pg_stat_statements_reset($RESET_ARGS) TO admin;
     if [ "$ENABLE_PG_MON" = "true" ] && [ "$PGVER" -ge 11 ]; then echo "CREATE EXTENSION IF NOT EXISTS pg_mon SCHEMA public;"; fi
     cat metric_helpers.sql
 done < <(psql -d "$2" -tAc 'select pg_catalog.quote_ident(datname) from pg_catalog.pg_database where datallowconn')
-) | PGOPTIONS="-c synchronous_commit=local" psql -Xd "$2"
+) | psql -Xd "$2"
