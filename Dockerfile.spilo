@@ -25,7 +25,6 @@ COPY --from=columnar_15 /pg_ext /
 
 # configuration
 COPY files/spilo/postgres-appliance/scripts /scripts/
-COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
 
 ARG POSTGRES_BASE_VERSION
 # Default envs
