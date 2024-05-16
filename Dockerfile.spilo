@@ -25,7 +25,6 @@ COPY --from=columnar_15 /pg_ext /
 
 # configuration
 COPY files/spilo/postgres-appliance/scripts /scripts/
-COPY files/spilo/postgres-appliance/pgq_ticker.ini /home/postgres/
 
 ARG POSTGRES_BASE_VERSION
 # Default envs
@@ -35,5 +34,5 @@ ENV PGVERSION=${POSTGRES_BASE_VERSION} SPILO_PROVIDER=local PGUSER_SUPERUSER=pos
 # Always force rebuild of this layer
 ARG TIMESTAMP=1
 COPY third-party/pgxman /tmp/pgxman/
-RUN curl -sfL https://install.pgx.sh | sh -s -- /tmp/pgxman/pgxman_13.yaml /tmp/pgxman/pgxman_14_spilo.yaml && \
+RUN curl -sfL https://install.pgx.sh | sh -s -- /tmp/pgxman/pgxman_13_spilo.yaml /tmp/pgxman/pgxman_14_spilo.yaml && \
   rm -rf /tmp/pgxman
