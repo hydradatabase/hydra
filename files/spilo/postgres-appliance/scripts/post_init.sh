@@ -7,7 +7,8 @@ export PGOPTIONS="-c synchronous_commit=local -c search_path=pg_catalog"
 PGVER=$(psql -d "$2" -XtAc "SELECT pg_catalog.current_setting('server_version_num')::int/10000")
 if [ "$PGVER" -ge 12 ]; then RESET_ARGS="oid, oid, bigint"; fi
 
-(echo "DO \$\$
+(echo "\set ON_ERROR_STOP on"
+echo "DO \$\$
 BEGIN
     PERFORM * FROM pg_catalog.pg_authid WHERE rolname = 'admin';
     IF FOUND THEN
@@ -50,7 +51,7 @@ CREATE EXTENSION IF NOT EXISTS pg_auth_mon SCHEMA public;
 ALTER EXTENSION pg_auth_mon UPDATE;
 GRANT SELECT ON TABLE public.pg_auth_mon TO robot_zmon;
 
-CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA pg_catalog;
 DO \$\$
 BEGIN
     PERFORM 1 FROM pg_catalog.pg_proc WHERE pronamespace = 'cron'::pg_catalog.regnamespace AND proname = 'schedule' AND proargnames = '{p_schedule,p_database,p_command}';

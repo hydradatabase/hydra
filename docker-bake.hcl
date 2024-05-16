@@ -7,7 +7,7 @@ variable "SPILO_REPO" {
 }
 
 variable "SPILO_VERSION" {
-  default = "hydra-3.0-p1"
+  default = "3.2-p2"
 }
 
 variable "POSTGRES_BASE_VERSION" {
@@ -80,7 +80,7 @@ target "spilo" {
 target "spilo_base" {
   inherits = ["shared"]
 
-  context = "https://github.com/hydradatabase/spilo.git#${SPILO_VERSION}:postgres-appliance"
+  context = "https://github.com/zalando/spilo.git#${SPILO_VERSION}:postgres-appliance"
 
   args = {
     TIMESCALEDB = ""
