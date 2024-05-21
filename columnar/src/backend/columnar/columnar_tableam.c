@@ -1301,7 +1301,45 @@ columnar_relation_nontransactional_truncate(Relation rel)
 static void
 columnar_relation_copy_data(Relation rel, const RelFileLocator *newrnode)
 {
-	elog(ERROR, "columnar_relation_copy_data not implemented");
+	char persistence = rel->rd_rel->relpersistence;
+
+	/*
+	 * Since we copy the file directly without looking at the shared buffers,
+	 * we'd better first flush out any pages of the source relation that are
+	 * in shared buffers.  We assume on new changes will be made while we are
+	 * holding exclusive lock on the rel.
+	 */
+	FlushRelationBuffers(rel);
+
+#if PG_VERSION_NUM >= PG_VERSION_15
+	SMgrRelation srel = RelationCreateStorage(*newrnode, persistence, true);
+#else
+	SMgrRelation srel = RelationCreateStorage(*newrnode, persistence);
+#endif
+
+	/* copy main fork */
+	RelationCopyStorage(RelationGetSmgr(rel), srel, MAIN_FORKNUM, persistence);
+
+	for (ForkNumber forkNum = MAIN_FORKNUM + 1;
+		forkNum <= MAX_FORKNUM; forkNum++)
+	{
+		if (smgrexists(srel, forkNum))
+		{
+			smgrcreate(srel, forkNum, false);
+
+			/*
+			 * WAL log creation if the relation is persistent, or
+			 * this is the init fork of an unlogged relation.
+			 */
+			if (RelationIsPermanent(rel) ||
+				(persistence == RELPERSISTENCE_UNLOGGED &&
+				forkNum == INIT_FORKNUM))
+				log_smgrcreate(newrnode, forkNum);
+
+			RelationCopyStorage(RelationGetSmgr(rel), srel,
+						forkNum, persistence);
+		}
+	}
 }
 
 
