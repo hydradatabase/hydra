@@ -2239,10 +2239,10 @@ ReadChunkGroupNextVector(ChunkGroupReadState *chunkGroupReadState, Datum *column
 
 
 				/* 
-				 * For data types which have len less or equal 8 we can
+				 * For data types which have len less or equal sizeof(Datum) we can
 				 * use `store_att_byval` function.
 				 */
-				if (vectorColumn->columnTypeLen <= 8)
+				if (vectorColumn->columnTypeLen <= sizeof(Datum))
 				{
 					store_att_byval(writeColumnRowPosition,
 									chunkGroupData->valueArray[columnIndex][rowIndex],
