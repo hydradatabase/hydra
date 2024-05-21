@@ -288,3 +288,64 @@ WHERE conrelid = '"tBl"'::regclass
 ORDER BY conname;
 
 DROP TABLE "tBl";
+
+-- 11. Check case sensitivity and schema sensitivity
+
+CREATE SCHEMA "tEST";
+
+CREATE TABLE "tEST"."tBl" (
+  c1 CIRCLE,
+  "C2" TEXT,
+  i int4[],
+  p point,
+  a int,
+  EXCLUDE USING gist
+    (c1 WITH &&, ("C2"::circle) WITH &&)
+    WHERE (circle_center(c1) <> '(0,0)'),
+  EXCLUDE USING btree
+    (a WITH =)
+	INCLUDE(p)
+	WHERE ("C2" < 'astring')
+);
+
+CREATE INDEX "TBL_GIN" ON "tEST"."tBl" USING gin (i);
+CREATE INDEX tbl_gist ON "tEST"."tBl" USING gist(p);
+CREATE INDEX tbl_brin ON "tEST"."tBl" USING brin (a) WITH (pages_per_range = 1);
+
+CREATE INDEX tbl_hash ON "tEST"."tBl" USING hash ("C2");
+ALTER TABLE "tEST"."tBl" ADD CONSTRAINT tbl_unique UNIQUE ("C2");
+
+CREATE UNIQUE INDEX tbl_btree ON "tEST"."tBl" USING btree (a);
+ALTER TABLE "tEST"."tBl" ADD CONSTRAINT tbl_pkey PRIMARY KEY USING INDEX tbl_btree;
+
+SELECT indexname, indexdef FROM pg_indexes
+WHERE tablename = 'tBl'
+ORDER BY indexname;
+
+SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = '"tEST"."tBl"'::regclass;
+
+SELECT columnar.alter_table_set_access_method('"tEST"."tBl"', 'columnar');
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'tBl' AND relam = (SELECT oid FROM pg_am WHERE amname = 'columnar');
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'tBl' ORDER BY indexname;
+
+SELECT conname FROM pg_constraint
+WHERE conrelid = '"tEST"."tBl"'::regclass
+ORDER BY conname;
+
+-- Convert back to 'heap'
+
+SELECT columnar.alter_table_set_access_method('"tEST"."tBl"', 'heap');
+
+SELECT COUNT(1) FROM pg_class WHERE relname = 'tBl' AND relam = (SELECT oid FROM pg_am WHERE amname = 'heap');
+
+SELECT indexname FROM pg_indexes WHERE tablename = 'tBl' ORDER BY indexname;
+
+SELECT conname FROM pg_constraint
+WHERE conrelid = '"tEST"."tBl"'::regclass
+ORDER BY conname;
+
+DROP TABLE "tEST"."tBl";
+
+DROP SCHEMA "tEST";
