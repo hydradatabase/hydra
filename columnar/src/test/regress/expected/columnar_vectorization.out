@@ -1,0 +1,24 @@
+CREATE TABLE t (id int, ts timestamp) USING columnar;
+INSERT INTO t SELECT id, now() + id * '1 day'::interval FROM generate_series(1, 100000) id;
+EXPLAIN (costs off) SELECT * FROM t WHERE ts between '2026-01-01'::timestamp and '2026-02-01'::timestamp;
+                                                                              QUERY PLAN                                                                               
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ColumnarScan) on t
+   Columnar Projected Columns: id, ts
+   Columnar Chunk Group Filters: ((ts >= 'Thu Jan 01 00:00:00 2026'::timestamp without time zone) AND (ts <= 'Sun Feb 01 00:00:00 2026'::timestamp without time zone))
+   Columnar Vectorized Filter: ((ts >= 'Thu Jan 01 00:00:00 2026'::timestamp without time zone) AND (ts <= 'Sun Feb 01 00:00:00 2026'::timestamp without time zone))
+(4 rows)
+
+DROP TABLE t;
+CREATE TABLE t (id int, ts timestamptz) USING columnar;
+INSERT INTO t SELECT id, now() + id * '1 day'::interval FROM generate_series(1, 100000) id;
+EXPLAIN (costs off) SELECT * FROM t WHERE ts between '2026-01-01'::timestamptz and '2026-02-01'::timestamptz;
+                                                                               QUERY PLAN                                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ColumnarScan) on t
+   Columnar Projected Columns: id, ts
+   Columnar Chunk Group Filters: ((ts >= 'Thu Jan 01 00:00:00 2026 PST'::timestamp with time zone) AND (ts <= 'Sun Feb 01 00:00:00 2026 PST'::timestamp with time zone))
+   Columnar Vectorized Filter: ((ts >= 'Thu Jan 01 00:00:00 2026 PST'::timestamp with time zone) AND (ts <= 'Sun Feb 01 00:00:00 2026 PST'::timestamp with time zone))
+(4 rows)
+
+DROP TABLE t;

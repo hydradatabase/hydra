@@ -37,3 +37,4 @@ test: columnar_cache
 test: columnar_aggregates
 test: columnar_upsert
 test: columnar_customindex
+test: columnar_vectorization
