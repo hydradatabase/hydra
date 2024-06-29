@@ -11,3 +11,9 @@ BUILD_CMP_OPERATOR_INT(date_, DateADT, DateADT)
 
 // time (int64)
 BUILD_CMP_OPERATOR_INT(time_, TimeADT, TimeADT)
+
+// timestamp (int64)
+BUILD_CMP_OPERATOR_INT(timestamp_, Timestamp, Timestamp)
+
+// timestamptz (int64)
+BUILD_CMP_OPERATOR_INT(timestamptz_, TimestampTz, TimestampTz)
