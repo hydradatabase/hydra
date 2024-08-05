@@ -2095,7 +2095,16 @@ InsertTupleAndEnforceConstraints(ModifyState *state, Datum *values, bool *nulls)
 	TupleTableSlot *slot = ExecInitExtraTupleSlot(state->estate, tupleDescriptor,
 												  &TTSOpsHeapTuple);
 
-	ExecStoreHeapTuple(tuple, slot, false);
+	/*
+	 * The tuple has no other reference.  Therefore, we can safely set
+	 * shouldFree to true, which can avoid duplicate memory allocation.
+	 *
+	 * When working with low-memory machines, it's important to be mindful
+	 * of duplicate memory allocation for large values.  This can lead to
+	 * out-of-memory errors and cause issues with the performance of the
+	 * machine.
+	 */
+	ExecStoreHeapTuple(tuple, slot, true);
 
 	/* use ExecSimpleRelationInsert to enforce constraints */
 	ExecSimpleRelationInsert_compat(state->resultRelInfo, state->estate, slot);
