@@ -188,6 +188,6 @@ SELECT columnar.alter_columnar_table_set('t', chunk_group_row_limit => '11000');
 INSERT INTO t SELECT a, md5(b::text) FROM generate_series(0,50000) AS t1(a)
 JOIN LATERAL generate_series(1, 10) AS t2(b) ON (true);
 
-SELECT b, count(*) FROM t WHERE a > 50 AND b <> '' GROUP BY b;
+SELECT b, count(*) FROM t WHERE a > 50 AND b <> '' GROUP BY b ORDER BY b;
 
 DROP TABLE t;
