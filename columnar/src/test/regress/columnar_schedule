@@ -28,6 +28,7 @@ test: columnar_types_without_comparison
 test: columnar_join
 test: columnar_trigger
 test: columnar_tableoptions
+test: columnar_tablespace
 test: columnar_recursive
 test: columnar_transactions
 test: columnar_matview
