@@ -408,11 +408,12 @@ static bool
 IsCreateTableAs(const char *query)
 {
 	char *c, *t, *a;
-	char *haystack = (char *) palloc(strlen(query) + 1);
-	int16 i;
+	size_t query_len = strlen(query);
+	char *haystack = (char *) palloc(query_len + 1);
+	int32 i;
 
 	/* Create a lower case copy of the string. */
-	for (i = 0; i < strlen(query); i++)
+	for (i = 0; i < query_len; i++)
 	{
 		haystack[i] = tolower(query[i]);
 	}
